@@ -61,14 +61,21 @@ resource "aws_iam_openid_connect_provider" "github" {
 }
 
 locals {
-  # Jobs that set `environment:` use environment subjects, not branch refs.
+  # Repos created after 2026-07-15 use immutable subjects:
+  #   repo:OWNER@OWNER_ID/REPO@REPO_ID:environment:NAME
+  # Older format (kept for compatibility):
+  #   repo:OWNER/REPO:environment:NAME
   github_subs_staging = [
     "repo:${var.github_org}/${var.github_repo}:environment:staging",
+    "repo:${var.github_org}@*/${var.github_repo}@*:environment:staging",
     "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/development",
+    "repo:${var.github_org}@*/${var.github_repo}@*:ref:refs/heads/development",
   ]
   github_subs_prod = [
     "repo:${var.github_org}/${var.github_repo}:environment:production",
+    "repo:${var.github_org}@*/${var.github_repo}@*:environment:production",
     "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/main",
+    "repo:${var.github_org}@*/${var.github_repo}@*:ref:refs/heads/main",
   ]
   oidc_audiences = ["sts.amazonaws.com"]
 }
@@ -90,7 +97,7 @@ data "aws_iam_policy_document" "gha_trust_staging" {
     }
 
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       values   = local.github_subs_staging
     }
@@ -114,7 +121,7 @@ data "aws_iam_policy_document" "gha_trust_prod" {
     }
 
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       values   = local.github_subs_prod
     }

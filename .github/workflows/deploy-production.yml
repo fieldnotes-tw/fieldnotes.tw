@@ -23,7 +23,8 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          # Assume via a long-lived STS region; resource calls still use AWS_REGION.
+          aws-region: us-east-1
 
       - uses: actions/setup-node@v4
         with:
@@ -44,6 +45,8 @@ jobs:
         id: tf
         working-directory: infra/production
         env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
           TF_BACKEND_BUCKET: ${{ vars.TF_STATE_BUCKET }}
         run: |
           cat > backend.hcl <<EOF
@@ -56,6 +59,9 @@ jobs:
           echo "instance=$(terraform output -raw api_instance_id)" >> "$GITHUB_OUTPUT"
 
       - name: Deploy frontend to S3
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
         run: |
           aws s3 sync dist/ "s3://${{ steps.tf.outputs.bucket }}/" --delete
           aws cloudfront create-invalidation \
@@ -63,10 +69,15 @@ jobs:
             --paths "/*"
 
       - name: Login to Amazon ECR
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push API image
         env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
           ECR_REPO: ${{ steps.tf.outputs.ecr }}
         run: |
           IMAGE_TAG="${GITHUB_SHA}"
@@ -76,6 +87,8 @@ jobs:
 
       - name: Deploy API via SSM
         env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
           INSTANCE_ID: ${{ steps.tf.outputs.instance }}
         run: |
           COMMAND_ID=$(aws ssm send-command \
