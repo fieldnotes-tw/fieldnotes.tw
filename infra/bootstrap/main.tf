@@ -61,9 +61,15 @@ resource "aws_iam_openid_connect_provider" "github" {
 }
 
 locals {
-  github_sub_staging = "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/development"
-  github_sub_prod    = "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/main"
-  # Allow terraform plan/apply from those branches too.
+  # Jobs that set `environment:` use environment subjects, not branch refs.
+  github_subs_staging = [
+    "repo:${var.github_org}/${var.github_repo}:environment:staging",
+    "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/development",
+  ]
+  github_subs_prod = [
+    "repo:${var.github_org}/${var.github_repo}:environment:production",
+    "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/main",
+  ]
   oidc_audiences = ["sts.amazonaws.com"]
 }
 
@@ -86,7 +92,7 @@ data "aws_iam_policy_document" "gha_trust_staging" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = [local.github_sub_staging]
+      values   = local.github_subs_staging
     }
   }
 }
@@ -110,7 +116,7 @@ data "aws_iam_policy_document" "gha_trust_prod" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = [local.github_sub_prod]
+      values   = local.github_subs_prod
     }
   }
 }
