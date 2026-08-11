@@ -74,7 +74,18 @@ authRoutes.post('/register', zValidator('json', credentialsSchema), async (c) =>
     });
   }
 
-  await sendConfirmEmail(email, token);
+  try {
+    await sendConfirmEmail(email, token);
+  } catch (err) {
+    console.error('Failed to send confirmation email', err);
+    return c.json(
+      {
+        error:
+          'Unable to send confirmation email. SES domain/recipient may still be unverified.',
+      },
+      503,
+    );
+  }
   return c.json({ data: { email } }, 201);
 });
 
@@ -164,7 +175,11 @@ authRoutes.post(
           updatedAt: new Date(),
         })
         .where(eq(users.id, row.id));
-      await sendConfirmEmail(email, token);
+      try {
+        await sendConfirmEmail(email, token);
+      } catch (err) {
+        console.error('Failed to resend confirmation email', err);
+      }
     }
 
     return c.json({ ok: true });

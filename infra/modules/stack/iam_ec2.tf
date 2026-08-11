@@ -46,11 +46,8 @@ data "aws_iam_policy_document" "api" {
       "ses:SendEmail",
       "ses:SendRawEmail",
     ]
-    resources = [
-      local.ses_identity_arn,
-      "arn:aws:ses:${var.ses_region}:${data.aws_caller_identity.current.account_id}:identity/${var.email_domain}",
-      "arn:aws:ses:${var.ses_region}:${data.aws_caller_identity.current.account_id}:identity/${local.email_from}",
-    ]
+    # SESv2 SendEmail evaluates From/To identity ARNs; wildcard is required.
+    resources = ["*"]
   }
 
   statement {

@@ -49,9 +49,11 @@ export async function sendConfirmEmail(to: string, token: string) {
   const text = `請開啟以下連結以確認信箱（24 小時內有效）：\n\n${link}\n`;
   const html = `<p>請開啟以下連結以確認信箱（24 小時內有效）：</p><p><a href="${link}">${link}</a></p>`;
 
+  // Always log so operators can recover the link if SES is pending verification.
+  console.log(`[mail] to=${to} confirm=${link}`);
+
   const mode = (process.env.MAIL_MODE ?? 'log').toLowerCase();
   if (mode === 'log') {
-    console.log(`[mail:log] to=${to} subject=${subject}\n${link}`);
     return;
   }
 
