@@ -24,7 +24,7 @@ CI authenticates with **GitHub OIDC** (no long-lived access keys in the repo).
 
 ```bash
 cd infra/bootstrap
-cp terraform.tfvars.example terraform.tfvars   # set github_org (gitignored)
+cp terraform.tfvars.example terraform.tfvars   # github_org=fieldnotes-tw (gitignored)
 aws sts get-caller-identity
 terraform init
 terraform apply
