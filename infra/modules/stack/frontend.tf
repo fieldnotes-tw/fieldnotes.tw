@@ -67,6 +67,12 @@ resource "aws_cloudfront_distribution" "this" {
   }
 
   origin {
+    domain_name              = aws_s3_bucket.media.bucket_regional_domain_name
+    origin_id                = "s3-media"
+    origin_access_control_id = aws_cloudfront_origin_access_control.media.id
+  }
+
+  origin {
     domain_name = aws_eip.api.public_dns
     origin_id   = "api-ec2"
 
@@ -113,6 +119,26 @@ resource "aws_cloudfront_distribution" "this" {
     min_ttl     = 0
     default_ttl = 0
     max_ttl     = 0
+  }
+
+  ordered_cache_behavior {
+    path_pattern           = "/media/*"
+    target_origin_id       = "s3-media"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+
+    forwarded_values {
+      query_string = false
+      cookies {
+        forward = "none"
+      }
+    }
+
+    min_ttl     = 86400
+    default_ttl = 604800
+    max_ttl     = 31536000
   }
 
   restrictions {

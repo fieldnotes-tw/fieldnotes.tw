@@ -25,6 +25,10 @@ output "frontend_bucket" {
   value = module.stack.frontend_bucket
 }
 
+output "media_bucket" {
+  value = module.stack.media_bucket
+}
+
 output "ecr_repository_url" {
   value = module.stack.ecr_repository_url
 }

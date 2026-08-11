@@ -22,7 +22,9 @@ resource "aws_secretsmanager_secret_version" "app" {
     admin_password = random_password.admin.result
     email_from     = local.email_from
     app_base_url   = "https://${aws_cloudfront_distribution.this.domain_name}"
-    mail_mode      = "ses"
-    ses_region     = var.ses_region
+    mail_mode            = "ses"
+    ses_region           = var.ses_region
+    media_bucket         = aws_s3_bucket.media.bucket
+    media_public_prefix  = "/media"
   })
 }

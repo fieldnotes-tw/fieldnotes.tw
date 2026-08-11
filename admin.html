@@ -21,8 +21,123 @@
 <main class="admin-main">
   <div class="admin-head">
     <h1 class="admin-head__title">管理後台</h1>
-    <p class="admin-head__sub">基本架構先就位，功能之後再補。</p>
+    <p class="admin-head__sub">管理現象卡片、圖片與使用者。</p>
   </div>
+
+  <section class="admin-panel">
+    <div class="admin-panel__bar">
+      <div>
+        <h2 class="admin-panel__title">現象內容</h2>
+        <p class="admin-panel__meta" id="phenomenaMeta">載入中…</p>
+      </div>
+      <button type="button" class="admin-btn admin-btn--primary" id="btnNewPhenomenon">新增現象</button>
+    </div>
+
+    <div class="admin-filters" role="group" aria-label="狀態篩選">
+      <button type="button" class="admin-filters__btn is-active" data-status="all">全部</button>
+      <button type="button" class="admin-filters__btn" data-status="active">正在發生</button>
+      <button type="button" class="admin-filters__btn" data-status="upcoming">即將到來</button>
+      <button type="button" class="admin-filters__btn" data-status="ending">即將結束</button>
+      <button type="button" class="admin-filters__btn" data-status="ended">已結束</button>
+    </div>
+
+    <div class="admin-table-wrap">
+      <table class="admin-table" id="phenomenaTable">
+        <thead>
+          <tr>
+            <th>圖</th>
+            <th>標題</th>
+            <th>分類</th>
+            <th>狀態</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="admin-panel" id="phenomenonEditor" hidden>
+    <h2 class="admin-panel__title" id="phenomenonEditorTitle">新增現象</h2>
+    <form class="admin-form" id="phenomenonForm">
+      <label class="admin-form__field">
+        <span>標題</span>
+        <input id="f_title" required maxlength="200">
+      </label>
+      <label class="admin-form__field">
+        <span>描述</span>
+        <textarea id="f_description" required maxlength="2000" rows="4"></textarea>
+      </label>
+      <div class="admin-form__row">
+        <label class="admin-form__field">
+          <span>分類</span>
+          <select id="f_category">
+            <option value="plant">植物</option>
+            <option value="animal">動物</option>
+            <option value="sky">天文地景</option>
+            <option value="taste">當季滋味</option>
+            <option value="workshop">工作坊</option>
+          </select>
+        </label>
+        <label class="admin-form__field">
+          <span>狀態</span>
+          <select id="f_status">
+            <option value="active">正在發生</option>
+            <option value="upcoming">即將到來</option>
+            <option value="ending">即將結束</option>
+            <option value="ended">已結束</option>
+          </select>
+        </label>
+      </div>
+      <div class="admin-form__row">
+        <label class="admin-form__field">
+          <span>地點</span>
+          <input id="f_location" maxlength="300">
+        </label>
+        <label class="admin-form__field">
+          <span>觀察者</span>
+          <input id="f_observerName" maxlength="100">
+        </label>
+      </div>
+      <div class="admin-form__row">
+        <label class="admin-form__field">
+          <span>緯度</span>
+          <input id="f_lat" type="number" step="any" min="-90" max="90">
+        </label>
+        <label class="admin-form__field">
+          <span>經度</span>
+          <input id="f_lng" type="number" step="any" min="-180" max="180">
+        </label>
+      </div>
+      <label class="admin-form__field">
+        <span>備註</span>
+        <textarea id="f_notes" maxlength="2000" rows="3"></textarea>
+      </label>
+      <label class="admin-form__field">
+        <span>時間標籤</span>
+        <input id="f_metaLabel" maxlength="200" placeholder="例如：最近一次注意到 · 1 天前">
+      </label>
+
+      <div class="admin-upload">
+        <label class="admin-form__field">
+          <span>圖片</span>
+          <input id="f_image" type="file" accept="image/jpeg,image/png,image/webp">
+        </label>
+        <img id="imagePreview" class="admin-upload__preview" alt="" hidden>
+        <p class="admin-upload__path" id="imagePath">尚未上傳</p>
+        <label class="admin-form__field">
+          <span>圖片說明</span>
+          <input id="f_imageAlt" maxlength="500">
+        </label>
+      </div>
+
+      <p class="auth-form__error" id="phenomenonError" hidden></p>
+      <div class="admin-form__actions">
+        <button type="button" class="admin-btn" id="btnCancelEditor">取消</button>
+        <button type="submit" class="admin-btn admin-btn--primary">儲存</button>
+      </div>
+    </form>
+  </section>
 
   <section class="admin-panel">
     <h2 class="admin-panel__title">使用者</h2>
@@ -43,72 +158,12 @@
   </section>
 
   <section class="admin-panel admin-panel--muted">
-    <h2 class="admin-panel__title">現象內容</h2>
-    <p class="admin-panel__meta">之後在這裡編輯、上下架現象卡片。</p>
-  </section>
-
-  <section class="admin-panel admin-panel--muted">
     <h2 class="admin-panel__title">投稿審核</h2>
     <p class="admin-panel__meta">之後在這裡處理觀察員投稿。</p>
   </section>
 </main>
 
 <script src="auth.js"></script>
-<script>
-  const metaEl = document.getElementById('adminUserMeta');
-  const tbody = document.querySelector('#adminUsersTable tbody');
-
-  function formatWhen(value) {
-    if (!value) return '—';
-    try {
-      return new Intl.DateTimeFormat('zh-TW', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }).format(new Date(value));
-    } catch {
-      return value;
-    }
-  }
-
-  async function loadAdmin() {
-    let user;
-    try {
-      user = await refreshCurrentUser();
-    } catch {
-      location.href = 'login.html';
-      return;
-    }
-
-    if (!user) {
-      location.href = 'login.html';
-      return;
-    }
-    if (user.role !== 'admin') {
-      location.href = 'index.html';
-      return;
-    }
-
-    document.querySelectorAll('[data-auth-nav]').forEach(renderAuthNav);
-
-    try {
-      const { data } = await api('/api/admin/users');
-      metaEl.textContent = `共 ${data.length} 位使用者`;
-      tbody.replaceChildren(...data.map((row) => {
-        const tr = document.createElement('tr');
-        const roleLabel = row.role === 'admin' ? '管理員' : '一般使用者';
-        tr.innerHTML = `<td></td><td></td><td></td><td></td>`;
-        tr.children[0].textContent = row.email;
-        tr.children[1].textContent = roleLabel;
-        tr.children[2].textContent = row.emailVerifiedAt ? '是' : '否';
-        tr.children[3].textContent = formatWhen(row.createdAt);
-        return tr;
-      }));
-    } catch (err) {
-      metaEl.textContent = err.message || '無法載入使用者列表';
-    }
-  }
-
-  loadAdmin();
-</script>
+<script src="admin.js"></script>
 </body>
 </html>

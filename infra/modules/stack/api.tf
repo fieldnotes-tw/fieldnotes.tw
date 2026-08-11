@@ -66,6 +66,8 @@ locals {
     APP_BASE_URL=$(echo "$APP_JSON" | jq -r .app_base_url)
     MAIL_MODE=$(echo "$APP_JSON" | jq -r .mail_mode)
     SES_REGION=$(echo "$APP_JSON" | jq -r .ses_region)
+    MEDIA_BUCKET=$(echo "$APP_JSON" | jq -r .media_bucket)
+    MEDIA_PUBLIC_PREFIX=$(echo "$APP_JSON" | jq -r .media_public_prefix)
 
     docker pull "$REPO:$IMAGE_TAG"
     docker rm -f fieldnotes-api || true
@@ -84,6 +86,8 @@ locals {
       -e EMAIL_FROM="$EMAIL_FROM" \
       -e APP_BASE_URL="$APP_BASE_URL" \
       -e MAIL_MODE="$MAIL_MODE" \
+      -e MEDIA_BUCKET="$MEDIA_BUCKET" \
+      -e MEDIA_PUBLIC_PREFIX="$MEDIA_PUBLIC_PREFIX" \
       "$REPO:$IMAGE_TAG"
     SCRIPT
     chmod +x /usr/local/bin/fieldnotes-deploy.sh
