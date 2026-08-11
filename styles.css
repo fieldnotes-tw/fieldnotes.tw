@@ -513,6 +513,12 @@ footer .credit{ font-size:0.78rem; color:var(--ink-faint); }
 }
 .auth-form__field input:focus-visible{ outline:2px solid var(--ink); outline-offset:1px; }
 .auth-form__error{ font-size:0.8rem; color:var(--status-ending); font-weight:700; margin:-0.5rem 0 1rem; }
+.auth-form__success{ font-size:0.85rem; color:var(--ink); font-weight:700; margin:-0.5rem 0 1rem; line-height:1.45; }
+.auth-form__secondary{
+  width:100%; margin-bottom:0.85rem; padding:0.75rem 1rem; border-radius:12px;
+  border:1.5px solid var(--ink); background:transparent; color:var(--ink);
+  font:inherit; font-weight:800; cursor:pointer;
+}
 .auth-form__submit{
   width:100%; font:inherit; font-weight:700; font-size:0.95rem; padding:0.75rem;
   border-radius:100px; border:2px solid var(--ink); background:var(--ink); color:var(--ground);

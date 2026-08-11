@@ -58,4 +58,4 @@ Roles: `user` · `admin`
 
 The homepage feed loads from `GET /api/phenomena`. Auth uses an httpOnly cookie (`fn_session`).
 
-Seed an admin (local): set `ADMIN_USERNAME` / `ADMIN_PASSWORD` in `server/.env`, then `npm run db:seed`. Admin UI: `/admin.html`.
+Seed an admin (local): set `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `server/.env`, then `npm run db:seed`. Admin UI: `/admin.html`. Registration requires email confirmation (`MAIL_MODE=log` prints the link locally).

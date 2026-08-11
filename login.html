@@ -22,8 +22,8 @@
   <form class="auth-form" id="loginForm" novalidate>
     <h1 class="auth-form__title">登入</h1>
     <label class="auth-form__field">
-      <span>用戶名</span>
-      <input type="text" name="username" autocomplete="username" required>
+      <span>電子郵件</span>
+      <input type="email" name="email" autocomplete="email" required>
     </label>
     <label class="auth-form__field">
       <span>密碼</span>
@@ -47,16 +47,20 @@
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     errorEl.hidden = true;
-    const username = form.username.value.trim();
+    const email = form.email.value.trim();
     const password = form.password.value;
-    if (!username || !password) return;
+    if (!email || !password) return;
     try {
-      const user = await login(username, password);
+      const user = await login(email, password);
       location.href = user.role === 'admin' ? 'admin.html' : 'index.html';
     } catch (err) {
-      errorEl.textContent = err.message === 'Invalid username or password'
-        ? '用戶名或密碼不正確'
-        : (err.message || '登入失敗');
+      if (err.status === 403 && err.message === 'Email not confirmed') {
+        errorEl.textContent = '請先至信箱完成確認，再登入。';
+      } else if (err.message === 'Invalid email or password') {
+        errorEl.textContent = '電子郵件或密碼不正確';
+      } else {
+        errorEl.textContent = err.message || '登入失敗';
+      }
       errorEl.hidden = false;
     }
   });

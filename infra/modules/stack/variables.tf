@@ -44,10 +44,10 @@ variable "api_container_port" {
   default = 3001
 }
 
-variable "admin_username" {
+variable "admin_email" {
   type        = string
-  description = "Initial admin username seeded on first API boot"
-  default     = "admin"
+  description = "Initial admin email seeded on first API boot (pre-verified)"
+  default     = "admin@fieldnotes.tw"
 }
 
 variable "extra_cors_origins" {

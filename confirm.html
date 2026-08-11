@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <title>確認信箱 · 最近左營</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    if (/Chrome\/|Chromium\//.test(navigator.userAgent)) {
+      document.documentElement.classList.add('is-blink');
+    }
+  </script>
+</head>
+<body>
+
+<header class="auth-page-head">
+  <a href="index.html" class="brand-mark" aria-label="最近左營"><span>最</span><span>近</span><span>左</span><span>營</span></a>
+  <div class="auth-nav" data-auth-nav></div>
+</header>
+
+<main class="auth-main">
+  <div class="auth-form">
+    <h1 class="auth-form__title">確認信箱</h1>
+    <p class="auth-form__success" id="confirmStatus">正在確認…</p>
+    <p class="auth-form__error" id="confirmError" hidden></p>
+    <p class="auth-form__switch"><a href="login.html">前往登入</a></p>
+  </div>
+</main>
+
+<script src="auth.js"></script>
+<script>
+  (async () => {
+    const statusEl = document.getElementById('confirmStatus');
+    const errorEl = document.getElementById('confirmError');
+    const token = new URLSearchParams(location.search).get('token');
+
+    if (!token) {
+      statusEl.hidden = true;
+      errorEl.textContent = '缺少確認連結參數。';
+      errorEl.hidden = false;
+      return;
+    }
+
+    try {
+      const user = await confirmEmail(token);
+      statusEl.textContent = '信箱已確認，正在帶你進入網站…';
+      document.querySelectorAll('[data-auth-nav]').forEach(renderAuthNav);
+      location.href = user.role === 'admin' ? 'admin.html' : 'index.html';
+    } catch (err) {
+      statusEl.hidden = true;
+      errorEl.textContent = err.message === 'Invalid or expired confirmation token'
+        ? '確認連結無效或已過期，請重新註冊或重送確認信。'
+        : (err.message || '確認失敗');
+      errorEl.hidden = false;
+    }
+  })();
+</script>
+</body>
+</html>

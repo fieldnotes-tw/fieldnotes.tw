@@ -12,6 +12,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@aws-sdk/client-sesv2": "^3.1107.0",
     "@hono/node-server": "^1.19.1",
     "@hono/zod-validator": "^0.7.2",
     "bcryptjs": "^3.0.3",

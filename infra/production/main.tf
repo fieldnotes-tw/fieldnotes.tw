@@ -1,11 +1,17 @@
 module "stack" {
   source = "../modules/stack"
 
-  environment       = "production"
-  aws_region        = "ap-east-2"
-  vpc_cidr          = "10.30.0.0/16"
-  instance_type     = "t4g.micro"
-  db_instance_class = "db.t4g.micro"
+  providers = {
+    aws     = aws
+    aws.ses = aws.ses
+  }
+
+  environment         = "production"
+  aws_region          = "ap-east-2"
+  vpc_cidr            = "10.30.0.0/16"
+  instance_type       = "t4g.micro"
+  db_instance_class   = "db.t4g.micro"
+  manage_ses_identity = false
 }
 
 output "cloudfront_domain_name" {
@@ -40,6 +46,14 @@ output "app_secret_arn" {
   value = module.stack.app_secret_arn
 }
 
-output "admin_username" {
-  value = module.stack.admin_username
+output "admin_email" {
+  value = module.stack.admin_email
+}
+
+output "ses_email_from" {
+  value = module.stack.ses_email_from
+}
+
+output "ses_dkim_tokens" {
+  value = module.stack.ses_dkim_tokens
 }

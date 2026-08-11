@@ -16,8 +16,9 @@ adminRoutes.get('/users', async (c) => {
   const rows = await db
     .select({
       id: users.id,
-      username: users.username,
+      email: users.email,
       role: users.role,
+      emailVerifiedAt: users.emailVerifiedAt,
       createdAt: users.createdAt,
     })
     .from(users)

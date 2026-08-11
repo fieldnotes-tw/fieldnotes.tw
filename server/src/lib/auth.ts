@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
 import type { Context } from 'hono';
@@ -8,16 +9,17 @@ import { users, type User, type UserRole } from '../db/schema.js';
 
 export const SESSION_COOKIE = 'fn_session';
 const BCRYPT_ROUNDS = 12;
+const CONFIRM_TTL_MS = 24 * 60 * 60 * 1000;
 
 export type SessionUser = {
   id: string;
-  username: string;
+  email: string;
   role: UserRole;
 };
 
 type JwtPayload = {
   sub: string;
-  username: string;
+  email: string;
   role: UserRole;
   exp: number;
 };
@@ -30,10 +32,14 @@ function jwtSecret() {
   return secret;
 }
 
-export function toPublicUser(user: Pick<User, 'id' | 'username' | 'role'>): SessionUser {
+export function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+export function toPublicUser(user: Pick<User, 'id' | 'email' | 'role'>): SessionUser {
   return {
     id: user.id,
-    username: user.username,
+    email: user.email,
     role: user.role,
   };
 }
@@ -46,12 +52,25 @@ export async function verifyPassword(password: string, passwordHash: string) {
   return bcrypt.compare(password, passwordHash);
 }
 
+export function hashConfirmToken(token: string) {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+export function createConfirmToken() {
+  const token = randomBytes(32).toString('base64url');
+  return {
+    token,
+    tokenHash: hashConfirmToken(token),
+    expiresAt: new Date(Date.now() + CONFIRM_TTL_MS),
+  };
+}
+
 export async function createSessionToken(user: SessionUser) {
   const now = Math.floor(Date.now() / 1000);
   return sign(
     {
       sub: user.id,
-      username: user.username,
+      email: user.email,
       role: user.role,
       exp: now + 60 * 60 * 24 * 14,
     } satisfies JwtPayload,
@@ -80,19 +99,20 @@ export async function readSessionUser(c: Context): Promise<SessionUser | null> {
 
   try {
     const payload = (await verify(token, jwtSecret(), 'HS256')) as JwtPayload;
-    if (!payload.sub || !payload.username || !payload.role) return null;
+    if (!payload.sub || !payload.email || !payload.role) return null;
 
     const [row] = await db
       .select({
         id: users.id,
-        username: users.username,
+        email: users.email,
         role: users.role,
+        emailVerifiedAt: users.emailVerifiedAt,
       })
       .from(users)
       .where(eq(users.id, payload.sub))
       .limit(1);
 
-    if (!row) return null;
+    if (!row || !row.emailVerifiedAt) return null;
     return toPublicUser(row);
   } catch {
     return null;

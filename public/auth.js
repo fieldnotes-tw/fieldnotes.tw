@@ -3,26 +3,37 @@
 const CURRENT_USER_KEY = 'lz_current_user';
 const AVATAR_COLOR_VARS = ['--avatar-plant', '--avatar-animal', '--avatar-sky', '--avatar-taste', '--avatar-workshop'];
 
-function colorForUsername(username) {
+function colorForEmail(email) {
   let hash = 0;
-  for (const ch of username) hash = (hash + ch.charCodeAt(0)) % AVATAR_COLOR_VARS.length;
+  for (const ch of email) hash = (hash + ch.charCodeAt(0)) % AVATAR_COLOR_VARS.length;
   return AVATAR_COLOR_VARS[hash];
 }
 
+function emailLocalPart(email) {
+  return (email || '').split('@')[0] || email || '?';
+}
+
 function shapeUser(apiUser) {
-  if (!apiUser) return null;
+  if (!apiUser?.email) return null;
+  const local = emailLocalPart(apiUser.email);
   return {
     id: apiUser.id,
-    username: apiUser.username,
+    email: apiUser.email,
     role: apiUser.role,
-    colorVar: colorForUsername(apiUser.username),
-    initial: Array.from(apiUser.username.trim())[0] || '?',
+    colorVar: colorForEmail(apiUser.email),
+    initial: Array.from(local.trim())[0]?.toUpperCase() || '?',
   };
 }
 
 function getCurrentUser() {
   try {
-    return JSON.parse(localStorage.getItem(CURRENT_USER_KEY));
+    const user = JSON.parse(localStorage.getItem(CURRENT_USER_KEY));
+    // Drop cached username-era sessions.
+    if (user && !user.email) {
+      localStorage.removeItem(CURRENT_USER_KEY);
+      return null;
+    }
+    return user;
   } catch {
     return null;
   }
@@ -63,19 +74,31 @@ async function refreshCurrentUser() {
   return setCurrentUser(data);
 }
 
-async function login(username, password) {
+async function login(email, password) {
   const { data } = await api('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ email, password }),
   });
   return setCurrentUser(data);
 }
 
-async function register(username, password) {
+async function register(email, password) {
   const { data } = await api('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ email, password }),
   });
+  return data;
+}
+
+async function resendConfirmation(email) {
+  return api('/api/auth/resend-confirmation', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+async function confirmEmail(token) {
+  const { data } = await api(`/api/auth/confirm?token=${encodeURIComponent(token)}`);
   return setCurrentUser(data);
 }
 
@@ -114,13 +137,13 @@ function renderAuthNav(container) {
     avatarBtn.className = 'avatar avatar--sm auth-nav__avatar';
     avatarBtn.style.background = `var(${user.colorVar})`;
     avatarBtn.textContent = user.initial;
-    avatarBtn.setAttribute('aria-label', `${user.username} 的帳號選單`);
+    avatarBtn.setAttribute('aria-label', `${user.email} 的帳號選單`);
 
     const dropdown = document.createElement('div');
     dropdown.className = 'auth-nav__dropdown';
     const nameEl = document.createElement('span');
     nameEl.className = 'auth-nav__dropdown-name';
-    nameEl.textContent = user.role === 'admin' ? `${user.username}（管理員）` : user.username;
+    nameEl.textContent = user.role === 'admin' ? `${user.email}（管理員）` : user.email;
     const logoutBtn = document.createElement('button');
     logoutBtn.type = 'button';
     logoutBtn.className = 'auth-nav__logout';

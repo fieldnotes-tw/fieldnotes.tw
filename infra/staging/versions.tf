@@ -32,3 +32,17 @@ provider "aws" {
     }
   }
 }
+
+# SES is not offered in ap-east-2; identities live in Tokyo.
+provider "aws" {
+  alias  = "ses"
+  region = "ap-northeast-1"
+
+  default_tags {
+    tags = {
+      Project     = "fieldnotes.tw"
+      Environment = "staging"
+      ManagedBy   = "terraform"
+    }
+  }
+}

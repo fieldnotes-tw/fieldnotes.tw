@@ -18,7 +18,11 @@ resource "aws_secretsmanager_secret_version" "app" {
     jwt_secret     = random_password.jwt.result
     cookie_secure  = "1"
     cors_origins   = join(",", concat(["https://${aws_cloudfront_distribution.this.domain_name}"], var.extra_cors_origins))
-    admin_username = var.admin_username
+    admin_email    = var.admin_email
     admin_password = random_password.admin.result
+    email_from     = local.email_from
+    app_base_url   = "https://${aws_cloudfront_distribution.this.domain_name}"
+    mail_mode      = "ses"
+    ses_region     = var.ses_region
   })
 }

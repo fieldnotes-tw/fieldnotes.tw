@@ -60,20 +60,30 @@ locals {
     JWT_SECRET=$(echo "$APP_JSON" | jq -r .jwt_secret)
     COOKIE_SECURE=$(echo "$APP_JSON" | jq -r .cookie_secure)
     CORS_ORIGINS=$(echo "$APP_JSON" | jq -r .cors_origins)
-    ADMIN_USERNAME=$(echo "$APP_JSON" | jq -r .admin_username)
+    ADMIN_EMAIL=$(echo "$APP_JSON" | jq -r .admin_email)
     ADMIN_PASSWORD=$(echo "$APP_JSON" | jq -r .admin_password)
+    EMAIL_FROM=$(echo "$APP_JSON" | jq -r .email_from)
+    APP_BASE_URL=$(echo "$APP_JSON" | jq -r .app_base_url)
+    MAIL_MODE=$(echo "$APP_JSON" | jq -r .mail_mode)
+    SES_REGION=$(echo "$APP_JSON" | jq -r .ses_region)
 
     docker pull "$REPO:$IMAGE_TAG"
     docker rm -f fieldnotes-api || true
     docker run -d --name fieldnotes-api --restart unless-stopped \
       -p ${var.api_container_port}:${var.api_container_port} \
       -e PORT=${var.api_container_port} \
+      -e AWS_REGION="$REGION" \
+      -e AWS_DEFAULT_REGION="$REGION" \
+      -e SES_REGION="$SES_REGION" \
       -e DATABASE_URL="$DATABASE_URL" \
       -e JWT_SECRET="$JWT_SECRET" \
       -e COOKIE_SECURE="$COOKIE_SECURE" \
       -e CORS_ORIGINS="$CORS_ORIGINS" \
-      -e ADMIN_USERNAME="$ADMIN_USERNAME" \
+      -e ADMIN_EMAIL="$ADMIN_EMAIL" \
       -e ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+      -e EMAIL_FROM="$EMAIL_FROM" \
+      -e APP_BASE_URL="$APP_BASE_URL" \
+      -e MAIL_MODE="$MAIL_MODE" \
       "$REPO:$IMAGE_TAG"
     SCRIPT
     chmod +x /usr/local/bin/fieldnotes-deploy.sh

@@ -32,3 +32,16 @@ provider "aws" {
     }
   }
 }
+
+provider "aws" {
+  alias  = "ses"
+  region = "ap-northeast-1"
+
+  default_tags {
+    tags = {
+      Project     = "fieldnotes.tw"
+      Environment = "production"
+      ManagedBy   = "terraform"
+    }
+  }
+}

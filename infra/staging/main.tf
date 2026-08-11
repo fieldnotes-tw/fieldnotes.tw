@@ -1,6 +1,11 @@
 module "stack" {
   source = "../modules/stack"
 
+  providers = {
+    aws     = aws
+    aws.ses = aws.ses
+  }
+
   environment       = "staging"
   aws_region        = "ap-east-2"
   vpc_cidr          = "10.20.0.0/16"
@@ -40,6 +45,14 @@ output "app_secret_arn" {
   value = module.stack.app_secret_arn
 }
 
-output "admin_username" {
-  value = module.stack.admin_username
+output "admin_email" {
+  value = module.stack.admin_email
+}
+
+output "ses_email_from" {
+  value = module.stack.ses_email_from
+}
+
+output "ses_dkim_tokens" {
+  value = module.stack.ses_dkim_tokens
 }

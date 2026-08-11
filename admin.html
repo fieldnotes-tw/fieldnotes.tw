@@ -31,8 +31,9 @@
       <table class="admin-table" id="adminUsersTable">
         <thead>
           <tr>
-            <th>用戶名</th>
+            <th>電子郵件</th>
             <th>角色</th>
+            <th>已確認</th>
             <th>建立時間</th>
           </tr>
         </thead>
@@ -95,10 +96,11 @@
       tbody.replaceChildren(...data.map((row) => {
         const tr = document.createElement('tr');
         const roleLabel = row.role === 'admin' ? '管理員' : '一般使用者';
-        tr.innerHTML = `<td></td><td></td><td></td>`;
-        tr.children[0].textContent = row.username;
+        tr.innerHTML = `<td></td><td></td><td></td><td></td>`;
+        tr.children[0].textContent = row.email;
         tr.children[1].textContent = roleLabel;
-        tr.children[2].textContent = formatWhen(row.createdAt);
+        tr.children[2].textContent = row.emailVerifiedAt ? '是' : '否';
+        tr.children[3].textContent = formatWhen(row.createdAt);
         return tr;
       }));
     } catch (err) {

@@ -7,14 +7,22 @@ Region: `ap-east-2` (Taipei)
 | `development` | staging |
 | `main` | production |
 
-Stack per environment: VPC (no NAT) · `t4g.micro` API EC2 · RDS Postgres `db.t4g.micro` · S3 + CloudFront (frontend + `/api/*` → EC2) · ECR · Secrets Manager (`…/database`, `…/app` for JWT/CORS/admin seed).
+Stack per environment: VPC (no NAT) · `t4g.micro` API EC2 · RDS Postgres `db.t4g.micro` · S3 + CloudFront (frontend + `/api/*` → EC2) · ECR · Secrets Manager (`…/database`, `…/app`) · SES domain identity for `noreply@fieldnotes.tw` in **ap-northeast-1** (SES is not available in Taipei).
 
 Retrieve the staging admin password after apply:
 
 ```bash
 aws secretsmanager get-secret-value --region ap-east-2 \
-  --secret-id fieldnotes-staging/app --query SecretString --output text | jq -r .admin_password
+  --secret-id fieldnotes-staging/app --query SecretString --output text | jq -r '{admin_email,admin_password}'
 ```
+
+### SES email (one-time DNS)
+
+SES identities are created in `ap-northeast-1` (Tokyo). After `terraform apply`, create three DKIM CNAMEs from `terraform output -json ses_dkim_tokens`:
+
+`TOKEN._domainkey.fieldnotes.tw` → `TOKEN.dkim.amazonses.com`
+
+Until the domain verifies (and while the account is in the SES sandbox), confirmation mail only delivers to SES-verified recipient addresses. Request production access when ready.
 
 CI authenticates with **GitHub OIDC** (no long-lived access keys in the repo).
 

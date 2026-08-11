@@ -30,8 +30,17 @@ output "app_secret_arn" {
   value = aws_secretsmanager_secret.app.arn
 }
 
-output "admin_username" {
-  value = var.admin_username
+output "admin_email" {
+  value = var.admin_email
+}
+
+output "ses_email_from" {
+  value = local.email_from
+}
+
+output "ses_dkim_tokens" {
+  description = "Create CNAME records: <token>._domainkey.fieldnotes.tw → <token>.dkim.amazonses.com"
+  value       = local.ses_dkim_tokens
 }
 
 output "database_endpoint" {

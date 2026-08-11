@@ -94,7 +94,7 @@ const seedData = [
 ];
 
 async function seedAdmin() {
-  const username = process.env.ADMIN_USERNAME ?? 'admin';
+  const email = (process.env.ADMIN_EMAIL ?? 'admin@fieldnotes.tw').trim().toLowerCase();
   const password = process.env.ADMIN_PASSWORD;
 
   if (!password) {
@@ -105,20 +105,21 @@ async function seedAdmin() {
   const [existing] = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.username, username))
+    .where(eq(users.email, email))
     .limit(1);
 
   if (existing) {
-    console.log(`Admin user "${username}" already exists; skipping.`);
+    console.log(`Admin user "${email}" already exists; skipping.`);
     return;
   }
 
   await db.insert(users).values({
-    username,
+    email,
     passwordHash: await hashPassword(password),
     role: 'admin',
+    emailVerifiedAt: new Date(),
   });
-  console.log(`Seeded admin user "${username}".`);
+  console.log(`Seeded admin user "${email}".`);
 }
 
 async function seedPhenomena() {

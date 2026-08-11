@@ -40,6 +40,20 @@ data "aws_iam_policy_document" "api" {
   }
 
   statement {
+    sid    = "SesSend"
+    effect = "Allow"
+    actions = [
+      "ses:SendEmail",
+      "ses:SendRawEmail",
+    ]
+    resources = [
+      local.ses_identity_arn,
+      "arn:aws:ses:${var.ses_region}:${data.aws_caller_identity.current.account_id}:identity/${var.email_domain}",
+      "arn:aws:ses:${var.ses_region}:${data.aws_caller_identity.current.account_id}:identity/${local.email_from}",
+    ]
+  }
+
+  statement {
     sid       = "Logs"
     effect    = "Allow"
     actions   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]

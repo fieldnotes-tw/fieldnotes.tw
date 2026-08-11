@@ -64,9 +64,14 @@ export const users = pgTable(
   'users',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    username: text('username').notNull(),
+    email: text('email').notNull(),
     passwordHash: text('password_hash').notNull(),
     role: userRoleEnum('role').notNull().default('user'),
+    emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+    emailConfirmTokenHash: text('email_confirm_token_hash'),
+    emailConfirmExpiresAt: timestamp('email_confirm_expires_at', {
+      withTimezone: true,
+    }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -74,7 +79,7 @@ export const users = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [uniqueIndex('users_username_uidx').on(table.username)],
+  (table) => [uniqueIndex('users_email_uidx').on(table.email)],
 );
 
 export type Phenomenon = typeof phenomena.$inferSelect;
