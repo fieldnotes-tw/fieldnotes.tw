@@ -145,6 +145,7 @@ data "aws_iam_policy_document" "gha_deploy" {
       "ssm:*",
       "dynamodb:*",
       "secretsmanager:*",
+      "ses:*",
       "kms:Decrypt",
       "kms:DescribeKey",
       "kms:CreateGrant",

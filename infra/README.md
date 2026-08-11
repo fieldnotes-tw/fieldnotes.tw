@@ -46,6 +46,10 @@ Outputs (local only — do not paste into the repo):
 
 ## Apply environments
 
+Deploy workflows run `terraform apply` on every push (`development` → staging, `main` → production), then build/push the API image and roll it out via SSM.
+
+For a local apply (or the first bring-up before CI has run):
+
 ```bash
 # After bootstrap, create backend config from the state_bucket output:
 cp ../backend.hcl.example backend.hcl   # in staging/ and production/

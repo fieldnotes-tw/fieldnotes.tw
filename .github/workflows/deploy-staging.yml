@@ -44,7 +44,7 @@ jobs:
         with:
           terraform_wrapper: false
 
-      - name: Read Terraform outputs
+      - name: Terraform apply
         id: tf
         working-directory: infra/staging
         env:
@@ -56,9 +56,30 @@ jobs:
           bucket = "${TF_BACKEND_BUCKET}"
           EOF
           terraform init -input=false -backend-config=backend.hcl
+          terraform apply -auto-approve -input=false
           echo "distribution=$(terraform output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
           echo "ecr=$(terraform output -raw ecr_repository_url)" >> "$GITHUB_OUTPUT"
           echo "instance=$(terraform output -raw api_instance_id)" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for API host (SSM)
+        env:
+          AWS_REGION: ${{ env.DEPLOY_REGION }}
+          AWS_DEFAULT_REGION: ${{ env.DEPLOY_REGION }}
+          INSTANCE_ID: ${{ steps.tf.outputs.instance }}
+        run: |
+          for i in $(seq 1 60); do
+            STATUS=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
+              --query 'InstanceInformationList[0].PingStatus' \
+              --output text 2>/dev/null || echo None)
+            echo "ssm ping=$STATUS (attempt $i)"
+            if [ "$STATUS" = "Online" ]; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "API instance ${INSTANCE_ID} never came online in SSM" >&2
+          exit 1
 
       - name: Build and push API image
         env:
@@ -87,23 +108,6 @@ jobs:
           B64=$(base64 -w0 <<EOF
           #!/bin/bash
           set -euo pipefail
-          cat >/etc/nginx/conf.d/api.conf <<'NGINX'
-          server {
-            listen 80 default_server;
-            client_max_body_size 20m;
-            location / {
-              proxy_pass http://127.0.0.1:3001;
-              proxy_http_version 1.1;
-              proxy_set_header Host \$host;
-              proxy_set_header X-Real-IP \$remote_addr;
-              proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-              proxy_set_header X-Forwarded-Proto \$scheme;
-              proxy_set_header Cookie \$http_cookie;
-              proxy_set_header Accept-Language \$http_accept_language;
-            }
-          }
-          NGINX
-          nginx -t && systemctl reload nginx
           /usr/local/bin/fieldnotes-deploy.sh ${GITHUB_SHA}
           EOF
           )
