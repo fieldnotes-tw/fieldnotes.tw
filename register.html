@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <title>註冊帳號 · 最近左營</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    if (/Chrome\/|Chromium\//.test(navigator.userAgent)) {
+      document.documentElement.classList.add('is-blink');
+    }
+  </script>
+</head>
+<body>
+
+<header class="auth-page-head">
+  <a href="index.html" class="brand-mark" aria-label="最近左營"><span>最</span><span>近</span><span>左</span><span>營</span></a>
+  <div class="auth-nav" data-auth-nav></div>
+</header>
+
+<main class="auth-main">
+  <form class="auth-form" id="registerForm" novalidate>
+    <h1 class="auth-form__title">註冊帳號</h1>
+    <label class="auth-form__field">
+      <span>用戶名</span>
+      <input type="text" name="username" autocomplete="username" required>
+    </label>
+    <label class="auth-form__field">
+      <span>密碼</span>
+      <input type="password" name="password" autocomplete="new-password" required>
+    </label>
+    <label class="auth-form__field">
+      <span>確認密碼</span>
+      <input type="password" name="confirmPassword" autocomplete="new-password" required>
+    </label>
+    <p class="auth-form__error" id="registerError" hidden>密碼與確認密碼不一致</p>
+    <button type="submit" class="auth-form__submit">註冊</button>
+    <div class="auth-form__divider"><span>或</span></div>
+    <button type="button" class="auth-form__line-btn" id="lineRegisterBtn">用 LINE 登入</button>
+    <p class="auth-form__switch">已經有帳號了嗎？<a href="login.html">登入</a></p>
+  </form>
+</main>
+
+<script src="auth.js"></script>
+<script>
+  if (getCurrentUser()) {
+    location.href = 'index.html';
+  }
+
+  const form = document.getElementById('registerForm');
+  const errorEl = document.getElementById('registerError');
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const username = form.username.value.trim();
+    const password = form.password.value;
+    const confirmPassword = form.confirmPassword.value;
+    if (password !== confirmPassword) {
+      errorEl.hidden = false;
+      return;
+    }
+    errorEl.hidden = true;
+    if (!username) return;
+    setCurrentUser(username);
+    location.href = 'index.html';
+  });
+
+  document.getElementById('lineRegisterBtn').addEventListener('click', () => {
+    setCurrentUser('LINE 用戶');
+    location.href = 'index.html';
+  });
+</script>
+</body>
+</html>

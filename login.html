@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <title>登入 · 最近左營</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    if (/Chrome\/|Chromium\//.test(navigator.userAgent)) {
+      document.documentElement.classList.add('is-blink');
+    }
+  </script>
+</head>
+<body>
+
+<header class="auth-page-head">
+  <a href="index.html" class="brand-mark" aria-label="最近左營"><span>最</span><span>近</span><span>左</span><span>營</span></a>
+  <div class="auth-nav" data-auth-nav></div>
+</header>
+
+<main class="auth-main">
+  <form class="auth-form" id="loginForm" novalidate>
+    <h1 class="auth-form__title">登入</h1>
+    <label class="auth-form__field">
+      <span>用戶名</span>
+      <input type="text" name="username" autocomplete="username" required>
+    </label>
+    <label class="auth-form__field">
+      <span>密碼</span>
+      <input type="password" name="password" autocomplete="current-password" required>
+    </label>
+    <button type="submit" class="auth-form__submit">登入</button>
+    <p class="auth-form__switch">還沒有帳號嗎？<a href="register.html">註冊帳號</a></p>
+  </form>
+</main>
+
+<script src="auth.js"></script>
+<script>
+  if (getCurrentUser()) {
+    location.href = 'index.html';
+  }
+
+  document.getElementById('loginForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const username = e.target.username.value.trim();
+    if (!username) return;
+    setCurrentUser(username);
+    location.href = 'index.html';
+  });
+</script>
+</body>
+</html>

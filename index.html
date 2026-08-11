@@ -30,11 +30,15 @@
       <label class="cat-toggle check-item" data-cat="taste"><span class="check-item__box"></span>當季滋味</label>
       <label class="cat-toggle check-item" data-cat="workshop"><span class="check-item__box"></span>工作坊</label>
     </div>
+    <div class="auth-nav" data-auth-nav></div>
   </div>
 </div>
 
 <header class="sitehead" id="top">
-  <div class="sitehead__weather serif-ui"><span id="todayDate">今天</span> <span id="weatherText">天氣讀取中…</span></div>
+  <div class="sitehead__weather serif-ui">
+    <span class="sitehead__weather-text"><span id="todayDate">今天</span> <span id="weatherText">天氣讀取中…</span></span>
+    <div class="auth-nav" data-auth-nav></div>
+  </div>
   <div class="sitehead__brandrow">
     <div class="sitehead__identity">
       <h1 class="brand-mark"><span>最</span><span>近</span><span>左</span><span>營</span></h1>
@@ -195,6 +199,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="auth.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>
