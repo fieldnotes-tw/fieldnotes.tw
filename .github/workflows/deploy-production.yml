@@ -91,9 +91,6 @@ jobs:
           aws ecr get-login-password --region "$AWS_REGION" \
             | docker login --username AWS --password-stdin "$REGISTRY"
           IMAGE_TAG="${GITHUB_SHA}"
-          mkdir -p server/locales server/public/locales
-          cp public/locales/*.json server/locales/
-          cp public/locales/*.json server/public/locales/
           docker build \
             -t "$ECR_REPO:$IMAGE_TAG" -t "$ECR_REPO:latest" server
           docker push "$ECR_REPO:$IMAGE_TAG"

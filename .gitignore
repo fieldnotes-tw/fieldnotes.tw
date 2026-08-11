@@ -5,7 +5,13 @@ node_modules/
 dist/
 .env
 server/.env
+
+# Runtime copies synced from public/ + fonts/ + Vite build (see npm run static:sync / build).
+server/locales/
 server/public/assets/
+server/public/js/
+server/public/locales/
+server/public/fonts/
 # Local-only copies of seed photos (source of truth: public/images/).
 server/public/media/
 server/public/images/

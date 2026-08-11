@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { getCookie } from 'hono/cookie';
 import type { Context } from 'hono';
 
-// Catalogs are authored in public/locales/; sync into server/locales via
-// `npm run locales:sync` (also run by CI before the API image build).
+// Catalogs are authored in public/locales/; synced into the API tree via
+// `npm run static:sync` (dev / prebuild / CI).
 
 export const LOCALES = ['zh-Hant', 'en'] as const;
 export type Locale = (typeof LOCALES)[number];
@@ -19,6 +19,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 function loadCatalog(locale: Locale): Catalog {
   const candidates = [
     join(here, '../../locales', `${locale}.json`),
+    join(here, '../../public/locales', `${locale}.json`),
     join(here, '../../../public/locales', `${locale}.json`),
   ];
   for (const path of candidates) {

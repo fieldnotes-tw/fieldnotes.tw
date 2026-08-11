@@ -34,10 +34,10 @@ Demo photos stay in [`public/images/`](public/images/) and are copied into `serv
 
 ## Structure
 
-- `index.html` / `styles.css` / `app.js` — frontend
-- `images/` — card photos
-- `mockups/` — design references
-- `server/` — Hono + Drizzle + Postgres API
+- `client/` — homepage JS/CSS (Vite entry)
+- `public/` — source static files (locales, `/js/*`, seed images); synced into `server/public/` on dev/build
+- `server/` — Hono + Eta pages + API; serves runtime files from `server/public/`
+- `fonts/` — Kaiti subset (synced to `/fonts/*`)
 - `docker-compose.yml` — local Postgres 16
 
 ## API
