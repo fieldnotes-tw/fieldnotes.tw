@@ -11,25 +11,29 @@ resource "aws_s3_bucket_public_access_block" "media" {
   restrict_public_buckets = true
 }
 
+resource "aws_s3_bucket_ownership_controls" "media" {
+  bucket = aws_s3_bucket.media.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "media" {
+  bucket = aws_s3_bucket.media.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
 resource "aws_s3_bucket_versioning" "media" {
   bucket = aws_s3_bucket.media.id
 
   versioning_configuration {
     status = "Enabled"
-  }
-}
-
-resource "aws_s3_bucket_cors_configuration" "media" {
-  bucket = aws_s3_bucket.media.id
-
-  # Presigned PUT is the real auth; allow any browser origin for upload CORS.
-  # (Cannot reference CloudFront domain here — dependency cycle with the distribution.)
-  cors_rule {
-    allowed_headers = ["*"]
-    allowed_methods = ["PUT", "GET", "HEAD"]
-    allowed_origins = ["*"]
-    expose_headers  = ["ETag"]
-    max_age_seconds = 3600
   }
 }
 
@@ -58,9 +62,45 @@ data "aws_iam_policy_document" "media_bucket" {
       values   = [aws_cloudfront_distribution.this.arn]
     }
   }
+
+  statement {
+    sid       = "DenyInsecureTransport"
+    effect    = "Deny"
+    actions   = ["s3:*"]
+    resources = [aws_s3_bucket.media.arn, "${aws_s3_bucket.media.arn}/*"]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
 }
 
 resource "aws_s3_bucket_policy" "media" {
   bucket = aws_s3_bucket.media.id
   policy = data.aws_iam_policy_document.media_bucket.json
+}
+
+# After the distribution exists so we can pin upload CORS to known app origins.
+resource "aws_s3_bucket_cors_configuration" "media" {
+  bucket = aws_s3_bucket.media.id
+
+  # Presigned PUT is still the real auth; CORS only limits which browser origins
+  # may call S3 with a valid signature.
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["PUT", "GET", "HEAD"]
+    allowed_origins = concat(
+      ["https://${aws_cloudfront_distribution.this.domain_name}"],
+      var.extra_cors_origins,
+    )
+    expose_headers  = ["ETag"]
+    max_age_seconds = 3600
+  }
 }
