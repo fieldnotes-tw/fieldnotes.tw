@@ -26,6 +26,14 @@ output "db_secret_arn" {
   value = aws_secretsmanager_secret.db.arn
 }
 
+output "app_secret_arn" {
+  value = aws_secretsmanager_secret.app.arn
+}
+
+output "admin_username" {
+  value = var.admin_username
+}
+
 output "database_endpoint" {
   value = aws_db_instance.this.address
 }

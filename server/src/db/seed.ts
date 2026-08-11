@@ -1,6 +1,7 @@
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from './index.js';
-import { phenomena } from './schema.js';
+import { phenomena, users } from './schema.js';
+import { hashPassword } from '../lib/auth.js';
 
 const seedData = [
   {
@@ -92,7 +93,35 @@ const seedData = [
   },
 ];
 
-async function seed() {
+async function seedAdmin() {
+  const username = process.env.ADMIN_USERNAME ?? 'admin';
+  const password = process.env.ADMIN_PASSWORD;
+
+  if (!password) {
+    console.log('ADMIN_PASSWORD not set; skipping admin user seed.');
+    return;
+  }
+
+  const [existing] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.username, username))
+    .limit(1);
+
+  if (existing) {
+    console.log(`Admin user "${username}" already exists; skipping.`);
+    return;
+  }
+
+  await db.insert(users).values({
+    username,
+    passwordHash: await hashPassword(password),
+    role: 'admin',
+  });
+  console.log(`Seeded admin user "${username}".`);
+}
+
+async function seedPhenomena() {
   const reset = process.env.SEED_RESET === '1';
 
   if (reset) {
@@ -102,12 +131,17 @@ async function seed() {
     const existing = await db.select({ id: phenomena.id }).from(phenomena).limit(1);
     if (existing.length > 0) {
       console.log('Phenomena already seeded; skipping. Set SEED_RESET=1 to replace.');
-      process.exit(0);
+      return;
     }
   }
 
   await db.insert(phenomena).values(seedData);
   console.log(`Seeded ${seedData.length} phenomena.`);
+}
+
+async function seed() {
+  await seedPhenomena();
+  await seedAdmin();
   process.exit(0);
 }
 

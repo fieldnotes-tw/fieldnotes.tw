@@ -35,3 +35,11 @@ output "api_public_ip" {
 output "db_secret_arn" {
   value = module.stack.db_secret_arn
 }
+
+output "app_secret_arn" {
+  value = module.stack.app_secret_arn
+}
+
+output "admin_username" {
+  value = module.stack.admin_username
+}

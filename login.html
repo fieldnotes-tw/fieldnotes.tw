@@ -27,8 +27,9 @@
     </label>
     <label class="auth-form__field">
       <span>密碼</span>
-      <input type="password" name="password" autocomplete="current-password" required>
+      <input type="password" name="password" autocomplete="current-password" required minlength="8">
     </label>
+    <p class="auth-form__error" id="loginError" hidden></p>
     <button type="submit" class="auth-form__submit">登入</button>
     <p class="auth-form__switch">還沒有帳號嗎？<a href="register.html">註冊帳號</a></p>
   </form>
@@ -36,16 +37,28 @@
 
 <script src="auth.js"></script>
 <script>
-  if (getCurrentUser()) {
-    location.href = 'index.html';
-  }
+  refreshCurrentUser().then((user) => {
+    if (user) location.href = user.role === 'admin' ? 'admin.html' : 'index.html';
+  }).catch(() => {});
 
-  document.getElementById('loginForm').addEventListener('submit', (e) => {
+  const form = document.getElementById('loginForm');
+  const errorEl = document.getElementById('loginError');
+
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const username = e.target.username.value.trim();
-    if (!username) return;
-    setCurrentUser(username);
-    location.href = 'index.html';
+    errorEl.hidden = true;
+    const username = form.username.value.trim();
+    const password = form.password.value;
+    if (!username || !password) return;
+    try {
+      const user = await login(username, password);
+      location.href = user.role === 'admin' ? 'admin.html' : 'index.html';
+    } catch (err) {
+      errorEl.textContent = err.message === 'Invalid username or password'
+        ? '用戶名或密碼不正確'
+        : (err.message || '登入失敗');
+      errorEl.hidden = false;
+    }
   });
 </script>
 </body>

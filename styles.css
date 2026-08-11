@@ -529,8 +529,39 @@ footer .credit{ font-size:0.78rem; color:var(--ink-faint); }
   border-radius:100px; border:2px solid var(--ink); background:#06C755; color:#fff; cursor:pointer;
 }
 .auth-form__line-btn:hover{ filter:brightness(1.05); }
+.auth-form__line-btn:disabled{ opacity:0.55; cursor:not-allowed; filter:none; }
 .auth-form__switch{ text-align:center; font-size:0.85rem; color:var(--ink-soft); margin-top:1.3rem; }
 .auth-form__switch a{ font-weight:700; color:var(--ink); text-decoration:underline; text-underline-offset:2px; }
+
+.admin-main{
+  width:min(920px,100%);
+  margin:0 auto;
+  padding:2rem 1.25rem 3.5rem;
+  display:flex;
+  flex-direction:column;
+  gap:1.25rem;
+}
+.admin-head__title{ font-weight:900; font-size:1.8rem; color:var(--ink); }
+.admin-head__sub{ margin-top:0.35rem; color:var(--ink-soft); font-size:0.95rem; }
+.admin-panel{
+  border:1.5px solid var(--line);
+  border-radius:16px;
+  padding:1.25rem 1.2rem 1.35rem;
+  background:color-mix(in srgb, var(--ground) 92%, #fff);
+}
+.admin-panel--muted{ opacity:0.85; }
+.admin-panel__title{ font-weight:800; font-size:1.1rem; margin-bottom:0.35rem; }
+.admin-panel__meta{ color:var(--ink-soft); font-size:0.88rem; font-weight:600; margin-bottom:0.9rem; }
+.admin-table-wrap{ overflow-x:auto; }
+.admin-table{ width:100%; border-collapse:collapse; font-size:0.9rem; }
+.admin-table th,
+.admin-table td{
+  text-align:left;
+  padding:0.65rem 0.5rem;
+  border-bottom:1px solid var(--line);
+  vertical-align:top;
+}
+.admin-table th{ font-size:0.78rem; color:var(--ink-faint); font-weight:700; }
 
 .submit-page{ width:100%; max-width:26rem; text-align:center; }
 .submit-page h1{ font-weight:900; font-size:2rem; margin-bottom:1rem; color:var(--ink); }

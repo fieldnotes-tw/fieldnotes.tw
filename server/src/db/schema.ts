@@ -4,6 +4,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -22,6 +23,8 @@ export const PHENOMENON_STATUSES = [
   'ended',
 ] as const;
 
+export const USER_ROLES = ['user', 'admin'] as const;
+
 export const phenomenonCategoryEnum = pgEnum(
   'phenomenon_category',
   PHENOMENON_CATEGORIES,
@@ -31,6 +34,8 @@ export const phenomenonStatusEnum = pgEnum(
   'phenomenon_status',
   PHENOMENON_STATUSES,
 );
+
+export const userRoleEnum = pgEnum('user_role', USER_ROLES);
 
 export const phenomena = pgTable('phenomena', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -55,5 +60,25 @@ export const phenomena = pgTable('phenomena', {
     .defaultNow(),
 });
 
+export const users = pgTable(
+  'users',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    username: text('username').notNull(),
+    passwordHash: text('password_hash').notNull(),
+    role: userRoleEnum('role').notNull().default('user'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [uniqueIndex('users_username_uidx').on(table.username)],
+);
+
 export type Phenomenon = typeof phenomena.$inferSelect;
 export type NewPhenomenon = typeof phenomena.$inferInsert;
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type UserRole = (typeof USER_ROLES)[number];

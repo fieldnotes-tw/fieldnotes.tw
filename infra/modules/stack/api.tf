@@ -46,14 +46,22 @@ locals {
     set -euo pipefail
     REGION="${var.aws_region}"
     REPO="${aws_ecr_repository.api.repository_url}"
-    SECRET_ARN="${aws_secretsmanager_secret.db.arn}"
+    DB_SECRET_ID="${local.name_prefix}/database"
+    APP_SECRET_ID="${local.name_prefix}/app"
     IMAGE_TAG="$${1:-latest}"
 
     aws ecr get-login-password --region "$REGION" \
       | docker login --username AWS --password-stdin "$${REPO%%/*}"
 
-    SECRET_JSON=$(aws secretsmanager get-secret-value --region "$REGION" --secret-id "$SECRET_ARN" --query SecretString --output text)
-    DATABASE_URL=$(echo "$SECRET_JSON" | jq -r .database_url)
+    DB_JSON=$(aws secretsmanager get-secret-value --region "$REGION" --secret-id "$DB_SECRET_ID" --query SecretString --output text)
+    APP_JSON=$(aws secretsmanager get-secret-value --region "$REGION" --secret-id "$APP_SECRET_ID" --query SecretString --output text)
+
+    DATABASE_URL=$(echo "$DB_JSON" | jq -r .database_url)
+    JWT_SECRET=$(echo "$APP_JSON" | jq -r .jwt_secret)
+    COOKIE_SECURE=$(echo "$APP_JSON" | jq -r .cookie_secure)
+    CORS_ORIGINS=$(echo "$APP_JSON" | jq -r .cors_origins)
+    ADMIN_USERNAME=$(echo "$APP_JSON" | jq -r .admin_username)
+    ADMIN_PASSWORD=$(echo "$APP_JSON" | jq -r .admin_password)
 
     docker pull "$REPO:$IMAGE_TAG"
     docker rm -f fieldnotes-api || true
@@ -61,6 +69,11 @@ locals {
       -p ${var.api_container_port}:${var.api_container_port} \
       -e PORT=${var.api_container_port} \
       -e DATABASE_URL="$DATABASE_URL" \
+      -e JWT_SECRET="$JWT_SECRET" \
+      -e COOKIE_SECURE="$COOKIE_SECURE" \
+      -e CORS_ORIGINS="$CORS_ORIGINS" \
+      -e ADMIN_USERNAME="$ADMIN_USERNAME" \
+      -e ADMIN_PASSWORD="$ADMIN_PASSWORD" \
       "$REPO:$IMAGE_TAG"
     SCRIPT
     chmod +x /usr/local/bin/fieldnotes-deploy.sh

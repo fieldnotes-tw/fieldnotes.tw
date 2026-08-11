@@ -27,13 +27,16 @@ data "aws_iam_policy_document" "api" {
   }
 
   statement {
-    sid    = "ReadDbSecret"
+    sid    = "ReadAppSecrets"
     effect = "Allow"
     actions = [
       "secretsmanager:GetSecretValue",
       "secretsmanager:DescribeSecret",
     ]
-    resources = [aws_secretsmanager_secret.db.arn]
+    resources = [
+      aws_secretsmanager_secret.db.arn,
+      aws_secretsmanager_secret.app.arn,
+    ]
   }
 
   statement {

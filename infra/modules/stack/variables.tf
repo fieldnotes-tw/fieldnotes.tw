@@ -43,3 +43,15 @@ variable "api_container_port" {
   type    = number
   default = 3001
 }
+
+variable "admin_username" {
+  type        = string
+  description = "Initial admin username seeded on first API boot"
+  default     = "admin"
+}
+
+variable "extra_cors_origins" {
+  type        = list(string)
+  description = "Additional allowed CORS origins beyond the CloudFront domain"
+  default     = []
+}

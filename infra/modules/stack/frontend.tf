@@ -105,7 +105,8 @@ resource "aws_cloudfront_distribution" "this" {
       query_string = true
       headers      = ["Authorization", "Content-Type", "Origin"]
       cookies {
-        forward = "none"
+        forward           = "whitelist"
+        whitelisted_names = ["fn_session"]
       }
     }
 

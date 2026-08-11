@@ -12,5 +12,5 @@ COPY tsconfig.json drizzle.config.ts ./
 COPY drizzle ./drizzle
 COPY src ./src
 EXPOSE 3001
-# Apply migrations then serve. DATABASE_URL comes from the host/task env.
-CMD ["sh", "-c", "npx drizzle-kit migrate && npx tsx src/index.ts"]
+# Migrate, seed admin if missing, then serve. Secrets come from the host env.
+CMD ["sh", "-c", "npx drizzle-kit migrate && npx tsx src/db/seed.ts && npx tsx src/index.ts"]

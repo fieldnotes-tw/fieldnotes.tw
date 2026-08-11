@@ -46,8 +46,16 @@ npm run dev          # terminal 2
 | POST | `/api/phenomena` | Create |
 | PATCH | `/api/phenomena/:id` | Partial update |
 | DELETE | `/api/phenomena/:id` | Delete |
+| POST | `/api/auth/register` | Create normal user + session cookie |
+| POST | `/api/auth/login` | Session cookie |
+| POST | `/api/auth/logout` | Clear session |
+| GET | `/api/auth/me` | Current user (`null` if logged out) |
+| GET | `/api/admin/users` | Admin-only user list |
 
 Categories: `animal` · `plant` · `sky` · `taste` · `workshop`  
-Statuses: `active` · `upcoming` · `ending` · `ended`
+Statuses: `active` · `upcoming` · `ending` · `ended`  
+Roles: `user` · `admin`
 
-The homepage feed loads from `GET /api/phenomena`.
+The homepage feed loads from `GET /api/phenomena`. Auth uses an httpOnly cookie (`fn_session`).
+
+Seed an admin (local): set `ADMIN_USERNAME` / `ADMIN_PASSWORD` in `server/.env`, then `npm run db:seed`. Admin UI: `/admin.html`.

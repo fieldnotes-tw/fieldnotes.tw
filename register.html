@@ -23,51 +23,58 @@
     <h1 class="auth-form__title">註冊帳號</h1>
     <label class="auth-form__field">
       <span>用戶名</span>
-      <input type="text" name="username" autocomplete="username" required>
+      <input type="text" name="username" autocomplete="username" required minlength="2" maxlength="40">
     </label>
     <label class="auth-form__field">
       <span>密碼</span>
-      <input type="password" name="password" autocomplete="new-password" required>
+      <input type="password" name="password" autocomplete="new-password" required minlength="8">
     </label>
     <label class="auth-form__field">
       <span>確認密碼</span>
-      <input type="password" name="confirmPassword" autocomplete="new-password" required>
+      <input type="password" name="confirmPassword" autocomplete="new-password" required minlength="8">
     </label>
-    <p class="auth-form__error" id="registerError" hidden>密碼與確認密碼不一致</p>
+    <p class="auth-form__error" id="registerError" hidden></p>
     <button type="submit" class="auth-form__submit">註冊</button>
     <div class="auth-form__divider"><span>或</span></div>
-    <button type="button" class="auth-form__line-btn" id="lineRegisterBtn">用 LINE 登入</button>
+    <button type="button" class="auth-form__line-btn" id="lineRegisterBtn" disabled>用 LINE 登入（即將開放）</button>
     <p class="auth-form__switch">已經有帳號了嗎？<a href="login.html">登入</a></p>
   </form>
 </main>
 
 <script src="auth.js"></script>
 <script>
-  if (getCurrentUser()) {
-    location.href = 'index.html';
-  }
+  refreshCurrentUser().then((user) => {
+    if (user) location.href = 'index.html';
+  }).catch(() => {});
 
   const form = document.getElementById('registerForm');
   const errorEl = document.getElementById('registerError');
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const username = form.username.value.trim();
     const password = form.password.value;
     const confirmPassword = form.confirmPassword.value;
     if (password !== confirmPassword) {
+      errorEl.textContent = '密碼與確認密碼不一致';
+      errorEl.hidden = false;
+      return;
+    }
+    if (password.length < 8) {
+      errorEl.textContent = '密碼至少需要 8 個字元';
       errorEl.hidden = false;
       return;
     }
     errorEl.hidden = true;
-    if (!username) return;
-    setCurrentUser(username);
-    location.href = 'index.html';
-  });
-
-  document.getElementById('lineRegisterBtn').addEventListener('click', () => {
-    setCurrentUser('LINE 用戶');
-    location.href = 'index.html';
+    try {
+      await register(username, password);
+      location.href = 'index.html';
+    } catch (err) {
+      errorEl.textContent = err.status === 409
+        ? '這個用戶名已被使用'
+        : (err.message || '註冊失敗');
+      errorEl.hidden = false;
+    }
   });
 </script>
 </body>
