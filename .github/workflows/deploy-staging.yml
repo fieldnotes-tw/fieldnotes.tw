@@ -68,18 +68,15 @@ jobs:
             --distribution-id "${{ steps.tf.outputs.distribution }}" \
             --paths "/*"
 
-      - name: Login to Amazon ECR
-        env:
-          AWS_REGION: ${{ env.AWS_REGION }}
-          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
-        uses: aws-actions/amazon-ecr-login@v2
-
       - name: Build and push API image
         env:
           AWS_REGION: ${{ env.AWS_REGION }}
           AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
           ECR_REPO: ${{ steps.tf.outputs.ecr }}
         run: |
+          REGISTRY="${ECR_REPO%%/*}"
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS --password-stdin "$REGISTRY"
           IMAGE_TAG="${GITHUB_SHA}"
           docker build -t "$ECR_REPO:$IMAGE_TAG" -t "$ECR_REPO:latest" server
           docker push "$ECR_REPO:$IMAGE_TAG"
