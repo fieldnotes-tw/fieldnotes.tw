@@ -69,6 +69,12 @@ jobs:
             --distribution-id "${{ steps.tf.outputs.distribution }}" \
             --paths "/*"
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and push API image
         env:
           AWS_REGION: ${{ env.DEPLOY_REGION }}
@@ -79,9 +85,9 @@ jobs:
           aws ecr get-login-password --region "$AWS_REGION" \
             | docker login --username AWS --password-stdin "$REGISTRY"
           IMAGE_TAG="${GITHUB_SHA}"
-          docker build -t "$ECR_REPO:$IMAGE_TAG" -t "$ECR_REPO:latest" server
-          docker push "$ECR_REPO:$IMAGE_TAG"
-          docker push "$ECR_REPO:latest"
+          # t4g.* API hosts are arm64
+          docker buildx build --platform linux/arm64 --push \
+            -t "$ECR_REPO:$IMAGE_TAG" -t "$ECR_REPO:latest" server
 
       - name: Deploy API via SSM
         env:
