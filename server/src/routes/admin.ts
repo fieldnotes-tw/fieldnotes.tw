@@ -37,6 +37,41 @@ adminRoutes.get('/users', async (c) => {
   return c.json({ data: rows });
 });
 
+adminRoutes.delete('/users/:id', async (c) => {
+  const id = uuidSchema.safeParse(c.req.param('id'));
+  if (!id.success) {
+    return c.json({ error: 'Invalid id' }, 400);
+  }
+
+  const actor = c.get('user');
+  if (actor.id === id.data) {
+    return c.json({ error: 'Cannot delete your own account' }, 400);
+  }
+
+  const [target] = await db
+    .select({ id: users.id, role: users.role, email: users.email })
+    .from(users)
+    .where(eq(users.id, id.data))
+    .limit(1);
+
+  if (!target) {
+    return c.json({ error: 'Not found' }, 404);
+  }
+
+  if (target.role === 'admin') {
+    const admins = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.role, 'admin'));
+    if (admins.length <= 1) {
+      return c.json({ error: 'Cannot delete the last admin' }, 400);
+    }
+  }
+
+  await db.delete(users).where(eq(users.id, id.data));
+  return c.body(null, 204);
+});
+
 const uploadSchema = z.object({
   contentType: z.string().trim().min(1),
 });

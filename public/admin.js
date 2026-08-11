@@ -79,19 +79,53 @@ function currentStatusFilter() {
   return active?.dataset.status || 'all';
 }
 
+async function deleteUser(row) {
+  if (!confirm(`確定刪除使用者「${row.email}」？`)) return;
+  try {
+    const res = await fetch(`/api/admin/users/${row.id}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    if (!res.ok && res.status !== 204) {
+      const payload = await res.json().catch(() => ({}));
+      throw new Error(payload.error || `HTTP ${res.status}`);
+    }
+    await loadUsers();
+  } catch (err) {
+    alert(err.message || '刪除失敗');
+  }
+}
+
 async function loadUsers() {
   const metaEl = $('adminUserMeta');
   const tbody = document.querySelector('#adminUsersTable tbody');
+  const me = getCurrentUser();
   try {
     const { data } = await api('/api/admin/users');
     metaEl.textContent = `共 ${data.length} 位使用者`;
     tbody.replaceChildren(...data.map((row) => {
       const tr = document.createElement('tr');
-      tr.innerHTML = '<td></td><td></td><td></td><td></td>';
-      tr.children[0].textContent = row.email;
-      tr.children[1].textContent = row.role === 'admin' ? '管理員' : '一般使用者';
-      tr.children[2].textContent = row.emailVerifiedAt ? '是' : '否';
-      tr.children[3].textContent = formatWhen(row.createdAt);
+      const email = document.createElement('td');
+      email.textContent = row.email;
+      const role = document.createElement('td');
+      role.textContent = row.role === 'admin' ? '管理員' : '一般使用者';
+      const verified = document.createElement('td');
+      verified.textContent = row.emailVerifiedAt ? '是' : '否';
+      const created = document.createElement('td');
+      created.textContent = formatWhen(row.createdAt);
+      const actions = document.createElement('td');
+      actions.className = 'admin-actions';
+      if (me?.id === row.id) {
+        actions.textContent = '（你）';
+      } else {
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'admin-btn admin-btn--danger';
+        delBtn.textContent = '刪除';
+        delBtn.addEventListener('click', () => deleteUser(row));
+        actions.appendChild(delBtn);
+      }
+      tr.append(email, role, verified, created, actions);
       return tr;
     }));
   } catch (err) {
