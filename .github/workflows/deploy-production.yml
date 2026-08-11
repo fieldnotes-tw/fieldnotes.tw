@@ -15,7 +15,8 @@ env:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # Native arm64 — matches t4g.* API hosts (no QEMU cross-build).
+    runs-on: ubuntu-24.04-arm
     environment: production
     steps:
       - uses: actions/checkout@v4
@@ -59,12 +60,6 @@ jobs:
           echo "ecr=$(terraform output -raw ecr_repository_url)" >> "$GITHUB_OUTPUT"
           echo "instance=$(terraform output -raw api_instance_id)" >> "$GITHUB_OUTPUT"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Build and push API image
         env:
           AWS_REGION: ${{ env.DEPLOY_REGION }}
@@ -78,9 +73,10 @@ jobs:
           mkdir -p server/locales server/public/locales
           cp public/locales/*.json server/locales/
           cp public/locales/*.json server/public/locales/
-          # t4g.* API hosts are arm64
-          docker buildx build --platform linux/arm64 --push \
+          docker build \
             -t "$ECR_REPO:$IMAGE_TAG" -t "$ECR_REPO:latest" server
+          docker push "$ECR_REPO:$IMAGE_TAG"
+          docker push "$ECR_REPO:latest"
 
       - name: Deploy API via SSM
         env:
