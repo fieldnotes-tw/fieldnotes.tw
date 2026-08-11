@@ -53,6 +53,7 @@ resource "aws_secretsmanager_secret_version" "db" {
     host         = aws_db_instance.this.address
     port         = aws_db_instance.this.port
     dbname       = var.db_name
-    database_url = "postgres://${var.db_username}:${random_password.db.result}@${aws_db_instance.this.address}:${aws_db_instance.this.port}/${var.db_name}"
+    # RDS requires TLS; postgres.js / drizzle-kit honor sslmode in the URL.
+    database_url = "postgres://${var.db_username}:${urlencode(random_password.db.result)}@${aws_db_instance.this.address}:${aws_db_instance.this.port}/${var.db_name}?sslmode=require"
   })
 }
