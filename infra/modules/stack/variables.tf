@@ -55,3 +55,9 @@ variable "extra_cors_origins" {
   description = "Additional allowed CORS origins beyond the CloudFront domain"
   default     = []
 }
+
+variable "seed_demo" {
+  type        = bool
+  description = "When true, seed demo phenomena on first boot if the catalog is empty"
+  default     = false
+}

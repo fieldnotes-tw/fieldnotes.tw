@@ -1,4 +1,5 @@
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import { DEFAULT_LOCALE, t, type Locale } from './i18n.js';
 
 function appBaseUrl() {
   const base = process.env.APP_BASE_URL?.replace(/\/$/, '');
@@ -17,7 +18,7 @@ function emailFrom() {
 }
 
 export function confirmUrl(token: string) {
-  return `${appBaseUrl()}/confirm.html?token=${encodeURIComponent(token)}`;
+  return `${appBaseUrl()}/confirm?token=${encodeURIComponent(token)}`;
 }
 
 async function sendViaSes(to: string, subject: string, text: string, html: string) {
@@ -43,14 +44,18 @@ async function sendViaSes(to: string, subject: string, text: string, html: strin
   );
 }
 
-export async function sendConfirmEmail(to: string, token: string) {
+export async function sendConfirmEmail(
+  to: string,
+  token: string,
+  locale: Locale = DEFAULT_LOCALE,
+) {
   const link = confirmUrl(token);
-  const subject = '確認你的 最近左營 帳號';
-  const text = `請開啟以下連結以確認信箱（24 小時內有效）：\n\n${link}\n`;
-  const html = `<p>請開啟以下連結以確認信箱（24 小時內有效）：</p><p><a href="${link}">${link}</a></p>`;
+  const subject = t(locale, 'mail.confirm.subject');
+  const text = t(locale, 'mail.confirm.body', { link });
+  const html = t(locale, 'mail.confirm.html', { link });
 
   // Always log so operators can recover the link if SES is pending verification.
-  console.log(`[mail] to=${to} confirm=${link}`);
+  console.log(`[mail] to=${to} locale=${locale} confirm=${link}`);
 
   const mode = (process.env.MAIL_MODE ?? 'log').toLowerCase();
   if (mode === 'log') {

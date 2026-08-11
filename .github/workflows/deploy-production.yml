@@ -32,9 +32,10 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Build frontend
+      - name: Build assets into server/public
         run: |
           npm ci
+          npm --prefix server ci
           npm run build
 
       - name: Setup Terraform
@@ -54,20 +55,9 @@ jobs:
           bucket = "${TF_BACKEND_BUCKET}"
           EOF
           terraform init -input=false -backend-config=backend.hcl
-          echo "bucket=$(terraform output -raw frontend_bucket)" >> "$GITHUB_OUTPUT"
           echo "distribution=$(terraform output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
           echo "ecr=$(terraform output -raw ecr_repository_url)" >> "$GITHUB_OUTPUT"
           echo "instance=$(terraform output -raw api_instance_id)" >> "$GITHUB_OUTPUT"
-
-      - name: Deploy frontend to S3
-        env:
-          AWS_REGION: ${{ env.DEPLOY_REGION }}
-          AWS_DEFAULT_REGION: ${{ env.DEPLOY_REGION }}
-        run: |
-          aws s3 sync dist/ "s3://${{ steps.tf.outputs.bucket }}/" --delete
-          aws cloudfront create-invalidation \
-            --distribution-id "${{ steps.tf.outputs.distribution }}" \
-            --paths "/*"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -85,6 +75,9 @@ jobs:
           aws ecr get-login-password --region "$AWS_REGION" \
             | docker login --username AWS --password-stdin "$REGISTRY"
           IMAGE_TAG="${GITHUB_SHA}"
+          mkdir -p server/locales server/public/locales
+          cp public/locales/*.json server/locales/
+          cp public/locales/*.json server/public/locales/
           # t4g.* API hosts are arm64
           docker buildx build --platform linux/arm64 --push \
             -t "$ECR_REPO:$IMAGE_TAG" -t "$ECR_REPO:latest" server
@@ -95,10 +88,43 @@ jobs:
           AWS_DEFAULT_REGION: ${{ env.DEPLOY_REGION }}
           INSTANCE_ID: ${{ steps.tf.outputs.instance }}
         run: |
+          B64=$(base64 -w0 <<EOF
+          #!/bin/bash
+          set -euo pipefail
+          cat >/etc/nginx/conf.d/api.conf <<'NGINX'
+          server {
+            listen 80 default_server;
+            client_max_body_size 20m;
+            location / {
+              proxy_pass http://127.0.0.1:3001;
+              proxy_http_version 1.1;
+              proxy_set_header Host \$host;
+              proxy_set_header X-Real-IP \$remote_addr;
+              proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto \$scheme;
+              proxy_set_header Cookie \$http_cookie;
+              proxy_set_header Accept-Language \$http_accept_language;
+            }
+          }
+          NGINX
+          nginx -t && systemctl reload nginx
+          /usr/local/bin/fieldnotes-deploy.sh ${GITHUB_SHA}
+          EOF
+          )
+          PARAMS=$(jq -n --arg c "echo $B64 | base64 -d | bash" '{commands:[$c]}')
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript \
-            --parameters "commands=[\"/usr/local/bin/fieldnotes-deploy.sh ${GITHUB_SHA}\"]" \
+            --parameters "$PARAMS" \
             --query 'Command.CommandId' \
             --output text)
           aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
+
+      - name: Invalidate CloudFront
+        env:
+          AWS_REGION: ${{ env.DEPLOY_REGION }}
+          AWS_DEFAULT_REGION: ${{ env.DEPLOY_REGION }}
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ steps.tf.outputs.distribution }}" \
+            --paths "/*"

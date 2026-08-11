@@ -1,10 +1,17 @@
-import { zValidator } from '@hono/zod-validator';
 import { and, asc, desc, eq, type SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { phenomena, users } from '../db/schema.js';
-import { createUploadUrl, isAllowedContentType, mediaBucket } from '../lib/media.js';
+import { localeOf, t } from '../lib/i18n.js';
+import {
+  createUploadUrl,
+  isAllowedContentType,
+  isSafeMediaFilename,
+  mediaBackend,
+  saveLocalUpload,
+} from '../lib/media.js';
+import { validated } from '../lib/validate.js';
 import {
   categorySchema,
   createPhenomenonSchema,
@@ -38,14 +45,15 @@ adminRoutes.get('/users', async (c) => {
 });
 
 adminRoutes.delete('/users/:id', async (c) => {
+  const locale = localeOf(c);
   const id = uuidSchema.safeParse(c.req.param('id'));
   if (!id.success) {
-    return c.json({ error: 'Invalid id' }, 400);
+    return c.json({ error: t(locale, 'errors.invalidId') }, 400);
   }
 
   const actor = c.get('user');
   if (actor.id === id.data) {
-    return c.json({ error: 'Cannot delete your own account' }, 400);
+    return c.json({ error: t(locale, 'errors.cannotDeleteSelf') }, 400);
   }
 
   const [target] = await db
@@ -55,7 +63,7 @@ adminRoutes.delete('/users/:id', async (c) => {
     .limit(1);
 
   if (!target) {
-    return c.json({ error: 'Not found' }, 404);
+    return c.json({ error: t(locale, 'errors.notFound') }, 404);
   }
 
   if (target.role === 'admin') {
@@ -64,7 +72,7 @@ adminRoutes.delete('/users/:id', async (c) => {
       .from(users)
       .where(eq(users.role, 'admin'));
     if (admins.length <= 1) {
-      return c.json({ error: 'Cannot delete the last admin' }, 400);
+      return c.json({ error: t(locale, 'errors.cannotDeleteLastAdmin') }, 400);
     }
   }
 
@@ -76,14 +84,11 @@ const uploadSchema = z.object({
   contentType: z.string().trim().min(1),
 });
 
-adminRoutes.post('/uploads', zValidator('json', uploadSchema), async (c) => {
-  if (!mediaBucket()) {
-    return c.json({ error: 'Media uploads are not configured' }, 501);
-  }
-
+adminRoutes.post('/uploads', validated('json', uploadSchema), async (c) => {
+  const locale = localeOf(c);
   const { contentType } = c.req.valid('json');
   if (!isAllowedContentType(contentType)) {
-    return c.json({ error: 'Unsupported content type' }, 400);
+    return c.json({ error: t(locale, 'errors.unsupportedContentType') }, 400);
   }
 
   try {
@@ -91,11 +96,42 @@ adminRoutes.post('/uploads', zValidator('json', uploadSchema), async (c) => {
     return c.json({ data: upload }, 201);
   } catch (err) {
     console.error('Failed to create upload URL', err);
-    return c.json({ error: 'Unable to create upload URL' }, 500);
+    return c.json({ error: t(locale, 'errors.uploadUrlFailed') }, 500);
+  }
+});
+
+// Local-dev PUT target when MEDIA_BUCKET is unset (same flow as S3 presign).
+adminRoutes.put('/uploads/local/:filename', async (c) => {
+  const locale = localeOf(c);
+  if (mediaBackend() !== 'local') {
+    return c.json({ error: t(locale, 'errors.mediaNotConfigured') }, 501);
+  }
+
+  const filename = c.req.param('filename');
+  if (!isSafeMediaFilename(filename)) {
+    return c.json({ error: t(locale, 'errors.invalidRequest') }, 400);
+  }
+
+  const contentType = c.req.header('content-type') || '';
+  if (!isAllowedContentType(contentType)) {
+    return c.json({ error: t(locale, 'errors.unsupportedContentType') }, 400);
+  }
+
+  try {
+    const body = await c.req.arrayBuffer();
+    if (!body.byteLength) {
+      return c.json({ error: t(locale, 'errors.invalidRequest') }, 400);
+    }
+    const publicPath = await saveLocalUpload(filename, body, contentType);
+    return c.json({ data: { publicPath } }, 201);
+  } catch (err) {
+    console.error('Local media upload failed', err);
+    return c.json({ error: t(locale, 'errors.uploadUrlFailed') }, 500);
   }
 });
 
 adminRoutes.get('/phenomena', async (c) => {
+  const locale = localeOf(c);
   const categoryParam = c.req.query('category');
   const statusParam = c.req.query('status') ?? 'all';
 
@@ -104,7 +140,7 @@ adminRoutes.get('/phenomena', async (c) => {
   if (statusParam !== 'all') {
     const status = statusSchema.safeParse(statusParam);
     if (!status.success) {
-      return c.json({ error: 'Invalid status filter' }, 400);
+      return c.json({ error: t(locale, 'errors.invalidStatusFilter') }, 400);
     }
     filters.push(eq(phenomena.status, status.data));
   }
@@ -112,7 +148,7 @@ adminRoutes.get('/phenomena', async (c) => {
   if (categoryParam) {
     const category = categorySchema.safeParse(categoryParam);
     if (!category.success) {
-      return c.json({ error: 'Invalid category filter' }, 400);
+      return c.json({ error: t(locale, 'errors.invalidCategoryFilter') }, 400);
     }
     filters.push(eq(phenomena.category, category.data));
   }
@@ -126,7 +162,7 @@ adminRoutes.get('/phenomena', async (c) => {
   return c.json({ data: rows });
 });
 
-adminRoutes.post('/phenomena', zValidator('json', createPhenomenonSchema), async (c) => {
+adminRoutes.post('/phenomena', validated('json', createPhenomenonSchema), async (c) => {
   const body = c.req.valid('json');
   const now = new Date();
   const [row] = await db
@@ -142,11 +178,12 @@ adminRoutes.post('/phenomena', zValidator('json', createPhenomenonSchema), async
 
 adminRoutes.patch(
   '/phenomena/:id',
-  zValidator('json', updatePhenomenonSchema),
+  validated('json', updatePhenomenonSchema),
   async (c) => {
+    const locale = localeOf(c);
     const id = uuidSchema.safeParse(c.req.param('id'));
     if (!id.success) {
-      return c.json({ error: 'Invalid id' }, 400);
+      return c.json({ error: t(locale, 'errors.invalidId') }, 400);
     }
 
     const body = c.req.valid('json');
@@ -160,7 +197,7 @@ adminRoutes.patch(
       .returning();
 
     if (!row) {
-      return c.json({ error: 'Not found' }, 404);
+      return c.json({ error: t(locale, 'errors.notFound') }, 404);
     }
 
     return c.json({ data: row });
@@ -168,9 +205,10 @@ adminRoutes.patch(
 );
 
 adminRoutes.delete('/phenomena/:id', async (c) => {
+  const locale = localeOf(c);
   const id = uuidSchema.safeParse(c.req.param('id'));
   if (!id.success) {
-    return c.json({ error: 'Invalid id' }, 400);
+    return c.json({ error: t(locale, 'errors.invalidId') }, 400);
   }
 
   const [row] = await db
@@ -179,7 +217,7 @@ adminRoutes.delete('/phenomena/:id', async (c) => {
     .returning({ id: phenomena.id });
 
   if (!row) {
-    return c.json({ error: 'Not found' }, 404);
+    return c.json({ error: t(locale, 'errors.notFound') }, 404);
   }
 
   return c.body(null, 204);

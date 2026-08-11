@@ -10,6 +10,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json ./
 COPY tsconfig.json drizzle.config.ts ./
 COPY drizzle ./drizzle
+COPY locales ./locales
+COPY public ./public
 COPY src ./src
 EXPOSE 3001
 # Migrate, seed admin if missing, then serve. Secrets come from the host env.

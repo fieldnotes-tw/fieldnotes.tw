@@ -25,16 +25,16 @@ locals {
     cat >/etc/nginx/conf.d/api.conf <<'NGINX'
     server {
       listen 80 default_server;
-      location /api/ {
+      client_max_body_size 20m;
+      location / {
         proxy_pass http://127.0.0.1:${var.api_container_port};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-      }
-      location / {
-        return 404;
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header Accept-Language $http_accept_language;
       }
     }
     NGINX
@@ -68,6 +68,26 @@ locals {
     SES_REGION=$(echo "$APP_JSON" | jq -r .ses_region)
     MEDIA_BUCKET=$(echo "$APP_JSON" | jq -r .media_bucket)
     MEDIA_PUBLIC_PREFIX=$(echo "$APP_JSON" | jq -r .media_public_prefix)
+    SEED_DEMO=$(echo "$APP_JSON" | jq -r '.seed_demo // "0"')
+
+    # Port is baked by Terraform; quoted heredoc keeps nginx $vars literal.
+    cat >/etc/nginx/conf.d/api.conf <<'NGINX'
+    server {
+      listen 80 default_server;
+      client_max_body_size 20m;
+      location / {
+        proxy_pass http://127.0.0.1:${var.api_container_port};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header Accept-Language $http_accept_language;
+      }
+    }
+    NGINX
+    nginx -t && systemctl reload nginx
 
     docker pull "$REPO:$IMAGE_TAG"
     docker rm -f fieldnotes-api || true
@@ -88,6 +108,7 @@ locals {
       -e MAIL_MODE="$MAIL_MODE" \
       -e MEDIA_BUCKET="$MEDIA_BUCKET" \
       -e MEDIA_PUBLIC_PREFIX="$MEDIA_PUBLIC_PREFIX" \
+      -e SEED_DEMO="$SEED_DEMO" \
       "$REPO:$IMAGE_TAG"
     SCRIPT
     chmod +x /usr/local/bin/fieldnotes-deploy.sh

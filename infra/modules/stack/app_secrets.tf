@@ -26,5 +26,6 @@ resource "aws_secretsmanager_secret_version" "app" {
     ses_region           = var.ses_region
     media_bucket         = aws_s3_bucket.media.bucket
     media_public_prefix  = "/media"
+    seed_demo            = var.seed_demo ? "1" : "0"
   })
 }

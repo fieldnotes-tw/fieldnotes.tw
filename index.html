@@ -2,7 +2,7 @@
 <html lang="zh-Hant" data-theme="light">
 <head>
   <meta charset="UTF-8">
-  <title>最近左營</title>
+  <title data-i18n-title="brand.title">最近左營</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -22,13 +22,13 @@
 
 <div class="floatingbar" id="floatingbar">
   <div class="floatingbar__row">
-    <a href="#top" class="brand-mark" aria-label="最近左營"><span>最</span><span>近</span><span>左</span><span>營</span></a>
+    <a href="#top" class="brand-mark" data-i18n-aria-label="brand.name" aria-label="最近左營"><span>最</span><span>近</span><span>左</span><span>營</span></a>
     <div class="floatingbar__menu">
-      <label class="cat-toggle check-item" data-cat="animal"><span class="check-item__box"></span>動物</label>
-      <label class="cat-toggle check-item" data-cat="plant"><span class="check-item__box"></span>植物</label>
-      <label class="cat-toggle check-item" data-cat="sky"><span class="check-item__box"></span>天文地景</label>
-      <label class="cat-toggle check-item" data-cat="taste"><span class="check-item__box"></span>當季滋味</label>
-      <label class="cat-toggle check-item" data-cat="workshop"><span class="check-item__box"></span>工作坊</label>
+      <label class="cat-toggle check-item" data-cat="animal"><span class="check-item__box"></span><span data-i18n="category.animal">動物</span></label>
+      <label class="cat-toggle check-item" data-cat="plant"><span class="check-item__box"></span><span data-i18n="category.plant">植物</span></label>
+      <label class="cat-toggle check-item" data-cat="sky"><span class="check-item__box"></span><span data-i18n="category.sky">天文地景</span></label>
+      <label class="cat-toggle check-item" data-cat="taste"><span class="check-item__box"></span><span data-i18n="category.taste">當季滋味</span></label>
+      <label class="cat-toggle check-item" data-cat="workshop"><span class="check-item__box"></span><span data-i18n="category.workshop">工作坊</span></label>
     </div>
     <div class="auth-nav" data-auth-nav></div>
   </div>
@@ -36,36 +36,36 @@
 
 <header class="sitehead" id="top">
   <div class="sitehead__weather serif-ui">
-    <span class="sitehead__weather-text"><span id="todayDate">今天</span> <span id="weatherText">天氣讀取中…</span></span>
+    <span class="sitehead__weather-text"><span id="todayDate" data-i18n="home.today">今天</span> <span id="weatherText" data-i18n="home.weatherLoading">天氣讀取中…</span></span>
     <div class="auth-nav" data-auth-nav></div>
   </div>
   <div class="sitehead__brandrow">
     <div class="sitehead__identity">
       <h1 class="brand-mark"><span>最</span><span>近</span><span>左</span><span>營</span></h1>
       <div class="sitehead__taglines">
-        <span>正在發生的自然現象</span>
-        <span>還有和土地相關的生活事</span>
+        <span data-i18n="home.tagline1">正在發生的自然現象</span>
+        <span data-i18n="home.tagline2">還有和土地相關的生活事</span>
       </div>
     </div>
-    <nav class="sitehead__menu" aria-label="分類選單">
-      <span class="cat-toggle sitehead__menu-oval" data-cat="plant" role="button" tabindex="0" aria-pressed="false" aria-label="植物"><span>植</span><span>物</span></span>
-      <span class="cat-toggle sitehead__menu-oval" data-cat="animal" role="button" tabindex="0" aria-pressed="false" aria-label="動物"><span>動</span><span>物</span></span>
-      <span class="cat-toggle sitehead__menu-oval" data-cat="sky" role="button" tabindex="0" aria-pressed="false" aria-label="天文地景"><span>天</span><span>文</span><span>地</span><span>景</span></span>
-      <span class="cat-toggle sitehead__menu-oval" data-cat="taste" role="button" tabindex="0" aria-pressed="false" aria-label="當季滋味"><span>當</span><span>季</span><span>滋</span><span>味</span></span>
-      <span class="cat-toggle sitehead__menu-oval" data-cat="workshop" role="button" tabindex="0" aria-pressed="false" aria-label="工作坊"><span>工</span><span>作</span><span>坊</span></span>
+    <nav class="sitehead__menu" data-i18n-aria-label="nav.categories" aria-label="分類選單">
+      <span class="cat-toggle sitehead__menu-oval" data-cat="plant" role="button" tabindex="0" aria-pressed="false" data-i18n-aria-label="category.plant" data-i18n-chars="category.plant" aria-label="植物"><span>植</span><span>物</span></span>
+      <span class="cat-toggle sitehead__menu-oval" data-cat="animal" role="button" tabindex="0" aria-pressed="false" data-i18n-aria-label="category.animal" data-i18n-chars="category.animal" aria-label="動物"><span>動</span><span>物</span></span>
+      <span class="cat-toggle sitehead__menu-oval" data-cat="sky" role="button" tabindex="0" aria-pressed="false" data-i18n-aria-label="category.sky" data-i18n-chars="category.sky" aria-label="天文地景"><span>天</span><span>文</span><span>地</span><span>景</span></span>
+      <span class="cat-toggle sitehead__menu-oval" data-cat="taste" role="button" tabindex="0" aria-pressed="false" data-i18n-aria-label="category.taste" data-i18n-chars="category.taste" aria-label="當季滋味"><span>當</span><span>季</span><span>滋</span><span>味</span></span>
+      <span class="cat-toggle sitehead__menu-oval" data-cat="workshop" role="button" tabindex="0" aria-pressed="false" data-i18n-aria-label="category.workshop" data-i18n-chars="category.workshop" aria-label="工作坊"><span>工</span><span>作</span><span>坊</span></span>
     </nav>
   </div>
 </header>
 
 <section class="section" id="phenomena">
-  <div class="view-toggle" role="group" aria-label="切換檢視方式">
+  <div class="view-toggle" role="group" data-i18n-aria-label="home.viewToggle" aria-label="切換檢視方式">
     <button type="button" class="view-toggle__btn is-active" data-view="list">
       <svg class="view-toggle__icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
-      卡片
+      <span data-i18n="home.view.cards">卡片</span>
     </button>
     <button type="button" class="view-toggle__btn" data-view="map">
       <svg class="view-toggle__icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>
-      地圖
+      <span data-i18n="home.view.map">地圖</span>
     </button>
   </div>
 
@@ -74,10 +74,10 @@
   <div class="map-view is-hidden" id="mapView">
     <div class="map-frame" id="mapFrame">
       <div class="map-sheet" id="mapSheet">
-        <button type="button" class="map-sheet__close" id="mapSheetClose" aria-label="關閉">
+        <button type="button" class="map-sheet__close" id="mapSheetClose" data-i18n-aria-label="home.close" aria-label="關閉">
           <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
         </button>
-        <button type="button" class="map-sheet__collapse" id="mapSheetCollapse" aria-label="收合面板">
+        <button type="button" class="map-sheet__collapse" id="mapSheetCollapse" data-i18n-aria-label="home.collapsePanel" aria-label="收合面板">
           <svg viewBox="0 0 24 24" width="14" height="14"><path d="M15 5 L8 12 L15 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
         </button>
         <div class="map-sheet__body" id="mapSheetBody"></div>
@@ -90,7 +90,7 @@
 <div class="card-modal" id="cardModal">
   <div class="card-modal__backdrop" id="cardModalBackdrop"></div>
   <div class="card-modal__panel" id="cardModalPanel">
-    <button type="button" class="card-modal__close" id="cardModalClose" aria-label="關閉">
+    <button type="button" class="card-modal__close" id="cardModalClose" data-i18n-aria-label="home.close" aria-label="關閉">
       <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
     </button>
     <div class="card-modal__body" id="cardModalBody"></div>
@@ -98,7 +98,7 @@
 </div>
 
 <section class="contributors" id="contributors">
-  <div class="contributors__head">在地觀察員</div>
+  <div class="contributors__head" data-i18n="home.contributors.title">在地觀察員</div>
   <p class="contributors__intro">這些是目前參與觀察、和我們分享左營生活與生態的在地朋友，點名字看更多介紹：</p>
   <ul class="observer-list">
     <li class="observer-item">
@@ -175,10 +175,10 @@
 
 <footer id="about">
   <div class="about__block">
-    <div class="about__head">關於這個網站</div>
+    <div class="about__head" data-i18n="home.about.title">關於這個網站</div>
     <div class="about__row">
       <div class="about__bird-wrap">
-        <p class="about__bird-bubble">最近龍眼很甜內。</p>
+        <p class="about__bird-bubble" data-i18n="home.about.birdBubble">最近龍眼很甜內。</p>
         <svg class="about__bird rough" viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="50" cy="50" r="16"/>
           <path d="M64 46 L82 38 L68 56 Z"/>
@@ -187,18 +187,18 @@
         </svg>
       </div>
       <div>
-        <p class="about__text"><strong>《最近左營》</strong>：一個由在地居民共同記錄的地方筆記。這裡記錄左營隨著季節而出現的生態現象和地方生活，分享最近值得去看看的事情。希望透過這些觀察，讓更多人看見左營一年四季不同的樣貌，以及生活在這裡的各種生命。</p>
-        <p class="about__cta">如果你也想加入觀察、一起記錄左營，歡迎<a href="https://forms.gle/Ln8WBNaK5s8fggTYA" class="about__cta-link" target="_blank" rel="noopener">申請加入我們的觀察群組</a>（目前先請填一份簡單表單，避免不明人士直接加入）。</p>
+        <p class="about__text"><strong data-i18n="home.about.bodyTitle">《最近左營》</strong><span data-i18n="home.about.body">：一個由在地居民共同記錄的地方筆記。這裡記錄左營隨著季節而出現的生態現象和地方生活，分享最近值得去看看的事情。希望透過這些觀察，讓更多人看見左營一年四季不同的樣貌，以及生活在這裡的各種生命。</span></p>
+        <p class="about__cta"><span data-i18n="home.about.ctaBefore">如果你也想加入觀察、一起記錄左營，歡迎</span><a href="https://forms.gle/Ln8WBNaK5s8fggTYA" class="about__cta-link" target="_blank" rel="noopener" data-i18n="home.about.ctaLink">申請加入我們的觀察群組</a><span data-i18n="home.about.ctaAfter">（目前先請填一份簡單表單，避免不明人士直接加入）。</span></p>
       </div>
     </div>
   </div>
   <div class="footer__row">
-    <span class="credit">最近左營 · 一份持續生長的地方筆記</span>
-    <span class="credit">首頁 Prototype</span>
+    <span class="credit" data-i18n="home.footer.credit">最近左營 · 一份持續生長的地方筆記</span>
+    <span class="credit" data-i18n="home.footer.prototype">首頁 Prototype</span>
   </div>
 </footer>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="i18n.js"></script>
 <script src="auth.js"></script>
 <script type="module" src="app.js"></script>
 </body>

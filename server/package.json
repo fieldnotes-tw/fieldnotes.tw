@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
+    "dev": "tsx watch --exclude '../node_modules/**' --exclude '**/node_modules/**' --exclude '**/.vite-temp/**' src/index.ts",
+    "start": "NODE_ENV=production tsx src/index.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
@@ -21,6 +21,7 @@
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.2.1",
     "drizzle-orm": "^0.44.4",
+    "eta": "^4.6.0",
     "hono": "^4.9.2",
     "postgres": "^3.4.7",
     "zod": "^4.0.17"
@@ -30,6 +31,7 @@
     "@types/node": "^24.3.0",
     "drizzle-kit": "^0.31.4",
     "tsx": "^4.20.4",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vite": "^7.3.6"
   }
 }

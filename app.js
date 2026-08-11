@@ -1,12 +1,5 @@
 const REPORT_FORM_URL = 'https://forms.gle/Ln8WBNaK5s8fggTYA';
 
-const STATUS_PILL = {
-  active: '正在發生',
-  upcoming: '即將到來',
-  ending: '即將結束',
-  ended: '已結束',
-};
-
 const gridFeed = document.getElementById('gridFeed');
 const mapView = document.getElementById('mapView');
 const mapSheet = document.getElementById('mapSheet');
@@ -25,6 +18,10 @@ const selectedCats = new Set();
 const ZUOYING_CENTER = [22.688, 120.297];
 let leafletMap = null;
 const markerRefs = [];
+
+function statusLabel(status) {
+  return t(`status.${status}`) || t('status.active');
+}
 
 function applyFilters() {
   const catActive = selectedCats.size > 0;
@@ -55,37 +52,36 @@ catToggles.forEach((el) => el.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
 }));
 
-const todayEl = document.getElementById('todayDate');
-if (todayEl) {
+function formatToday() {
+  const todayEl = document.getElementById('todayDate');
+  if (!todayEl) return;
+  const locale = getLocale() === 'en' ? 'en-US' : 'zh-TW';
   const d = new Date();
-  const parts = new Intl.DateTimeFormat('zh-TW', { month: 'numeric', day: 'numeric', weekday: 'long' }).formatToParts(d);
-  const get = (t) => parts.find((p) => p.type === t)?.value || '';
-  todayEl.textContent = `${get('month')}月${get('day')}日 ${get('weekday')}`;
+  const parts = new Intl.DateTimeFormat(locale, { month: 'numeric', day: 'numeric', weekday: 'long' }).formatToParts(d);
+  const get = (type) => parts.find((p) => p.type === type)?.value || '';
+  todayEl.textContent = t('home.date', {
+    month: get('month'),
+    day: get('day'),
+    weekday: get('weekday'),
+  });
 }
 
-// WMO weather codes -> zh-TW description. https://open-meteo.com/en/docs
-const WMO_TEXT = {
-  0: '晴朗', 1: '晴時多雲', 2: '多雲', 3: '陰天',
-  45: '有霧', 48: '有霧',
-  51: '毛毛雨', 53: '毛毛雨', 55: '毛毛雨',
-  56: '凍雨', 57: '凍雨',
-  61: '小雨', 63: '中雨', 65: '大雨',
-  66: '凍雨', 67: '凍雨',
-  71: '小雪', 73: '中雪', 75: '大雪', 77: '陣雪',
-  80: '短暫陣雨', 81: '短暫陣雨', 82: '強陣雨',
-  85: '短暫陣雪', 86: '強陣雪',
-  95: '雷陣雨', 96: '雷陣雨', 99: '強雷陣雨',
-};
-const weatherEl = document.getElementById('weatherText');
-if (weatherEl) {
-  fetch('https://api.open-meteo.com/v1/forecast?latitude=22.688&longitude=120.297&current=temperature_2m,weather_code&timezone=Asia%2FTaipei')
-    .then((res) => res.json())
-    .then((data) => {
-      const temp = Math.round(data.current.temperature_2m);
-      const desc = WMO_TEXT[data.current.weather_code] || '';
-      weatherEl.textContent = `${desc} ${temp}°C`;
-    })
-    .catch(() => { weatherEl.textContent = '天氣資料暫時無法取得'; });
+function weatherTextForCode(code) {
+  return t(`weather.${code}`) || '';
+}
+
+async function loadWeather() {
+  const weatherEl = document.getElementById('weatherText');
+  if (!weatherEl) return;
+  try {
+    const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=22.688&longitude=120.297&current=temperature_2m,weather_code&timezone=Asia%2FTaipei');
+    const data = await res.json();
+    const temp = Math.round(data.current.temperature_2m);
+    const desc = weatherTextForCode(data.current.weather_code);
+    weatherEl.textContent = `${desc} ${temp}°C`;
+  } catch {
+    weatherEl.textContent = t('home.weatherUnavailable');
+  }
 }
 
 function observerInitial(name) {
@@ -120,7 +116,7 @@ function renderCard(item) {
   const pill = document.createElement('span');
   pill.className = 'pill';
   pill.innerHTML = '<span class="dot"></span>';
-  pill.append(STATUS_PILL[item.status] || STATUS_PILL.active);
+  pill.append(statusLabel(item.status));
 
   const title = document.createElement('h3');
   title.className = 'card__title';
@@ -235,8 +231,9 @@ function buildDetailNodes(card) {
   if (card.dataset.location) {
     const locationRow = document.createElement('p');
     locationRow.className = 'detail__row';
-    locationRow.innerHTML = '<strong>地點</strong>';
-    locationRow.append(' ' + card.dataset.location);
+    const strong = document.createElement('strong');
+    strong.textContent = t('home.detail.location');
+    locationRow.append(strong, ' ' + card.dataset.location);
     body.appendChild(locationRow);
   }
 
@@ -244,16 +241,18 @@ function buildDetailNodes(card) {
   if (metaText) {
     const meta = document.createElement('p');
     meta.className = 'detail__row';
-    meta.innerHTML = '<strong>上次看見</strong>';
-    meta.append(' ' + metaText);
+    const strong = document.createElement('strong');
+    strong.textContent = t('home.detail.lastSeen');
+    meta.append(strong, ' ' + metaText);
     body.appendChild(meta);
   }
 
   if (card.dataset.notes) {
     const notesRow = document.createElement('p');
     notesRow.className = 'detail__row';
-    notesRow.innerHTML = '<strong>注意事項</strong>';
-    notesRow.append(' ' + card.dataset.notes);
+    const strong = document.createElement('strong');
+    strong.textContent = t('home.detail.notes');
+    notesRow.append(strong, ' ' + card.dataset.notes);
     body.appendChild(notesRow);
   }
 
@@ -262,7 +261,7 @@ function buildDetailNodes(card) {
   cta.href = REPORT_FORM_URL;
   cta.target = '_blank';
   cta.rel = 'noopener';
-  cta.textContent = '回報最新狀態（申請加入觀察群組）';
+  cta.textContent = t('home.detail.reportCta');
   body.appendChild(cta);
 
   return [photoWrap, body];
@@ -338,12 +337,14 @@ function showFeedMessage(message) {
 async function loadPhenomena() {
   gridFeed.replaceChildren();
   try {
-    const res = await fetch('/api/phenomena');
+    const res = await fetch('/api/phenomena', {
+      headers: { 'Accept-Language': getLocale() },
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json();
     const items = payload.data ?? [];
     if (!items.length) {
-      showFeedMessage('目前還沒有正在發生的現象。');
+      showFeedMessage(t('home.feed.empty'));
       return;
     }
     const nodes = items.map(renderCard);
@@ -354,8 +355,11 @@ async function loadPhenomena() {
     applyFilters();
   } catch (err) {
     console.error(err);
-    showFeedMessage('無法載入現象資料，請稍後再試。');
+    showFeedMessage(t('home.feed.error'));
   }
 }
 
+await i18nReady;
+formatToday();
+loadWeather();
 loadPhenomena();

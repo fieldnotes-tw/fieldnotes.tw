@@ -1,0 +1,13 @@
+<header class="auth-page-head">
+  <a href="/" class="brand-mark" aria-label="<%= it.t('brand.name') %>"><span>最</span><span>近</span><span>左</span><span>營</span></a>
+  <div class="auth-nav" data-auth-nav></div>
+</header>
+
+<main class="auth-main">
+  <div class="auth-form">
+    <h1 class="auth-form__title"><%= it.t('auth.confirm.title') %></h1>
+    <p class="auth-form__success" id="confirmStatus"><%= it.t('auth.confirm.working') %></p>
+    <p class="auth-form__error" id="confirmError" hidden></p>
+    <p class="auth-form__switch"><a href="/login"><%= it.t('auth.confirm.goLogin') %></a></p>
+  </div>
+</main>

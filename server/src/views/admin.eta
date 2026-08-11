@@ -1,0 +1,150 @@
+<header class="auth-page-head">
+  <a href="/" class="brand-mark" aria-label="<%= it.t('brand.name') %>"><span>最</span><span>近</span><span>左</span><span>營</span></a>
+  <div class="auth-nav" data-auth-nav></div>
+</header>
+
+<main class="admin-main">
+  <div class="admin-head">
+    <h1 class="admin-head__title"><%= it.t('admin.title') %></h1>
+    <p class="admin-head__sub"><%= it.t('admin.subtitle') %></p>
+  </div>
+
+  <section class="admin-panel">
+    <div class="admin-panel__bar">
+      <div>
+        <h2 class="admin-panel__title"><%= it.t('admin.phenomena.title') %></h2>
+        <p class="admin-panel__meta" id="phenomenaMeta"><%= it.t('admin.phenomena.loading') %></p>
+      </div>
+      <button type="button" class="admin-btn admin-btn--primary" id="btnNewPhenomenon"><%= it.t('admin.phenomena.new') %></button>
+    </div>
+
+    <div class="admin-filters" role="group" aria-label="<%= it.t('admin.filters.status') %>">
+      <button type="button" class="admin-filters__btn is-active" data-status="all"><%= it.t('status.all') %></button>
+      <button type="button" class="admin-filters__btn" data-status="active"><%= it.t('status.active') %></button>
+      <button type="button" class="admin-filters__btn" data-status="upcoming"><%= it.t('status.upcoming') %></button>
+      <button type="button" class="admin-filters__btn" data-status="ending"><%= it.t('status.ending') %></button>
+      <button type="button" class="admin-filters__btn" data-status="ended"><%= it.t('status.ended') %></button>
+    </div>
+
+    <div class="admin-table-wrap">
+      <table class="admin-table" id="phenomenaTable">
+        <thead>
+          <tr>
+            <th><%= it.t('admin.table.image') %></th>
+            <th><%= it.t('admin.table.title') %></th>
+            <th><%= it.t('admin.table.category') %></th>
+            <th><%= it.t('admin.table.status') %></th>
+            <th><%= it.t('admin.table.actions') %></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="admin-panel" id="phenomenonEditor" hidden>
+    <h2 class="admin-panel__title" id="phenomenonEditorTitle"><%= it.t('admin.phenomena.new') %></h2>
+    <form class="admin-form" id="phenomenonForm">
+      <label class="admin-form__field">
+        <span><%= it.t('admin.form.title') %></span>
+        <input id="f_title" required maxlength="200">
+      </label>
+      <label class="admin-form__field">
+        <span><%= it.t('admin.form.description') %></span>
+        <textarea id="f_description" required maxlength="2000" rows="4"></textarea>
+      </label>
+      <div class="admin-form__row">
+        <label class="admin-form__field">
+          <span><%= it.t('admin.form.category') %></span>
+          <select id="f_category">
+            <option value="plant"><%= it.t('category.plant') %></option>
+            <option value="animal"><%= it.t('category.animal') %></option>
+            <option value="sky"><%= it.t('category.sky') %></option>
+            <option value="taste"><%= it.t('category.taste') %></option>
+            <option value="workshop"><%= it.t('category.workshop') %></option>
+          </select>
+        </label>
+        <label class="admin-form__field">
+          <span><%= it.t('admin.form.status') %></span>
+          <select id="f_status">
+            <option value="active"><%= it.t('status.active') %></option>
+            <option value="upcoming"><%= it.t('status.upcoming') %></option>
+            <option value="ending"><%= it.t('status.ending') %></option>
+            <option value="ended"><%= it.t('status.ended') %></option>
+          </select>
+        </label>
+      </div>
+      <div class="admin-form__row">
+        <label class="admin-form__field">
+          <span><%= it.t('admin.form.location') %></span>
+          <input id="f_location" maxlength="300">
+        </label>
+        <label class="admin-form__field">
+          <span><%= it.t('admin.form.observer') %></span>
+          <input id="f_observerName" maxlength="100">
+        </label>
+      </div>
+      <div class="admin-form__row">
+        <label class="admin-form__field">
+          <span><%= it.t('admin.form.lat') %></span>
+          <input id="f_lat" type="number" step="any" min="-90" max="90">
+        </label>
+        <label class="admin-form__field">
+          <span><%= it.t('admin.form.lng') %></span>
+          <input id="f_lng" type="number" step="any" min="-180" max="180">
+        </label>
+      </div>
+      <label class="admin-form__field">
+        <span><%= it.t('admin.form.notes') %></span>
+        <textarea id="f_notes" maxlength="2000" rows="3"></textarea>
+      </label>
+      <label class="admin-form__field">
+        <span><%= it.t('admin.form.metaLabel') %></span>
+        <input id="f_metaLabel" maxlength="200" placeholder="<%= it.t('admin.form.metaPlaceholder') %>">
+      </label>
+
+      <div class="admin-upload">
+        <label class="admin-form__field">
+          <span><%= it.t('admin.form.image') %></span>
+          <input id="f_image" type="file" accept="image/jpeg,image/png,image/webp">
+        </label>
+        <img id="imagePreview" class="admin-upload__preview" alt="" hidden>
+        <p class="admin-upload__path" id="imagePath"><%= it.t('admin.form.imageNone') %></p>
+        <label class="admin-form__field">
+          <span><%= it.t('admin.form.imageAlt') %></span>
+          <input id="f_imageAlt" maxlength="500">
+        </label>
+      </div>
+
+      <p class="auth-form__error" id="phenomenonError" hidden></p>
+      <div class="admin-form__actions">
+        <button type="button" class="admin-btn" id="btnCancelEditor"><%= it.t('admin.form.cancel') %></button>
+        <button type="submit" class="admin-btn admin-btn--primary"><%= it.t('admin.form.save') %></button>
+      </div>
+    </form>
+  </section>
+
+  <section class="admin-panel">
+    <h2 class="admin-panel__title"><%= it.t('admin.users.title') %></h2>
+    <p class="admin-panel__meta" id="adminUserMeta"><%= it.t('admin.users.loading') %></p>
+    <div class="admin-table-wrap">
+      <table class="admin-table" id="adminUsersTable">
+        <thead>
+          <tr>
+            <th><%= it.t('admin.users.email') %></th>
+            <th><%= it.t('admin.users.role') %></th>
+            <th><%= it.t('admin.users.verified') %></th>
+            <th><%= it.t('admin.users.created') %></th>
+            <th><%= it.t('admin.users.actions') %></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="admin-panel admin-panel--muted">
+    <h2 class="admin-panel__title"><%= it.t('admin.moderation.title') %></h2>
+    <p class="admin-panel__meta"><%= it.t('admin.moderation.meta') %></p>
+  </section>
+</main>

@@ -1,27 +1,29 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  // Prod assets are served under /assets/*; dev middleware uses "/".
+  base: command === 'build' ? '/assets/' : '/',
+  // Don't copy the site's public/ tree into the asset outDir.
+  publicDir: false,
   build: {
+    outDir: 'server/public/assets',
+    emptyOutDir: true,
+    manifest: true,
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
-        login: resolve(__dirname, 'login.html'),
-        register: resolve(__dirname, 'register.html'),
-        confirm: resolve(__dirname, 'confirm.html'),
-        admin: resolve(__dirname, 'admin.html'),
-        submit: resolve(__dirname, 'submit.html'),
+        main: resolve(__dirname, 'client/main.js'),
+      },
+      output: {
+        entryFileNames: '[name]-[hash].js',
+        chunkFileNames: '[name]-[hash].js',
+        assetFileNames: '[name]-[hash][extname]',
       },
     },
   },
   server: {
-    port: 5173,
-    open: false,
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:3001',
-        changeOrigin: true,
-      },
-    },
+    // Used when Vite runs in middleware mode from the Hono server.
+    middlewareMode: true,
   },
-});
+  appType: 'custom',
+}));

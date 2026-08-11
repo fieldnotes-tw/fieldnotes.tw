@@ -1,0 +1,29 @@
+<header class="auth-page-head">
+  <a href="/" class="brand-mark" aria-label="<%= it.t('brand.name') %>"><span>最</span><span>近</span><span>左</span><span>營</span></a>
+  <div class="auth-nav" data-auth-nav></div>
+</header>
+
+<main class="auth-main">
+  <form class="auth-form" id="registerForm" novalidate>
+    <h1 class="auth-form__title"><%= it.t('auth.register.title') %></h1>
+    <label class="auth-form__field">
+      <span><%= it.t('auth.field.email') %></span>
+      <input type="email" name="email" autocomplete="email" required maxlength="254">
+    </label>
+    <label class="auth-form__field">
+      <span><%= it.t('auth.field.password') %></span>
+      <input type="password" name="password" autocomplete="new-password" required minlength="8">
+    </label>
+    <label class="auth-form__field">
+      <span><%= it.t('auth.register.confirmPassword') %></span>
+      <input type="password" name="confirmPassword" autocomplete="new-password" required minlength="8">
+    </label>
+    <p class="auth-form__error" id="registerError" hidden></p>
+    <p class="auth-form__success" id="registerSuccess" hidden></p>
+    <button type="submit" class="auth-form__submit"><%= it.t('auth.register.submit') %></button>
+    <button type="button" class="auth-form__secondary" id="resendBtn" hidden><%= it.t('auth.register.resend') %></button>
+    <div class="auth-form__divider"><span><%= it.t('auth.register.or') %></span></div>
+    <button type="button" class="auth-form__line-btn" id="lineRegisterBtn" disabled><%= it.t('auth.register.line') %></button>
+    <p class="auth-form__switch"><span><%= it.t('auth.register.switch') %></span><a href="/login"><%= it.t('auth.register.switchLink') %></a></p>
+  </form>
+</main>

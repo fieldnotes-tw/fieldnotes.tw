@@ -3,16 +3,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "locales:sync": "mkdir -p server/locales server/public/locales && cp public/locales/*.json server/locales/ && cp public/locales/*.json server/public/locales/",
+    "static:sync": "npm run locales:sync && mkdir -p server/public/js/pages server/public/fonts && cp public/i18n.js public/auth.js public/admin.js server/public/js/ && cp fonts/kaiti-tc-bold-subset.woff2 server/public/fonts/",
+    "seed:media-local": "mkdir -p server/public/media/phenomena server/public/images && cp public/images/*.jpg server/public/media/phenomena/ && cp public/images/*.jpg server/public/images/",
+    "assets:build": "vite build",
+    "prebuild": "npm run static:sync",
+    "build": "npm run assets:build",
+    "dev": "npm run locales:sync && npm run seed:media-local && npm run dev:server",
     "dev:server": "npm --prefix server run dev",
-    "dev:all": "npm run dev:server & npm run dev",
-    "build": "vite build",
-    "preview": "vite preview",
     "db:up": "docker-compose up -d",
     "db:down": "docker-compose down",
     "db:push": "npm --prefix server run db:push",
     "db:seed": "npm --prefix server run db:seed",
-    "db:reseed": "SEED_RESET=1 npm --prefix server run db:seed"
+    "db:reseed": "SEED_DEMO=1 SEED_RESET=1 npm --prefix server run db:seed"
   },
   "devDependencies": {
     "vite": "^7.0.6"

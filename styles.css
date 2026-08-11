@@ -71,7 +71,7 @@
    the ovals silently fall back to plain serif on mobile. */
 @font-face{
   font-family:"Kaiti Subset";
-  src:url("fonts/kaiti-tc-bold-subset.woff2") format("woff2");
+  src:url("/fonts/kaiti-tc-bold-subset.woff2") format("woff2");
   font-weight:700; font-style:normal; font-display:swap;
 }
 
@@ -175,6 +175,12 @@ html.is-blink .brand-mark{
   border:2px solid #1A1A1A;
 }
 .sitehead__menu-oval > span{ display:block; line-height:1; }
+/* Latin letters need a Latin face + slightly smaller type to stack in the ovals. */
+html[lang="en"] .sitehead__menu-oval{
+  font-family:"Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;
+  font-size:clamp(0.92rem,1.7vw,1.15rem);
+  letter-spacing:0.02em;
+}
 .sitehead__menu-oval:hover{ transform:translateY(-3px); filter:brightness(1.08); }
 .sitehead__menu-oval[data-cat="plant"]{ background:var(--cat-plant); }
 .sitehead__menu-oval[data-cat="animal"]{ background:var(--cat-animal); }
@@ -215,6 +221,14 @@ html.is-blink .brand-mark{
 
 /* ---------- auth nav ---------- */
 .auth-nav{ display:flex; align-items:center; gap:0.5rem; flex:0 0 auto; }
+.lang-switch{ display:inline-flex; align-items:center; gap:0.15rem; margin-right:0.15rem; }
+.lang-switch__btn{
+  appearance:none; border:0; background:transparent; cursor:pointer;
+  font:inherit; font-size:0.72rem; letter-spacing:0.04em; color:var(--ink-faint);
+  padding:0.2rem 0.35rem;
+}
+.lang-switch__btn.is-active{ color:var(--ink); font-weight:600; }
+.lang-switch__btn:not(.is-active):hover{ color:var(--ink); }
 .auth-nav__btn{
   display:inline-block; font-weight:700; font-size:0.82rem; line-height:1;
   padding:0.45rem 0.9rem; border-radius:100px;

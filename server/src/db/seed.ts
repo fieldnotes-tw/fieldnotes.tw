@@ -123,6 +123,13 @@ async function seedAdmin() {
 }
 
 async function seedPhenomena() {
+  // Demo cards are opt-in. Production should stay empty until real observers post.
+  // Local/staging: SEED_DEMO=1. Images live in public/images (or S3), not the app bundle.
+  if (process.env.SEED_DEMO !== '1') {
+    console.log('SEED_DEMO not set; skipping phenomena seed (empty catalog).');
+    return;
+  }
+
   const reset = process.env.SEED_RESET === '1';
 
   if (reset) {
@@ -137,12 +144,12 @@ async function seedPhenomena() {
   }
 
   await db.insert(phenomena).values(seedData);
-  console.log(`Seeded ${seedData.length} phenomena.`);
+  console.log(`Seeded ${seedData.length} demo phenomena.`);
 }
 
 async function seed() {
-  await seedPhenomena();
   await seedAdmin();
+  await seedPhenomena();
   process.exit(0);
 }
 

@@ -26,5 +26,5 @@ export const createPhenomenonSchema = z.object({
 
 export const updatePhenomenonSchema = createPhenomenonSchema.partial().refine(
   (value) => Object.keys(value).length > 0,
-  { message: 'At least one field is required' },
+  { message: 'errors.atLeastOneField' },
 );

@@ -1,4 +1,3 @@
-import { zValidator } from '@hono/zod-validator';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -16,7 +15,10 @@ import {
   toPublicUser,
   verifyPassword,
 } from '../lib/auth.js';
+import { localeOf, t } from '../lib/i18n.js';
 import { sendConfirmEmail } from '../lib/mail.js';
+import { validated } from '../lib/validate.js';
+import type { LocaleEnv } from '../middleware/locale.js';
 
 const credentialsSchema = z.object({
   email: z.string().trim().email().max(254),
@@ -27,7 +29,7 @@ const emailOnlySchema = z.object({
   email: z.string().trim().email().max(254),
 });
 
-export const authRoutes = new Hono();
+export const authRoutes = new Hono<LocaleEnv>();
 
 authRoutes.get('/me', async (c) => {
   const user = await readSessionUser(c);
@@ -37,7 +39,8 @@ authRoutes.get('/me', async (c) => {
   return c.json({ data: user });
 });
 
-authRoutes.post('/register', zValidator('json', credentialsSchema), async (c) => {
+authRoutes.post('/register', validated('json', credentialsSchema), async (c) => {
+  const locale = localeOf(c);
   const email = normalizeEmail(c.req.valid('json').email);
   const { password } = c.req.valid('json');
 
@@ -48,7 +51,7 @@ authRoutes.post('/register', zValidator('json', credentialsSchema), async (c) =>
     .limit(1);
 
   if (existing?.emailVerifiedAt) {
-    return c.json({ error: 'Email already registered' }, 409);
+    return c.json({ error: t(locale, 'errors.emailAlreadyRegistered') }, 409);
   }
 
   const { token, tokenHash, expiresAt } = createConfirmToken();
@@ -75,31 +78,26 @@ authRoutes.post('/register', zValidator('json', credentialsSchema), async (c) =>
   }
 
   try {
-    await sendConfirmEmail(email, token);
+    await sendConfirmEmail(email, token, locale);
   } catch (err) {
     console.error('Failed to send confirmation email', err);
-    return c.json(
-      {
-        error:
-          'Unable to send confirmation email. SES domain/recipient may still be unverified.',
-      },
-      503,
-    );
+    return c.json({ error: t(locale, 'errors.confirmEmailSendFailed') }, 503);
   }
   return c.json({ data: { email } }, 201);
 });
 
-authRoutes.post('/login', zValidator('json', credentialsSchema), async (c) => {
+authRoutes.post('/login', validated('json', credentialsSchema), async (c) => {
+  const locale = localeOf(c);
   const email = normalizeEmail(c.req.valid('json').email);
   const { password } = c.req.valid('json');
 
   const [row] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   if (!row || !(await verifyPassword(password, row.passwordHash))) {
-    return c.json({ error: 'Invalid email or password' }, 401);
+    return c.json({ error: t(locale, 'errors.invalidCredentials') }, 401);
   }
 
   if (!row.emailVerifiedAt) {
-    return c.json({ error: 'Email not confirmed' }, 403);
+    return c.json({ error: t(locale, 'errors.emailNotConfirmed') }, 403);
   }
 
   const publicUser = toPublicUser(row);
@@ -109,9 +107,10 @@ authRoutes.post('/login', zValidator('json', credentialsSchema), async (c) => {
 });
 
 authRoutes.get('/confirm', async (c) => {
+  const locale = localeOf(c);
   const token = c.req.query('token')?.trim();
   if (!token) {
-    return c.json({ error: 'Missing confirmation token' }, 400);
+    return c.json({ error: t(locale, 'errors.missingConfirmToken') }, 400);
   }
 
   const tokenHash = hashConfirmToken(token);
@@ -129,7 +128,7 @@ authRoutes.get('/confirm', async (c) => {
     .limit(1);
 
   if (!row) {
-    return c.json({ error: 'Invalid or expired confirmation token' }, 400);
+    return c.json({ error: t(locale, 'errors.invalidConfirmToken') }, 400);
   }
 
   const [updated] = await db
@@ -155,8 +154,9 @@ authRoutes.get('/confirm', async (c) => {
 
 authRoutes.post(
   '/resend-confirmation',
-  zValidator('json', emailOnlySchema),
+  validated('json', emailOnlySchema),
   async (c) => {
+    const locale = localeOf(c);
     const email = normalizeEmail(c.req.valid('json').email);
 
     const [row] = await db
@@ -176,7 +176,7 @@ authRoutes.post(
         })
         .where(eq(users.id, row.id));
       try {
-        await sendConfirmEmail(email, token);
+        await sendConfirmEmail(email, token, locale);
       } catch (err) {
         console.error('Failed to resend confirmation email', err);
       }

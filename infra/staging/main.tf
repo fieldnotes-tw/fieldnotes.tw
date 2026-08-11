@@ -11,6 +11,8 @@ module "stack" {
   vpc_cidr          = "10.20.0.0/16"
   instance_type     = "t4g.micro"
   db_instance_class = "db.t4g.micro"
+  # Demo cards for staging previews; images live in the media bucket, not the API image.
+  seed_demo         = true
 }
 
 output "cloudfront_domain_name" {

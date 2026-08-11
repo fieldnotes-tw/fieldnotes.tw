@@ -1,0 +1,12 @@
+<header class="auth-page-head">
+  <a href="/" class="brand-mark" aria-label="<%= it.t('brand.name') %>"><span>最</span><span>近</span><span>左</span><span>營</span></a>
+  <div class="auth-nav" data-auth-nav></div>
+</header>
+
+<main class="auth-main">
+  <div class="submit-page">
+    <h1><%= it.t('submit.title') %></h1>
+    <p><%= it.t('submit.body') %></p>
+    <a href="/"><%= it.t('submit.backHome') %></a>
+  </div>
+</main>

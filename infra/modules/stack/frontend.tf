@@ -54,12 +54,12 @@ resource "aws_s3_bucket_policy" "frontend" {
 }
 
 resource "aws_cloudfront_distribution" "this" {
-  enabled             = true
-  is_ipv6_enabled     = true
-  comment             = local.name_prefix
-  default_root_object = "index.html"
-  price_class         = "PriceClass_200"
+  enabled         = true
+  is_ipv6_enabled = true
+  comment         = local.name_prefix
+  price_class     = "PriceClass_200"
 
+  # Kept for rollback / future static hosting; HTML now comes from the API origin.
   origin {
     domain_name              = aws_s3_bucket.frontend.bucket_regional_domain_name
     origin_id                = "s3-frontend"
@@ -84,19 +84,26 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
+  # HTML + page routes from the API (locale-aware; do not cache).
   default_cache_behavior {
-    target_origin_id       = "s3-frontend"
+    target_origin_id       = "api-ec2"
     viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     cached_methods         = ["GET", "HEAD"]
     compress               = true
 
     forwarded_values {
-      query_string = false
+      query_string = true
+      headers      = ["Accept-Language", "Content-Type", "Origin"]
       cookies {
-        forward = "none"
+        forward           = "whitelist"
+        whitelisted_names = ["fn_session", "fn_locale"]
       }
     }
+
+    min_ttl     = 0
+    default_ttl = 0
+    max_ttl     = 0
   }
 
   ordered_cache_behavior {
@@ -109,16 +116,96 @@ resource "aws_cloudfront_distribution" "this" {
 
     forwarded_values {
       query_string = true
-      headers      = ["Authorization", "Content-Type", "Origin"]
+      headers      = ["Accept-Language", "Authorization", "Content-Type", "Origin"]
       cookies {
         forward           = "whitelist"
-        whitelisted_names = ["fn_session"]
+        whitelisted_names = ["fn_session", "fn_locale"]
       }
     }
 
     min_ttl     = 0
     default_ttl = 0
     max_ttl     = 0
+  }
+
+  ordered_cache_behavior {
+    path_pattern           = "/assets/*"
+    target_origin_id       = "api-ec2"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+
+    forwarded_values {
+      query_string = false
+      cookies {
+        forward = "none"
+      }
+    }
+
+    min_ttl     = 86400
+    default_ttl = 604800
+    max_ttl     = 31536000
+  }
+
+  ordered_cache_behavior {
+    path_pattern           = "/js/*"
+    target_origin_id       = "api-ec2"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+
+    forwarded_values {
+      query_string = false
+      cookies {
+        forward = "none"
+      }
+    }
+
+    min_ttl     = 3600
+    default_ttl = 86400
+    max_ttl     = 604800
+  }
+
+  ordered_cache_behavior {
+    path_pattern           = "/fonts/*"
+    target_origin_id       = "api-ec2"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+
+    forwarded_values {
+      query_string = false
+      cookies {
+        forward = "none"
+      }
+    }
+
+    min_ttl     = 86400
+    default_ttl = 604800
+    max_ttl     = 31536000
+  }
+
+  ordered_cache_behavior {
+    path_pattern           = "/locales/*"
+    target_origin_id       = "api-ec2"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+
+    forwarded_values {
+      query_string = false
+      cookies {
+        forward = "none"
+      }
+    }
+
+    min_ttl     = 3600
+    default_ttl = 86400
+    max_ttl     = 604800
   }
 
   ordered_cache_behavior {
@@ -149,13 +236,6 @@ resource "aws_cloudfront_distribution" "this" {
 
   viewer_certificate {
     cloudfront_default_certificate = true
-  }
-
-  custom_error_response {
-    error_code            = 404
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 0
   }
 
   tags = {

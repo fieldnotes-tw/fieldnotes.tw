@@ -2,7 +2,7 @@
 <html lang="zh-Hant" data-theme="light">
 <head>
   <meta charset="UTF-8">
-  <title>登入 · 最近左營</title>
+  <title data-i18n-title="auth.login.pageTitle">登入 · 最近左營</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="styles.css">
   <script>
@@ -14,55 +14,52 @@
 <body>
 
 <header class="auth-page-head">
-  <a href="index.html" class="brand-mark" aria-label="最近左營"><span>最</span><span>近</span><span>左</span><span>營</span></a>
+  <a href="index.html" class="brand-mark" data-i18n-aria-label="brand.name" aria-label="最近左營"><span>最</span><span>近</span><span>左</span><span>營</span></a>
   <div class="auth-nav" data-auth-nav></div>
 </header>
 
 <main class="auth-main">
   <form class="auth-form" id="loginForm" novalidate>
-    <h1 class="auth-form__title">登入</h1>
+    <h1 class="auth-form__title" data-i18n="auth.login.title">登入</h1>
     <label class="auth-form__field">
-      <span>電子郵件</span>
+      <span data-i18n="auth.field.email">電子郵件</span>
       <input type="email" name="email" autocomplete="email" required>
     </label>
     <label class="auth-form__field">
-      <span>密碼</span>
+      <span data-i18n="auth.field.password">密碼</span>
       <input type="password" name="password" autocomplete="current-password" required minlength="8">
     </label>
     <p class="auth-form__error" id="loginError" hidden></p>
-    <button type="submit" class="auth-form__submit">登入</button>
-    <p class="auth-form__switch">還沒有帳號嗎？<a href="register.html">註冊帳號</a></p>
+    <button type="submit" class="auth-form__submit" data-i18n="auth.login.submit">登入</button>
+    <p class="auth-form__switch"><span data-i18n="auth.login.switch">還沒有帳號嗎？</span><a href="register.html" data-i18n="auth.login.switchLink">註冊帳號</a></p>
   </form>
 </main>
 
+<script src="i18n.js"></script>
 <script src="auth.js"></script>
 <script>
-  refreshCurrentUser().then((user) => {
-    if (user) location.href = user.role === 'admin' ? 'admin.html' : 'index.html';
-  }).catch(() => {});
+  i18nReady.then(() => {
+    refreshCurrentUser().then((user) => {
+      if (user) location.href = user.role === 'admin' ? 'admin.html' : 'index.html';
+    }).catch(() => {});
 
-  const form = document.getElementById('loginForm');
-  const errorEl = document.getElementById('loginError');
+    const form = document.getElementById('loginForm');
+    const errorEl = document.getElementById('loginError');
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    errorEl.hidden = true;
-    const email = form.email.value.trim();
-    const password = form.password.value;
-    if (!email || !password) return;
-    try {
-      const user = await login(email, password);
-      location.href = user.role === 'admin' ? 'admin.html' : 'index.html';
-    } catch (err) {
-      if (err.status === 403 && err.message === 'Email not confirmed') {
-        errorEl.textContent = '請先至信箱完成確認，再登入。';
-      } else if (err.message === 'Invalid email or password') {
-        errorEl.textContent = '電子郵件或密碼不正確';
-      } else {
-        errorEl.textContent = err.message || '登入失敗';
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.hidden = true;
+      const email = form.email.value.trim();
+      const password = form.password.value;
+      if (!email || !password) return;
+      try {
+        const user = await login(email, password);
+        location.href = user.role === 'admin' ? 'admin.html' : 'index.html';
+      } catch (err) {
+        errorEl.textContent = err.message || t('auth.login.failed');
+        errorEl.hidden = false;
       }
-      errorEl.hidden = false;
-    }
+    });
   });
 </script>
 </body>

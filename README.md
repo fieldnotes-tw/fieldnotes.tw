@@ -10,23 +10,27 @@ Homepage prototype + TypeScript API.
 # 1. Start Postgres (requires Docker)
 npm run db:up
 
-# 2. Install deps (frontend + API)
+# 2. Install deps (frontend assets + API)
 npm install
 npm --prefix server install
 
-# 3. Push schema + seed sample phenomena
-cp server/.env.example server/.env   # if needed
+# 3. Push schema + seed (admin always; demo cards only with SEED_DEMO=1)
+cp server/.env.example server/.env   # includes SEED_DEMO=1 for local
 npm run db:push
 npm run db:seed      # or: npm run db:reseed
 
-# 4. API (port 3001) and Vite (port 5173)
-npm run dev:server   # terminal 1
-npm run dev          # terminal 2
+# 4. Start the app (Hono + Vite HMR on :3001)
+npm run dev
 ```
 
-- Site: [http://127.0.0.1:5173/](http://127.0.0.1:5173/)
-- API health: [http://127.0.0.1:5173/api/health](http://127.0.0.1:5173/api/health) (proxied) or [http://127.0.0.1:3001/api/health](http://127.0.0.1:3001/api/health)
+- Site: [http://127.0.0.1:3001/](http://127.0.0.1:3001/)
+- Clean routes: `/`, `/login`, `/register`, `/confirm`, `/admin`, `/submit`
+- API health: [http://127.0.0.1:3001/api/health](http://127.0.0.1:3001/api/health)
 - Phenomena: `GET /api/phenomena`
+
+Dev uses Vite middleware for live reload (JS/CSS HMR; templates and `/js/*` trigger a full refresh). Production builds hashed assets with `npm run build` and serves them from the API image.
+
+Demo photos stay in [`public/images/`](public/images/) and are copied into `server/public/media/` only for local serving (`npm run seed:media-local`). They are **not** part of the production asset bundle; staging/prod media is S3. Production boots with an empty catalog (admin user only) unless you create real content in the admin UI.
 
 ## Structure
 
@@ -58,4 +62,4 @@ Roles: `user` · `admin`
 
 The homepage feed loads from `GET /api/phenomena`. Auth uses an httpOnly cookie (`fn_session`).
 
-Seed an admin (local): set `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `server/.env`, then `npm run db:seed`. Admin UI: `/admin.html`. Registration requires email confirmation (`MAIL_MODE=log` prints the link locally).
+Seed an admin (local): set `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `server/.env`, then `npm run db:seed`. Demo phenomena require `SEED_DEMO=1`. Admin UI: `/admin`. Registration requires email confirmation (`MAIL_MODE=log` prints the link locally).

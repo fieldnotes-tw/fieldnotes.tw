@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="<%= it.locale %>" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <title><%= it.t(it.titleKey) %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <% if (!it.dev) { %>
+  <link rel="stylesheet" href="<%= it.assets.css %>">
+  <% } %>
+  <% if (it.leaflet) { %>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <% } %>
+  <script>
+    if (/Chrome\/|Chromium\//.test(navigator.userAgent)) {
+      document.documentElement.classList.add('is-blink');
+    }
+  </script>
+</head>
+<body>
+<%~ it.body %>
+<% if (it.leaflet) { %>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<% } %>
+<script src="/js/i18n.js"></script>
+<script src="/js/auth.js"></script>
+<% for (const src of it.scripts) { %>
+<script src="<%= src %>"></script>
+<% } %>
+<% if (it.dev) { %>
+<script type="module" src="/@vite/client"></script>
+<% if (it.moduleScript) { %>
+<script type="module" src="<%= it.moduleScript %>"></script>
+<% } else { %>
+<script type="module" src="/client/styles.js"></script>
+<% } %>
+<% } else if (it.moduleScript) { %>
+<script type="module" src="<%= it.moduleScript %>"></script>
+<% } %>
+</body>
+</html>
