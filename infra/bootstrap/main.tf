@@ -174,6 +174,8 @@ data "aws_iam_policy_document" "gha_deploy" {
       "rds:*",
       "s3:*",
       "cloudfront:*",
+      "route53:*",
+      "acm:*",
       "logs:*",
       "ssm:*",
       "dynamodb:*",

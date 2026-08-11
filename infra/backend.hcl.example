@@ -1,3 +1,3 @@
-# Copy to backend.hcl in staging/ and production/ (gitignored).
+# Copy to backend.hcl in staging/, production/, and dns/ (gitignored).
 # Use the state bucket name from: cd bootstrap && terraform output -raw state_bucket
 bucket = "fieldnotes-tw-tfstate-REPLACE_WITH_ACCOUNT_ID"

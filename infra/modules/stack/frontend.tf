@@ -90,10 +90,12 @@ resource "aws_s3_bucket_policy" "frontend" {
 }
 
 resource "aws_cloudfront_distribution" "this" {
-  enabled         = true
-  is_ipv6_enabled = true
-  comment         = local.name_prefix
-  price_class     = "PriceClass_200"
+  enabled             = true
+  is_ipv6_enabled     = true
+  comment             = local.name_prefix
+  price_class         = "PriceClass_200"
+  aliases             = local.custom_domain_enabled ? var.domain_names : []
+  wait_for_deployment = true
 
   # Kept for rollback / future static hosting; HTML now comes from the API origin.
   origin {
@@ -270,8 +272,20 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
-  viewer_certificate {
-    cloudfront_default_certificate = true
+  dynamic "viewer_certificate" {
+    for_each = local.custom_domain_enabled ? [1] : []
+    content {
+      acm_certificate_arn      = var.acm_certificate_arn
+      ssl_support_method       = "sni-only"
+      minimum_protocol_version = "TLSv1.2_2021"
+    }
+  }
+
+  dynamic "viewer_certificate" {
+    for_each = local.custom_domain_enabled ? [] : [1]
+    content {
+      cloudfront_default_certificate = true
+    }
   }
 
   tags = {

@@ -1,3 +1,26 @@
+variable "use_custom_domain" {
+  type        = bool
+  description = "Attach staging.fieldnotes.tw once infra/dns ACM is issued (after NS flip)."
+  default     = false
+}
+
+variable "tf_state_bucket" {
+  type        = string
+  description = "Shared Terraform state bucket (same value as backend.hcl). Required when use_custom_domain is true."
+  default     = null
+}
+
+data "terraform_remote_state" "dns" {
+  count = var.use_custom_domain ? 1 : 0
+
+  backend = "s3"
+  config = {
+    bucket = var.tf_state_bucket
+    key    = "dns/terraform.tfstate"
+    region = "ap-east-2"
+  }
+}
+
 module "stack" {
   source = "../modules/stack"
 
@@ -12,7 +35,13 @@ module "stack" {
   instance_type     = "t4g.micro"
   db_instance_class = "db.t4g.micro"
   # Demo cards for staging previews; images live in the media bucket, not the API image.
-  seed_demo         = true
+  seed_demo = true
+
+  hosted_zone_id      = var.use_custom_domain ? data.terraform_remote_state.dns[0].outputs.zone_id : null
+  acm_certificate_arn = var.use_custom_domain ? data.terraform_remote_state.dns[0].outputs.acm_certificate_arn : null
+  domain_names        = var.use_custom_domain ? ["staging.fieldnotes.tw"] : []
+  primary_domain      = var.use_custom_domain ? "staging.fieldnotes.tw" : null
+  create_dns_records  = var.use_custom_domain
 }
 
 output "cloudfront_domain_name" {
@@ -61,4 +90,8 @@ output "ses_email_from" {
 
 output "ses_dkim_tokens" {
   value = module.stack.ses_dkim_tokens
+}
+
+output "app_public_host" {
+  value = module.stack.app_public_host
 }

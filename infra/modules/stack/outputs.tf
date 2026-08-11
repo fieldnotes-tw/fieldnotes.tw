@@ -6,6 +6,15 @@ output "cloudfront_distribution_id" {
   value = aws_cloudfront_distribution.this.id
 }
 
+output "primary_domain" {
+  value = local.primary_domain
+}
+
+output "app_public_host" {
+  description = "Hostname used for app_base_url (custom domain when enabled)"
+  value       = local.app_public_host
+}
+
 output "frontend_bucket" {
   value = aws_s3_bucket.frontend.bucket
 }

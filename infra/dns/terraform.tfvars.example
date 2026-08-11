@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars (gitignored).
+# After staging apply: terraform -chdir=../staging output -json ses_dkim_tokens
+ses_dkim_tokens = [
+  # "token1",
+  # "token2",
+  # "token3",
+]
+
+# Keep true until you are ready to point apex/www at CloudFront.
+legacy_github_pages = true
+
+# Set true only after GoDaddy nameservers point at this zone.
+wait_for_acm_validation = false
