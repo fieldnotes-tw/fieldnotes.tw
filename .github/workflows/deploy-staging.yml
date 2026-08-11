@@ -10,7 +10,8 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: ap-east-2
+  # Keep separate from AWS_REGION — configure-aws-credentials overwrites AWS_REGION.
+  DEPLOY_REGION: ap-east-2
 
 jobs:
   deploy:
@@ -23,7 +24,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          # Assume via a long-lived STS region; resource calls still use AWS_REGION.
+          # Assume via a long-lived STS region; resource calls use DEPLOY_REGION.
           aws-region: us-east-1
 
       - uses: actions/setup-node@v4
@@ -45,8 +46,8 @@ jobs:
         id: tf
         working-directory: infra/staging
         env:
-          AWS_REGION: ${{ env.AWS_REGION }}
-          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+          AWS_REGION: ${{ env.DEPLOY_REGION }}
+          AWS_DEFAULT_REGION: ${{ env.DEPLOY_REGION }}
           TF_BACKEND_BUCKET: ${{ vars.TF_STATE_BUCKET }}
         run: |
           cat > backend.hcl <<EOF
@@ -60,8 +61,8 @@ jobs:
 
       - name: Deploy frontend to S3
         env:
-          AWS_REGION: ${{ env.AWS_REGION }}
-          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+          AWS_REGION: ${{ env.DEPLOY_REGION }}
+          AWS_DEFAULT_REGION: ${{ env.DEPLOY_REGION }}
         run: |
           aws s3 sync dist/ "s3://${{ steps.tf.outputs.bucket }}/" --delete
           aws cloudfront create-invalidation \
@@ -70,8 +71,8 @@ jobs:
 
       - name: Build and push API image
         env:
-          AWS_REGION: ${{ env.AWS_REGION }}
-          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+          AWS_REGION: ${{ env.DEPLOY_REGION }}
+          AWS_DEFAULT_REGION: ${{ env.DEPLOY_REGION }}
           ECR_REPO: ${{ steps.tf.outputs.ecr }}
         run: |
           REGISTRY="${ECR_REPO%%/*}"
@@ -84,8 +85,8 @@ jobs:
 
       - name: Deploy API via SSM
         env:
-          AWS_REGION: ${{ env.AWS_REGION }}
-          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+          AWS_REGION: ${{ env.DEPLOY_REGION }}
+          AWS_DEFAULT_REGION: ${{ env.DEPLOY_REGION }}
           INSTANCE_ID: ${{ steps.tf.outputs.instance }}
         run: |
           COMMAND_ID=$(aws ssm send-command \
