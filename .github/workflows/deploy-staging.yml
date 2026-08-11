@@ -1,0 +1,87 @@
+name: Deploy staging
+
+on:
+  push:
+    branches: [development]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-east-2
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Build frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Read Terraform outputs
+        id: tf
+        working-directory: infra/staging
+        env:
+          TF_BACKEND_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+        run: |
+          cat > backend.hcl <<EOF
+          bucket = "${TF_BACKEND_BUCKET}"
+          EOF
+          terraform init -input=false -backend-config=backend.hcl
+          echo "bucket=$(terraform output -raw frontend_bucket)" >> "$GITHUB_OUTPUT"
+          echo "distribution=$(terraform output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
+          echo "ecr=$(terraform output -raw ecr_repository_url)" >> "$GITHUB_OUTPUT"
+          echo "instance=$(terraform output -raw api_instance_id)" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy frontend to S3
+        run: |
+          aws s3 sync dist/ "s3://${{ steps.tf.outputs.bucket }}/" --delete
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ steps.tf.outputs.distribution }}" \
+            --paths "/*"
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push API image
+        env:
+          ECR_REPO: ${{ steps.tf.outputs.ecr }}
+        run: |
+          IMAGE_TAG="${GITHUB_SHA}"
+          docker build -t "$ECR_REPO:$IMAGE_TAG" -t "$ECR_REPO:latest" server
+          docker push "$ECR_REPO:$IMAGE_TAG"
+          docker push "$ECR_REPO:latest"
+
+      - name: Deploy API via SSM
+        env:
+          INSTANCE_ID: ${{ steps.tf.outputs.instance }}
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --parameters "commands=[\"/usr/local/bin/fieldnotes-deploy.sh ${GITHUB_SHA}\"]" \
+            --query 'Command.CommandId' \
+            --output text)
+          aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"

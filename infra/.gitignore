@@ -1,0 +1,15 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Local / secret-adjacent config (may contain account IDs)
+backend.hcl
+terraform.tfvars
+*.auto.tfvars
+.terraform.tfvars

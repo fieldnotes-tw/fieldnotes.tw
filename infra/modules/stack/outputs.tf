@@ -1,0 +1,31 @@
+output "cloudfront_domain_name" {
+  value = aws_cloudfront_distribution.this.domain_name
+}
+
+output "cloudfront_distribution_id" {
+  value = aws_cloudfront_distribution.this.id
+}
+
+output "frontend_bucket" {
+  value = aws_s3_bucket.frontend.bucket
+}
+
+output "ecr_repository_url" {
+  value = aws_ecr_repository.api.repository_url
+}
+
+output "api_instance_id" {
+  value = aws_instance.api.id
+}
+
+output "api_public_ip" {
+  value = aws_eip.api.public_ip
+}
+
+output "db_secret_arn" {
+  value = aws_secretsmanager_secret.db.arn
+}
+
+output "database_endpoint" {
+  value = aws_db_instance.this.address
+}
