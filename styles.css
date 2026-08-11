@@ -230,6 +230,13 @@ html.is-blink .brand-mark{
 }
 
 /* ---------- phenomena feed ---------- */
+.grid-feed__message{
+  grid-column:1 / -1;
+  padding:2rem 0.5rem;
+  color:var(--ink-soft);
+  font-size:0.95rem;
+  font-weight:600;
+}
 .grid-feed{
   display:grid;
   grid-template-columns:repeat(2,1fr); gap:2px; background:var(--line);

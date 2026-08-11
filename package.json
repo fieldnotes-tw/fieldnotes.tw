@@ -1,11 +1,18 @@
 {
-  "name": "lately-kaohsiung",
+  "name": "fieldnotes.tw",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "npm --prefix server run dev",
+    "dev:all": "npm run dev:server & npm run dev",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:up": "docker-compose up -d",
+    "db:down": "docker-compose down",
+    "db:push": "npm --prefix server run db:push",
+    "db:seed": "npm --prefix server run db:seed",
+    "db:reseed": "SEED_RESET=1 npm --prefix server run db:seed"
   },
   "devDependencies": {
     "vite": "^7.0.6"
