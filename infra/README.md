@@ -7,7 +7,7 @@ Region: `ap-east-2` (Taipei)
 | `development` | staging |
 | `main` | production |
 
-Stack per environment: VPC (no NAT) · `t4g.micro` API EC2 · RDS Postgres `db.t4g.micro` · S3 + CloudFront (frontend + `/api/*` → EC2) · ECR · Secrets Manager (`…/database`, `…/app`) · SES domain identity for `noreply@fieldnotes.tw` in **ap-northeast-1** (SES is not available in Taipei).
+Stack per environment: VPC (no NAT) · `t4g.micro` API EC2 · RDS Postgres `db.t4g.micro` · S3 media + CloudFront (`/media/*` → S3; pages + `/api/*` → EC2) · ECR · Secrets Manager (`…/database`, `…/app`) · SES domain identity for `noreply@fieldnotes.tw` in **ap-northeast-1** (SES is not available in Taipei).
 
 Shared DNS lives in `infra/dns` (Route 53 hosted zone + us-east-1 ACM). Domain **registration** stays at GoDaddy; only nameservers move to Route 53.
 

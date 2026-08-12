@@ -1,94 +1,3 @@
-resource "aws_s3_bucket" "frontend" {
-  bucket = "${local.name_prefix}-web-${data.aws_caller_identity.current.account_id}"
-}
-
-data "aws_caller_identity" "current" {}
-
-resource "aws_s3_bucket_public_access_block" "frontend" {
-  bucket = aws_s3_bucket.frontend.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-resource "aws_s3_bucket_ownership_controls" "frontend" {
-  bucket = aws_s3_bucket.frontend.id
-
-  rule {
-    object_ownership = "BucketOwnerEnforced"
-  }
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "frontend" {
-  bucket = aws_s3_bucket.frontend.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
-
-resource "aws_s3_bucket_versioning" "frontend" {
-  bucket = aws_s3_bucket.frontend.id
-
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-resource "aws_cloudfront_origin_access_control" "frontend" {
-  name                              = "${local.name_prefix}-oac"
-  description                       = "S3 OAC for ${local.name_prefix}"
-  origin_access_control_origin_type = "s3"
-  signing_behavior                  = "always"
-  signing_protocol                  = "sigv4"
-}
-
-data "aws_iam_policy_document" "frontend_bucket" {
-  statement {
-    sid    = "AllowCloudFront"
-    effect = "Allow"
-    principals {
-      type        = "Service"
-      identifiers = ["cloudfront.amazonaws.com"]
-    }
-    actions   = ["s3:GetObject"]
-    resources = ["${aws_s3_bucket.frontend.arn}/*"]
-
-    condition {
-      test     = "StringEquals"
-      variable = "AWS:SourceArn"
-      values   = [aws_cloudfront_distribution.this.arn]
-    }
-  }
-
-  statement {
-    sid       = "DenyInsecureTransport"
-    effect    = "Deny"
-    actions   = ["s3:*"]
-    resources = [aws_s3_bucket.frontend.arn, "${aws_s3_bucket.frontend.arn}/*"]
-
-    principals {
-      type        = "*"
-      identifiers = ["*"]
-    }
-
-    condition {
-      test     = "Bool"
-      variable = "aws:SecureTransport"
-      values   = ["false"]
-    }
-  }
-}
-
-resource "aws_s3_bucket_policy" "frontend" {
-  bucket = aws_s3_bucket.frontend.id
-  policy = data.aws_iam_policy_document.frontend_bucket.json
-}
-
 resource "aws_cloudfront_distribution" "this" {
   enabled             = true
   is_ipv6_enabled     = true
@@ -96,13 +5,6 @@ resource "aws_cloudfront_distribution" "this" {
   price_class         = "PriceClass_200"
   aliases             = local.custom_domain_enabled ? var.domain_names : []
   wait_for_deployment = true
-
-  # Kept for rollback / future static hosting; HTML now comes from the API origin.
-  origin {
-    domain_name              = aws_s3_bucket.frontend.bucket_regional_domain_name
-    origin_id                = "s3-frontend"
-    origin_access_control_id = aws_cloudfront_origin_access_control.frontend.id
-  }
 
   origin {
     domain_name              = aws_s3_bucket.media.bucket_regional_domain_name
@@ -122,7 +24,7 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
-  # HTML + page routes from the API (locale-aware; do not cache).
+  # SSR page routes from the API (locale-aware; do not cache).
   default_cache_behavior {
     target_origin_id       = "api-ec2"
     viewer_protocol_policy = "redirect-to-https"

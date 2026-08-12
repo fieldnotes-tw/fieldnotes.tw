@@ -15,10 +15,6 @@ output "app_public_host" {
   value       = local.app_public_host
 }
 
-output "frontend_bucket" {
-  value = aws_s3_bucket.frontend.bucket
-}
-
 output "media_bucket" {
   value = aws_s3_bucket.media.bucket
 }

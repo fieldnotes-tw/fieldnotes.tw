@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 resource "aws_s3_bucket" "media" {
   bucket = "${local.name_prefix}-media-${data.aws_caller_identity.current.account_id}"
 }

@@ -57,10 +57,6 @@ output "cloudfront_distribution_id" {
   value = module.stack.cloudfront_distribution_id
 }
 
-output "frontend_bucket" {
-  value = module.stack.frontend_bucket
-}
-
 output "media_bucket" {
   value = module.stack.media_bucket
 }
