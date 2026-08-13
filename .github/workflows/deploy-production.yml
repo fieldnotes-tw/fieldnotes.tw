@@ -60,6 +60,12 @@ jobs:
           bucket = "${TF_BACKEND_BUCKET}"
           EOF
           terraform init -input=false -backend-config=backend.hcl
+          # If a removed frontend OAC is still in state, update the distribution first
+          # so CloudFront releases it (same-apply delete races with OriginAccessControlInUse).
+          if terraform state list 2>/dev/null | grep -q 'aws_cloudfront_origin_access_control.frontend'; then
+            terraform apply -auto-approve -input=false \
+              -target=module.stack.aws_cloudfront_distribution.this
+          fi
           terraform apply -auto-approve -input=false
           echo "distribution=$(terraform output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
           echo "ecr=$(terraform output -raw ecr_repository_url)" >> "$GITHUB_OUTPUT"

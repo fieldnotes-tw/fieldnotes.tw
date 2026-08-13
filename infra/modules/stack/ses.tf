@@ -23,20 +23,14 @@ variable "manage_ses_identity" {
 }
 
 locals {
-  email_from       = "${var.email_from_local_part}@${var.email_domain}"
-  ses_identity_arn = var.manage_ses_identity ? aws_sesv2_email_identity.domain[0].arn : data.aws_sesv2_email_identity.domain[0].arn
-  ses_dkim_tokens  = var.manage_ses_identity ? try(aws_sesv2_email_identity.domain[0].dkim_signing_attributes[0].tokens, []) : []
+  email_from = "${var.email_from_local_part}@${var.email_domain}"
+  # Only the owning env exposes DKIM tokens; others do not look up the identity
+  # (a data source would block terraform destroy when the identity is missing).
+  ses_dkim_tokens = var.manage_ses_identity ? try(aws_sesv2_email_identity.domain[0].dkim_signing_attributes[0].tokens, []) : []
 }
 
 resource "aws_sesv2_email_identity" "domain" {
   count    = var.manage_ses_identity ? 1 : 0
-  provider = aws.ses
-
-  email_identity = var.email_domain
-}
-
-data "aws_sesv2_email_identity" "domain" {
-  count    = var.manage_ses_identity ? 0 : 1
   provider = aws.ses
 
   email_identity = var.email_domain
