@@ -91,3 +91,9 @@ variable "seed_demo" {
   description = "When true, seed demo phenomena on first boot if the catalog is empty"
   default     = false
 }
+
+variable "force_destroy" {
+  type        = bool
+  description = "Allow terraform destroy to delete non-empty versioned S3 buckets (staging teardown)"
+  default     = false
+}

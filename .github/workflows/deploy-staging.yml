@@ -99,10 +99,47 @@ jobs:
           TF_VAR_tf_state_bucket: ${{ vars.TF_STATE_BUCKET }}
           TF_VAR_use_custom_domain: ${{ vars.USE_CUSTOM_DOMAIN || 'false' }}
         run: |
+          set -euo pipefail
           cat > backend.hcl <<EOF
           bucket = "${TF_BACKEND_BUCKET}"
           EOF
           terraform init -input=false -backend-config=backend.hcl
+
+          # Versioned buckets block DeleteBucket unless emptied (or force_destroy is
+          # already true in state). Empty everything still tracked in state first,
+          # including leftover frontend buckets removed from config but not yet gone.
+          empty_bucket() {
+            local bucket="$1"
+            if ! aws s3api head-bucket --bucket "$bucket" 2>/dev/null; then
+              echo "Bucket $bucket already gone"
+              return 0
+            fi
+            echo "Emptying s3://$bucket"
+            while true; do
+              local versions payload count
+              versions=$(aws s3api list-object-versions --bucket "$bucket" --max-keys 1000 --output json)
+              payload=$(echo "$versions" | jq '{
+                Objects: ([.Versions[]?, .DeleteMarkers[]?] | map({Key: .Key, VersionId: .VersionId})),
+                Quiet: true
+              }')
+              count=$(echo "$payload" | jq '.Objects | length')
+              if [ "$count" -eq 0 ]; then
+                break
+              fi
+              aws s3api delete-objects --bucket "$bucket" --delete "$payload" >/dev/null
+            done
+          }
+
+          while IFS= read -r bucket; do
+            [ -z "$bucket" ] && continue
+            empty_bucket "$bucket"
+          done < <(terraform state pull | jq -r '
+            .resources[]?
+            | select(.type == "aws_s3_bucket")
+            | .instances[]?.attributes.bucket
+            | select(. != null)
+          ' | sort -u)
+
           terraform destroy -auto-approve -input=false
 
       - name: Wait for API host (SSM)

@@ -38,6 +38,8 @@ module "stack" {
   seed_demo = true
   # Production owns the SES domain identity so staging can be destroyed without breaking mail.
   manage_ses_identity = false
+  # Allow terraform destroy to wipe versioned objects (idle teardown).
+  force_destroy = true
 
   hosted_zone_id      = var.use_custom_domain ? data.terraform_remote_state.dns[0].outputs.zone_id : null
   acm_certificate_arn = var.use_custom_domain ? data.terraform_remote_state.dns[0].outputs.acm_certificate_arn : null

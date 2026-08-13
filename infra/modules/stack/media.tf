@@ -1,7 +1,8 @@
 data "aws_caller_identity" "current" {}
 
 resource "aws_s3_bucket" "media" {
-  bucket = "${local.name_prefix}-media-${data.aws_caller_identity.current.account_id}"
+  bucket        = "${local.name_prefix}-media-${data.aws_caller_identity.current.account_id}"
+  force_destroy = var.force_destroy
 }
 
 resource "aws_s3_bucket_public_access_block" "media" {
