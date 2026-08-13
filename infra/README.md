@@ -20,7 +20,9 @@ aws secretsmanager get-secret-value --region ap-east-2 \
 
 ### SES email
 
-SES identities are created in `ap-northeast-1` (Tokyo). DKIM CNAMEs are managed in `infra/dns` from `ses_dkim_tokens` (staging output). Until the domain verifies (and while the account is in the SES sandbox), confirmation mail only delivers to SES-verified recipient addresses. Request production access when ready.
+SES identities are created in `ap-northeast-1` (Tokyo). **Production** owns the domain identity (`manage_ses_identity = true`); staging only looks it up so it can be destroyed without breaking mail. DKIM CNAMEs are managed in `infra/dns` from `ses_dkim_tokens` (production output). Until the domain verifies (and while the account is in the SES sandbox), confirmation mail only delivers to SES-verified recipient addresses. Request production access when ready.
+
+**SES ownership cutover** (one-time, if staging still owns the identity): deploy production first so it creates/adopts the identity, then deploy staging with `manage_ses_identity = false`. Only after that is it safe to destroy staging.
 
 CI authenticates with **GitHub OIDC** (no long-lived access keys in the repo).
 
@@ -96,8 +98,8 @@ cd infra/dns
 cp ../backend.hcl.example backend.hcl   # same state bucket as staging/production
 cp terraform.tfvars.example terraform.tfvars
 
-# Pull DKIM tokens from staging (after staging has been applied at least once):
-terraform -chdir=../staging output -json ses_dkim_tokens
+# Pull DKIM tokens from production (after production has been applied at least once):
+terraform -chdir=../production output -json ses_dkim_tokens
 # paste into terraform.tfvars as ses_dkim_tokens = ["...", "...", "..."]
 
 terraform init -backend-config=backend.hcl
@@ -144,4 +146,4 @@ After cutover, the root repo `CNAME` (GitHub Pages) and the old Pages project ca
 
 - No NAT Gateway (RDS private; API EC2 public, reaches RDS in-VPC).
 - Two environments ≈ two EC2 micros + two RDS micros + CloudFront/S3. RDS dominates spend.
-- `terraform destroy` in `infra/staging` when idle if you want to save money.
+- Tear down idle staging from GitHub Actions: **Actions → Deploy staging → Run workflow**, set `action=destroy` and `confirm=destroy-staging`. Recreate with a push to `development`, or Run workflow with `action=deploy`. Do this only after the SES ownership cutover above (production owns the identity).

@@ -40,7 +40,7 @@ module "stack" {
   vpc_cidr            = "10.30.0.0/16"
   instance_type       = "t4g.micro"
   db_instance_class   = "db.t4g.micro"
-  manage_ses_identity = false
+  manage_ses_identity = true
 
   hosted_zone_id      = var.use_custom_domain ? data.terraform_remote_state.dns[0].outputs.zone_id : null
   acm_certificate_arn = var.use_custom_domain ? data.terraform_remote_state.dns[0].outputs.acm_certificate_arn : null

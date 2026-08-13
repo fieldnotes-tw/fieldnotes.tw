@@ -36,6 +36,8 @@ module "stack" {
   db_instance_class = "db.t4g.micro"
   # Demo cards for staging previews; images live in the media bucket, not the API image.
   seed_demo = true
+  # Production owns the SES domain identity so staging can be destroyed without breaking mail.
+  manage_ses_identity = false
 
   hosted_zone_id      = var.use_custom_domain ? data.terraform_remote_state.dns[0].outputs.zone_id : null
   acm_certificate_arn = var.use_custom_domain ? data.terraform_remote_state.dns[0].outputs.acm_certificate_arn : null

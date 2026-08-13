@@ -21,7 +21,7 @@ variable "dmarc_rua" {
 
 variable "ses_dkim_tokens" {
   type        = list(string)
-  description = "SES DKIM tokens for the apex domain (from staging output ses_dkim_tokens). Empty skips DKIM records."
+  description = "SES DKIM tokens for the apex domain (from production output ses_dkim_tokens). Empty skips DKIM records."
   default     = []
 }
 
