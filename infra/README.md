@@ -5,7 +5,7 @@ Region: `ap-east-2` (Taipei)
 | Branch | Environment |
 |--------|-------------|
 | `development` | staging |
-| `main` | production |
+| `production` | production |
 
 Stack per environment: VPC (no NAT) · `t4g.micro` API EC2 · RDS Postgres `db.t4g.micro` · S3 media + CloudFront (`/media/*` → S3; pages + `/api/*` → EC2) · ECR · Secrets Manager (`…/database`, `…/app`) · SES domain identity for `noreply@fieldnotes.tw` in **ap-northeast-1** (SES is not available in Taipei).
 
@@ -48,7 +48,7 @@ Outputs (local only — do not paste into the repo):
 
 ## Apply environments
 
-Deploy workflows run `terraform apply` on every push (`development` → staging, `main` → production), then build/push the API image and roll it out via SSM.
+Deploy workflows run `terraform apply` on every push (`development` → staging, `production` → production), then build/push the API image and roll it out via SSM.
 
 For a local apply (or the first bring-up before CI has run):
 
@@ -79,7 +79,7 @@ Create Environments **staging** and **production**. On each environment, set var
 
 Optional: require reviewers on the **production** environment.
 
-Branch flow: feature → `development` (staging deploy) → PR → `main` (production deploy).
+Branch flow: feature → `development` (staging deploy) → PR → `production` (production deploy).
 
 ## DNS cutover (GoDaddy → Route 53 nameservers)
 
