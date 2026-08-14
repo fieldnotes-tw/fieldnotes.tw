@@ -2,7 +2,8 @@ import { and, asc, desc, eq, type SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { db } from '../db/index.js';
-import { phenomena, users } from '../db/schema.js';
+import { USER_ROLES, phenomena, users } from '../db/schema.js';
+import { hashPassword, normalizeEmail } from '../lib/auth.js';
 import { localeOf, t } from '../lib/i18n.js';
 import {
   createUploadUrl,
@@ -25,6 +26,30 @@ export const adminRoutes = new Hono<AuthEnv>();
 
 adminRoutes.use('*', requireAdmin);
 
+const userRoleSchema = z.enum(USER_ROLES);
+
+const createUserSchema = z.object({
+  email: z.string().trim().email().max(254),
+  password: z.string().min(8).max(200),
+  role: userRoleSchema.default('user'),
+});
+
+const updateUserSchema = z
+  .object({
+    role: userRoleSchema,
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'errors.atLeastOneField',
+  });
+
+async function adminCount() {
+  const rows = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.role, 'admin'));
+  return rows.length;
+}
+
 adminRoutes.get('/me', async (c) => {
   return c.json({ data: c.get('user') });
 });
@@ -43,6 +68,100 @@ adminRoutes.get('/users', async (c) => {
 
   return c.json({ data: rows });
 });
+
+adminRoutes.post('/users', validated('json', createUserSchema), async (c) => {
+  const locale = localeOf(c);
+  const body = c.req.valid('json');
+  const email = normalizeEmail(body.email);
+
+  const [existing] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+
+  if (existing) {
+    return c.json({ error: t(locale, 'errors.emailAlreadyRegistered') }, 409);
+  }
+
+  const now = new Date();
+  const [row] = await db
+    .insert(users)
+    .values({
+      email,
+      passwordHash: await hashPassword(body.password),
+      role: body.role,
+      // Admin-created accounts are ready to sign in immediately.
+      emailVerifiedAt: now,
+    })
+    .returning({
+      id: users.id,
+      email: users.email,
+      role: users.role,
+      emailVerifiedAt: users.emailVerifiedAt,
+      createdAt: users.createdAt,
+    });
+
+  return c.json({ data: row }, 201);
+});
+
+adminRoutes.patch(
+  '/users/:id',
+  validated('json', updateUserSchema),
+  async (c) => {
+    const locale = localeOf(c);
+    const id = uuidSchema.safeParse(c.req.param('id'));
+    if (!id.success) {
+      return c.json({ error: t(locale, 'errors.invalidId') }, 400);
+    }
+
+    const actor = c.get('user');
+    if (actor.id === id.data) {
+      return c.json({ error: t(locale, 'errors.cannotChangeOwnRole') }, 400);
+    }
+
+    const { role } = c.req.valid('json');
+
+    const [target] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        role: users.role,
+        emailVerifiedAt: users.emailVerifiedAt,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .where(eq(users.id, id.data))
+      .limit(1);
+
+    if (!target) {
+      return c.json({ error: t(locale, 'errors.notFound') }, 404);
+    }
+
+    if (target.role === 'admin' && role !== 'admin') {
+      if ((await adminCount()) <= 1) {
+        return c.json({ error: t(locale, 'errors.cannotDemoteLastAdmin') }, 400);
+      }
+    }
+
+    const [row] = await db
+      .update(users)
+      .set({
+        role,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id.data))
+      .returning({
+        id: users.id,
+        email: users.email,
+        role: users.role,
+        emailVerifiedAt: users.emailVerifiedAt,
+        createdAt: users.createdAt,
+      });
+
+    return c.json({ data: row });
+  },
+);
 
 adminRoutes.delete('/users/:id', async (c) => {
   const locale = localeOf(c);
@@ -67,11 +186,7 @@ adminRoutes.delete('/users/:id', async (c) => {
   }
 
   if (target.role === 'admin') {
-    const admins = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.role, 'admin'));
-    if (admins.length <= 1) {
+    if ((await adminCount()) <= 1) {
       return c.json({ error: t(locale, 'errors.cannotDeleteLastAdmin') }, 400);
     }
   }

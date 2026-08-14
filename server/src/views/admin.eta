@@ -127,6 +127,33 @@
   <section class="admin-panel">
     <h2 class="admin-panel__title"><%= it.t('admin.users.title') %></h2>
     <p class="admin-panel__meta" id="adminUserMeta"><%= it.t('admin.users.loading') %></p>
+
+    <form class="admin-form admin-form--compact" id="createUserForm">
+      <div class="admin-form__row admin-form__row--users">
+        <label class="admin-form__field">
+          <span><%= it.t('admin.users.email') %></span>
+          <input type="email" id="u_email" name="email" required maxlength="254" autocomplete="off">
+        </label>
+        <label class="admin-form__field">
+          <span><%= it.t('admin.users.password') %></span>
+          <input type="password" id="u_password" name="password" required minlength="8" maxlength="200" autocomplete="new-password">
+        </label>
+        <label class="admin-form__field">
+          <span><%= it.t('admin.users.role') %></span>
+          <select id="u_role" name="role">
+            <option value="user"><%= it.t('admin.users.roleUser') %></option>
+            <option value="admin"><%= it.t('admin.users.roleAdmin') %></option>
+          </select>
+        </label>
+        <div class="admin-form__field admin-form__field--action">
+          <span aria-hidden="true">&nbsp;</span>
+          <button type="submit" class="admin-btn admin-btn--primary"><%= it.t('admin.users.create') %></button>
+        </div>
+      </div>
+      <p class="admin-form__hint" id="createUserError" hidden></p>
+      <p class="admin-form__hint admin-form__hint--muted"><%= it.t('admin.users.createHint') %></p>
+    </form>
+
     <div class="admin-table-wrap">
       <table class="admin-table" id="adminUsersTable">
         <thead>
