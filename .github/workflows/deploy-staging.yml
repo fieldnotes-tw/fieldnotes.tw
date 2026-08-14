@@ -23,6 +23,11 @@ permissions:
   id-token: write
   contents: read
 
+# One staging environment — don't let push + PR deploys fight each other.
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: true
+
 env:
   # Keep separate from AWS_REGION — configure-aws-credentials overwrites AWS_REGION.
   DEPLOY_REGION: ap-east-2
