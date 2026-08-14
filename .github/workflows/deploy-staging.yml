@@ -3,6 +3,8 @@ name: Deploy staging
 on:
   push:
     branches: [development]
+  pull_request:
+    branches: [production]
   workflow_dispatch:
     inputs:
       action:
