@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { db } from '../db/index.js';
 import { phenomena } from '../db/schema.js';
@@ -10,16 +10,21 @@ import {
 } from '../lib/validators.js';
 import type { LocaleEnv } from '../middleware/locale.js';
 
+/** Homepage feed: live cards only (exclude ended). */
+const FEED_STATUSES = ['active', 'upcoming', 'ending'] as const;
+
 export const phenomenaRoutes = new Hono<LocaleEnv>();
 
 phenomenaRoutes.get('/', async (c) => {
   const locale = localeOf(c);
   const categoryParam = c.req.query('category');
-  const statusParam = c.req.query('status') ?? 'active';
+  const statusParam = c.req.query('status');
 
   const filters: SQL[] = [];
 
-  if (statusParam !== 'all') {
+  if (!statusParam) {
+    filters.push(inArray(phenomena.status, [...FEED_STATUSES]));
+  } else if (statusParam !== 'all') {
     const status = statusSchema.safeParse(statusParam);
     if (!status.success) {
       return c.json({ error: t(locale, 'errors.invalidStatusFilter') }, 400);
