@@ -604,14 +604,22 @@ footer .credit{ font-size:0.78rem; color:var(--ink-faint); }
 .admin-btn--primary{ background:var(--ink); color:var(--ground); }
 .admin-btn--danger{ border-color:var(--status-ending); color:var(--status-ending); }
 .admin-form{ display:flex; flex-direction:column; gap:0.85rem; margin-top:0.75rem; }
+.admin-form--compact{ margin:0 0 1rem; }
 .admin-form__row{ display:grid; grid-template-columns:1fr 1fr; gap:0.85rem; }
+.admin-form__row--users{
+  grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(7rem,0.7fr) auto;
+  align-items:end;
+}
 .admin-form__field{ display:flex; flex-direction:column; gap:0.35rem; font-size:0.85rem; font-weight:700; color:var(--ink); }
+.admin-form__field--action .admin-btn{ width:100%; white-space:nowrap; }
 .admin-form__field input,
 .admin-form__field select,
 .admin-form__field textarea{
   font:inherit; font-weight:600; padding:0.55rem 0.7rem; border-radius:10px;
   border:1.5px solid var(--line); background:var(--ground); color:var(--ink);
 }
+.admin-form__hint{ margin:0; font-size:0.82rem; font-weight:600; color:var(--status-ending); }
+.admin-form__hint--muted{ color:var(--ink-soft); }
 .admin-form__actions{ display:flex; justify-content:flex-end; gap:0.55rem; margin-top:0.35rem; }
 .admin-upload{
   border:1px dashed var(--line); border-radius:12px; padding:0.9rem; display:flex; flex-direction:column; gap:0.7rem;
@@ -620,6 +628,7 @@ footer .credit{ font-size:0.78rem; color:var(--ink-faint); }
 .admin-upload__path{ font-size:0.78rem; color:var(--ink-soft); word-break:break-all; margin:0; }
 @media (max-width:700px){
   .admin-form__row{ grid-template-columns:1fr; }
+  .admin-form__row--users{ grid-template-columns:1fr; }
   .admin-panel__bar{ flex-direction:column; align-items:stretch; }
 }
 

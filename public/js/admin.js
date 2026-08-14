@@ -83,6 +83,53 @@ async function deleteUser(row) {
   }
 }
 
+async function setUserRole(row, role) {
+  const key =
+    role === 'admin'
+      ? 'admin.users.promoteConfirm'
+      : 'admin.users.demoteConfirm';
+  if (!confirm(t(key, { email: row.email }))) return;
+  try {
+    await api(`/api/admin/users/${row.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    });
+    await loadUsers();
+  } catch (err) {
+    alert(err.message || t('admin.users.roleFailed'));
+  }
+}
+
+function setCreateUserError(message) {
+  const el = $('createUserError');
+  if (!message) {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  el.textContent = message;
+  el.hidden = false;
+}
+
+async function createUser(e) {
+  e.preventDefault();
+  setCreateUserError('');
+  const email = $('u_email').value.trim();
+  const password = $('u_password').value;
+  const role = $('u_role').value;
+  try {
+    await api('/api/admin/users', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, role }),
+    });
+    $('createUserForm').reset();
+    $('u_role').value = 'user';
+    await loadUsers();
+  } catch (err) {
+    setCreateUserError(err.message || t('admin.users.createFailed'));
+  }
+}
+
 async function loadUsers() {
   const metaEl = $('adminUserMeta');
   const tbody = document.querySelector('#adminUsersTable tbody');
@@ -105,12 +152,22 @@ async function loadUsers() {
       if (me?.id === row.id) {
         actions.textContent = t('admin.users.you');
       } else {
+        const roleBtn = document.createElement('button');
+        roleBtn.type = 'button';
+        roleBtn.className = 'admin-btn';
+        if (row.role === 'admin') {
+          roleBtn.textContent = t('admin.users.demote');
+          roleBtn.addEventListener('click', () => setUserRole(row, 'user'));
+        } else {
+          roleBtn.textContent = t('admin.users.promote');
+          roleBtn.addEventListener('click', () => setUserRole(row, 'admin'));
+        }
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
         delBtn.className = 'admin-btn admin-btn--danger';
         delBtn.textContent = t('admin.action.delete');
         delBtn.addEventListener('click', () => deleteUser(row));
-        actions.appendChild(delBtn);
+        actions.append(roleBtn, delBtn);
       }
       tr.append(email, role, verified, created, actions);
       return tr;
@@ -280,6 +337,7 @@ async function boot() {
   $('btnNewPhenomenon').addEventListener('click', () => openEditor());
   $('btnCancelEditor').addEventListener('click', closeEditor);
   $('phenomenonForm').addEventListener('submit', savePhenomenon);
+  $('createUserForm').addEventListener('submit', createUser);
   $('f_image').addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
