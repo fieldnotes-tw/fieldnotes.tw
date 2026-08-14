@@ -3,8 +3,6 @@ name: Deploy staging
 on:
   push:
     branches: [development]
-  pull_request:
-    branches: [production]
   workflow_dispatch:
     inputs:
       action:
@@ -22,12 +20,6 @@ on:
 permissions:
   id-token: write
   contents: read
-
-# One staging environment — serialize push + PR deploys (do not cancel;
-# a cancelled run still fails the PR check for this commit).
-concurrency:
-  group: staging-deploy
-  cancel-in-progress: false
 
 env:
   # Keep separate from AWS_REGION — configure-aws-credentials overwrites AWS_REGION.
