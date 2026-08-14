@@ -23,10 +23,11 @@ permissions:
   id-token: write
   contents: read
 
-# One staging environment — don't let push + PR deploys fight each other.
+# One staging environment — serialize push + PR deploys (do not cancel;
+# a cancelled run still fails the PR check for this commit).
 concurrency:
   group: staging-deploy
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   # Keep separate from AWS_REGION — configure-aws-credentials overwrites AWS_REGION.
