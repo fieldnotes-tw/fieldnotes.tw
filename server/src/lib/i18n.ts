@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { getCookie } from 'hono/cookie';
 import type { Context } from 'hono';
+import { isDev, repoRoot, serverRoot } from './env.js';
 
 // Catalogs are authored in public/locales/; synced into the API tree via
 // `npm run static:sync` (dev / prebuild / CI).
@@ -14,15 +14,19 @@ export const LOCALE_COOKIE = 'fn_locale';
 
 type Catalog = Record<string, string>;
 
-const here = dirname(fileURLToPath(import.meta.url));
+function catalogPaths(locale: Locale): string[] {
+  const name = `${locale}.json`;
+  const source = join(repoRoot, 'public/locales', name);
+  const synced = [
+    join(serverRoot, 'locales', name),
+    join(serverRoot, 'public/locales', name),
+  ];
+  // Dev: prefer the authored file so edits apply without waiting on sync.
+  return isDev() ? [source, ...synced] : [...synced, source];
+}
 
 function loadCatalog(locale: Locale): Catalog {
-  const candidates = [
-    join(here, '../../locales', `${locale}.json`),
-    join(here, '../../public/locales', `${locale}.json`),
-    join(here, '../../../public/locales', `${locale}.json`),
-  ];
-  for (const path of candidates) {
+  for (const path of catalogPaths(locale)) {
     try {
       return JSON.parse(readFileSync(path, 'utf8')) as Catalog;
     } catch {
@@ -36,6 +40,13 @@ const catalogs: Record<Locale, Catalog> = {
   'zh-Hant': loadCatalog('zh-Hant'),
   en: loadCatalog('en'),
 };
+
+/** Re-read locale JSON from disk (dev live-reload). */
+export function reloadCatalogs() {
+  for (const locale of LOCALES) {
+    catalogs[locale] = loadCatalog(locale);
+  }
+}
 
 function normalizeLocale(raw: string | undefined | null): Locale | null {
   if (!raw) return null;

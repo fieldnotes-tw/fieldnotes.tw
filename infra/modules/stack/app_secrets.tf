@@ -9,7 +9,9 @@ resource "random_password" "admin" {
 }
 
 resource "aws_secretsmanager_secret" "app" {
-  name = "${local.name_prefix}/app"
+  name                    = "${local.name_prefix}/app"
+  # Staging uses force_destroy; skip the 30-day recovery window so recreate can reuse names.
+  recovery_window_in_days = var.force_destroy ? 0 : 30
 }
 
 resource "aws_secretsmanager_secret_version" "app" {

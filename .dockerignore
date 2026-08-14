@@ -1,0 +1,11 @@
+**/node_modules
+**/.git
+**/.env
+**/.env.*
+!**/.env.example
+**/dist
+**/.vite-temp
+infra
+.github
+*.md
+.DS_Store
