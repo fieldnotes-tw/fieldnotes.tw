@@ -70,17 +70,33 @@ function weatherTextForCode(code) {
   return t(`weather.${code}`) || '';
 }
 
+const WEATHER_URL =
+  'https://api.open-meteo.com/v1/forecast?latitude=22.688&longitude=120.297&current=temperature_2m,weather_code&timezone=Asia%2FTaipei';
+
 async function loadWeather() {
   const weatherEl = document.getElementById('weatherText');
   if (!weatherEl) return;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+
   try {
-    const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=22.688&longitude=120.297&current=temperature_2m,weather_code&timezone=Asia%2FTaipei');
+    // Low priority so feed/API work isn't starved; overlaps i18n load.
+    const res = await fetch(WEATHER_URL, {
+      signal: controller.signal,
+      priority: 'low',
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    await i18nReady;
     const temp = Math.round(data.current.temperature_2m);
     const desc = weatherTextForCode(data.current.weather_code);
     weatherEl.textContent = `${desc} ${temp}°C`;
   } catch {
+    await i18nReady;
     weatherEl.textContent = t('home.weatherUnavailable');
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -339,6 +355,7 @@ async function loadPhenomena() {
   try {
     const res = await fetch('/api/phenomena', {
       headers: { 'Accept-Language': getLocale() },
+      priority: 'high',
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json();
@@ -359,7 +376,9 @@ async function loadPhenomena() {
   }
 }
 
+// Start weather immediately (do not await) so it never gates the feed.
+loadWeather();
+
 await i18nReady;
 formatToday();
-loadWeather();
 loadPhenomena();

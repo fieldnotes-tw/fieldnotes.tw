@@ -138,7 +138,10 @@ function renderLangSwitcher(container) {
 }
 
 async function loadCatalog(locale) {
-  const res = await fetch(`/locales/${locale}.json`, { credentials: 'same-origin' });
+  const res = await fetch(`/locales/${locale}.json`, {
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
   if (!res.ok) throw new Error(`Failed to load locale ${locale}`);
   return res.json();
 }

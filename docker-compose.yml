@@ -16,5 +16,41 @@ services:
       timeout: 5s
       retries: 10
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    ports:
+      - '3001:3001'
+    environment:
+      PORT: '3001'
+      # Unset production so Vite middleware + HMR start.
+      NODE_ENV: development
+      DATABASE_URL: postgres://lately:lately@db:5432/lately
+      JWT_SECRET: local-docker-compose-jwt-secret-change-me
+      COOKIE_SECURE: '0'
+      CORS_ORIGINS: http://localhost:3001,http://127.0.0.1:3001
+      ADMIN_EMAIL: admin@fieldnotes.tw
+      ADMIN_PASSWORD: replace-me
+      MAIL_MODE: log
+      APP_BASE_URL: http://127.0.0.1:3001
+      EMAIL_FROM: noreply@localhost
+      MEDIA_BUCKET: ''
+      MEDIA_PUBLIC_PREFIX: /media
+      SEED_DEMO: '1'
+      # Bind mounts on Docker Desktop often miss native FS events.
+      CHOKIDAR_USEPOLLING: 'true'
+    volumes:
+      - .:/app
+      # Keep container-installed deps out of the bind mount.
+      - api_node_modules:/app/node_modules
+      - api_server_node_modules:/app/server/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:
+  api_node_modules:
+  api_server_node_modules:

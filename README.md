@@ -6,20 +6,28 @@ Homepage prototype + TypeScript API.
 
 ## Run locally
 
+### Docker Compose (dev + live reload)
+
 ```bash
-# 1. Start Postgres (requires Docker)
+npm run compose:up          # Postgres + API with bind-mounted repo + Vite HMR
+# Site: http://127.0.0.1:3001/
+# Admin: admin@fieldnotes.tw / replace-me
+# Confirmation links print in: npm run compose:logs
+npm run compose:down
+```
+
+Edit files on the host; the container bind-mounts the repo. Client JS/CSS get Vite HMR; templates and `/js/*` trigger a full reload. Server TypeScript reloads via `tsx watch`.
+
+### Host process (optional)
+
+Same app, Postgres still from Compose:
+
+```bash
 npm run db:up
-
-# 2. Install deps (frontend assets + API)
-npm install
-npm --prefix server install
-
-# 3. Push schema + seed (admin always; demo cards only with SEED_DEMO=1)
+npm install && npm --prefix server install
 cp server/.env.example server/.env   # includes SEED_DEMO=1 for local
 npm run db:push
 npm run db:seed      # or: npm run db:reseed
-
-# 4. Start the app (Hono + Vite HMR on :3001)
 npm run dev
 ```
 
@@ -28,7 +36,7 @@ npm run dev
 - API health: [http://127.0.0.1:3001/api/health](http://127.0.0.1:3001/api/health)
 - Phenomena: `GET /api/phenomena`
 
-Dev uses Vite middleware for live reload (JS/CSS HMR; templates and `/js/*` trigger a full refresh). Production builds hashed assets with `npm run build` and serves them from the API image.
+Production builds hashed assets with `npm run build` and serves them from the API image (`server/Dockerfile`).
 
 Demo photos stay in [`public/images/`](public/images/) and are copied into `server/public/media/` only for local serving (`npm run seed:media-local`). They are **not** part of the production asset bundle; staging/prod media is S3. Production boots with an empty catalog (admin user only) unless you create real content in the admin UI.
 
