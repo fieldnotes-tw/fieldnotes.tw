@@ -129,7 +129,7 @@ function renderAuthNav(container) {
   const user = getCurrentUser();
   container.replaceChildren();
 
-  if (typeof renderLangSwitcher === 'function') {
+  if (typeof renderLangSwitcher === 'function' && !container.closest('.floatingbar')) {
     renderLangSwitcher(container);
   }
 

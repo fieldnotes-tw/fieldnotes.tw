@@ -118,22 +118,88 @@ function applyI18n(root = document) {
   document.documentElement.lang = i18nLocale;
 }
 
+let langSwitchDocBound = false;
+
+function closeAllLangPanels() {
+  document.querySelectorAll('.lang-switch.is-open').forEach((wrap) => {
+    wrap.classList.remove('is-open');
+    const btn = wrap.querySelector('.lang-switch__btn');
+    const panel = wrap.querySelector('.lang-switch__panel');
+    btn?.classList.remove('is-open');
+    btn?.setAttribute('aria-expanded', 'false');
+    if (panel) panel.hidden = true;
+  });
+}
+
+function setLangPanelOpen(wrap, open) {
+  const btn = wrap.querySelector('.lang-switch__btn');
+  const panel = wrap.querySelector('.lang-switch__panel');
+  if (!btn || !panel) return;
+  if (open) {
+    closeAllLangPanels();
+    window.closeFloatingSearch?.();
+  }
+  wrap.classList.toggle('is-open', open);
+  btn.classList.toggle('is-open', open);
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  panel.hidden = !open;
+}
+
+function bindLangSwitchDoc() {
+  if (langSwitchDocBound) return;
+  langSwitchDocBound = true;
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.lang-switch')) return;
+    closeAllLangPanels();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeAllLangPanels();
+  });
+}
+
 function renderLangSwitcher(container) {
+  bindLangSwitchDoc();
+
   const wrap = document.createElement('div');
   wrap.className = 'lang-switch';
-  wrap.setAttribute('role', 'group');
-  wrap.setAttribute('aria-label', t('nav.lang.label'));
+
+  const panelId = `lang-panel-${Math.random().toString(36).slice(2, 9)}`;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'lang-switch__btn';
+  btn.setAttribute('aria-label', t('nav.lang.label'));
+  btn.setAttribute('aria-expanded', 'false');
+  btn.setAttribute('aria-controls', panelId);
+  btn.innerHTML = `<svg class="lang-switch__icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15.3 15.3 0 0 1 4 9 15.3 15.3 0 0 1-4 9 15.3 15.3 0 0 1-4-9 15.3 15.3 0 0 1 4-9z"/></svg>`;
+
+  const panel = document.createElement('div');
+  panel.className = 'lang-switch__panel';
+  panel.id = panelId;
+  panel.hidden = true;
+  panel.setAttribute('role', 'menu');
+  panel.setAttribute('aria-label', t('nav.lang.label'));
 
   for (const locale of I18N_LOCALES) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'lang-switch__btn' + (locale === i18nLocale ? ' is-active' : '');
-    btn.textContent = locale === 'zh-Hant' ? t('nav.lang.zh') : t('nav.lang.en');
-    btn.addEventListener('click', () => {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'lang-switch__option' + (locale === i18nLocale ? ' is-active' : '');
+    option.setAttribute('role', 'menuitemradio');
+    option.setAttribute('aria-checked', locale === i18nLocale ? 'true' : 'false');
+    option.textContent = locale === 'zh-Hant' ? t('nav.lang.zh') : t('nav.lang.en');
+    option.addEventListener('click', (e) => {
+      e.stopPropagation();
       if (locale !== i18nLocale) setLocale(locale);
+      else closeAllLangPanels();
     });
-    wrap.appendChild(btn);
+    panel.appendChild(option);
   }
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setLangPanelOpen(wrap, panel.hidden);
+  });
+
+  wrap.append(btn, panel);
   container.appendChild(wrap);
 }
 
@@ -166,3 +232,4 @@ window.setLocale = setLocale;
 window.applyI18n = applyI18n;
 window.i18nReady = i18nReady;
 window.renderLangSwitcher = renderLangSwitcher;
+window.closeAllLangPanels = closeAllLangPanels;

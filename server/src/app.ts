@@ -10,6 +10,7 @@ import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from './routes/auth.js';
 import { health } from './routes/health.js';
 import { pageRoutes } from './routes/pages.js';
+import { submissionRoutes } from './routes/submissions.js';
 import { phenomenaRoutes } from './routes/phenomena.js';
 
 export function createApp() {
@@ -62,6 +63,7 @@ export function createApp() {
   app.route('/api/health', health);
   app.route('/api/auth', authRoutes);
   app.route('/api/admin', adminRoutes);
+  app.route('/api/submissions', submissionRoutes);
   app.route('/api/phenomena', phenomenaRoutes);
   app.route('/', pageRoutes);
 

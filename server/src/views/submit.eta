@@ -3,10 +3,114 @@
   <div class="auth-nav" data-auth-nav></div>
 </header>
 
-<main class="auth-main">
-  <div class="submit-page">
-    <h1><%= it.t('submit.title') %></h1>
-    <p><%= it.t('submit.body') %></p>
-    <a href="/"><%= it.t('submit.backHome') %></a>
+<main class="auth-main auth-main--submit">
+  <form class="submit-form" id="submitForm" novalidate>
+    <header class="submit-form__intro">
+      <h1 class="submit-form__title"><%= it.t('submit.title') %></h1>
+    </header>
+
+    <section class="submit-form__section" aria-labelledby="submitWhat">
+      <h2 class="submit-form__section-title" id="submitWhat"><%= it.t('submit.what.label') %></h2>
+      <label class="submit-form__field">
+        <span class="visually-hidden"><%= it.t('submit.what.label') %></span>
+        <input type="text" id="f_title" maxlength="200" required>
+      </label>
+    </section>
+
+    <section class="submit-form__section" aria-labelledby="submitWhere">
+      <h2 class="submit-form__section-title" id="submitWhere"><%= it.t('submit.where.label') %></h2>
+      <div class="submit-form__search">
+        <input
+          type="search"
+          id="f_location"
+          class="submit-form__search-input"
+          maxlength="300"
+          autocomplete="off"
+          placeholder="<%= it.t('submit.where.placeholder') %>"
+          aria-controls="searchResults"
+          aria-expanded="false"
+        >
+        <ul class="submit-form__search-results" id="searchResults" hidden role="listbox"></ul>
+      </div>
+      <div class="submit-form__map-wrap">
+        <div class="submit-form__map" id="submitMap" role="application" aria-label="<%= it.t('submit.where.mapLabel') %>"></div>
+      </div>
+      <input type="hidden" id="f_lat">
+      <input type="hidden" id="f_lng">
+    </section>
+
+    <section class="submit-form__section" aria-labelledby="submitWhen">
+      <h2 class="submit-form__section-title" id="submitWhen"><%= it.t('submit.when.label') %></h2>
+      <label class="submit-form__field">
+        <span class="visually-hidden"><%= it.t('submit.when.label') %></span>
+        <input type="date" id="f_seenDate" required>
+      </label>
+    </section>
+
+    <section class="submit-form__section" aria-labelledby="submitStatus">
+      <h2 class="submit-form__section-title" id="submitStatus"><%= it.t('submit.status.label') %></h2>
+      <div class="submit-form__status" id="statusGroup" role="radiogroup" aria-labelledby="submitStatus">
+        <label class="submit-form__status-btn" data-status="upcoming">
+          <input type="radio" name="status" value="upcoming">
+          <span><%= it.t('submit.status.upcoming') %></span>
+        </label>
+        <label class="submit-form__status-btn" data-status="active">
+          <input type="radio" name="status" value="active">
+          <span><%= it.t('submit.status.active') %></span>
+        </label>
+        <label class="submit-form__status-btn" data-status="ending">
+          <input type="radio" name="status" value="ending">
+          <span><%= it.t('submit.status.ending') %></span>
+        </label>
+        <label class="submit-form__status-btn" data-status="other">
+          <input type="radio" name="status" value="other">
+          <span><%= it.t('submit.status.other') %></span>
+        </label>
+      </div>
+      <label class="submit-form__field submit-form__status-other" id="statusOtherWrap" hidden>
+        <span class="visually-hidden"><%= it.t('submit.status.other') %></span>
+        <input type="text" id="f_statusOther" maxlength="100">
+      </label>
+    </section>
+
+    <section class="submit-form__section" aria-labelledby="submitPhoto">
+      <h2 class="submit-form__section-title" id="submitPhoto"><%= it.t('submit.photo.label') %></h2>
+      <p class="submit-form__hint submit-form__photo-hint" id="photoDragHint" hidden><%= it.t('submit.photo.dragHint') %></p>
+      <div class="submit-form__photo">
+        <ul class="submit-form__photo-list" id="photoList" aria-live="polite"></ul>
+        <label class="submit-form__photo-upload">
+          <input type="file" id="f_image" accept="image/jpeg,image/png,image/webp" multiple hidden>
+          <span class="submit-form__photo-btn"><%= it.t('submit.photo.upload') %></span>
+        </label>
+        <p class="submit-form__photo-status" id="imageStatus" hidden></p>
+      </div>
+    </section>
+
+    <section class="submit-form__section" aria-labelledby="submitDesc">
+      <h2 class="submit-form__section-title" id="submitDesc"><%= it.t('submit.description.label') %></h2>
+      <label class="submit-form__field">
+        <span class="visually-hidden"><%= it.t('submit.description.label') %></span>
+        <textarea id="f_description" rows="4" maxlength="2000" required></textarea>
+      </label>
+    </section>
+
+    <section class="submit-form__section" aria-labelledby="submitExtra">
+      <h2 class="submit-form__section-title" id="submitExtra"><%= it.t('submit.extra.label') %></h2>
+      <label class="submit-form__field">
+        <span class="visually-hidden"><%= it.t('submit.extra.label') %></span>
+        <textarea id="f_extra" rows="3" maxlength="2000"></textarea>
+      </label>
+    </section>
+
+    <p class="submit-form__error" id="submitError" hidden></p>
+    <p class="submit-form__foot"><%= it.t('submit.foot') %></p>
+    <button type="submit" class="submit-form__submit" id="submitBtn"><%= it.t('submit.send') %></button>
+  </form>
+
+  <div class="submit-form__success" id="submitSuccess" hidden>
+    <h1 class="submit-form__title"><%= it.t('submit.success.title') %></h1>
+    <p class="submit-form__lede"><%= it.t('submit.success.body') %></p>
+    <a href="/" class="submit-form__success-link"><%= it.t('submit.success.home') %></a>
+    <button type="button" class="submit-form__success-again" id="submitAgain"><%= it.t('submit.success.again') %></button>
   </div>
 </main>

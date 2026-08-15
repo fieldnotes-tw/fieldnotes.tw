@@ -49,12 +49,16 @@ function newObjectName(contentType: string) {
   return { filename, key, publicPath, contentType, ext };
 }
 
-export async function createUploadUrl(contentType: string) {
+export async function createUploadUrl(
+  contentType: string,
+  options?: { localUploadBase?: string },
+) {
   const { filename, key, publicPath } = newObjectName(contentType);
+  const localBase = options?.localUploadBase ?? '/api/admin/uploads/local';
 
   if (mediaBackend() === 'local') {
     return {
-      uploadUrl: `/api/admin/uploads/local/${filename}`,
+      uploadUrl: `${localBase}/${filename}`,
       publicPath,
       key,
       contentType,
