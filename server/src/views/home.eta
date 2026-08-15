@@ -8,14 +8,39 @@
 <div class="floatingbar" id="floatingbar">
   <div class="floatingbar__row">
     <a href="#top" class="brand-mark" aria-label="<%= it.t('brand.name') %>"><span>最</span><span>近</span><span>左</span><span>營</span></a>
-    <div class="floatingbar__menu">
-      <label class="cat-toggle check-item" data-cat="animal"><span class="check-item__box"></span><span><%= it.t('category.animal') %></span></label>
+    <div class="floatingbar__actions">
+      <button type="button" class="floatingbar__search-btn" id="floatingSearchBtn" aria-label="<%= it.t('home.advancedSearch') %>" aria-expanded="false" aria-controls="floatingSearchPanel">
+        <svg class="floatingbar__search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <path d="M10 5 H22 M2 5 H6 M14 12 H22 M2 12 H10 M18 19 H22 M2 19 H14"/>
+          <circle cx="8" cy="5" r="2"/>
+          <circle cx="12" cy="12" r="2"/>
+          <circle cx="16" cy="19" r="2"/>
+        </svg>
+      </button>
+      <button type="button" class="floatingbar__lang-btn" id="floatingLangBtn" aria-label="<%= it.t('nav.lang.label') %>" aria-expanded="false" aria-controls="floatingLangPanel">
+        <svg class="floatingbar__lang-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M3 12h18"/>
+          <path d="M12 3a15.3 15.3 0 0 1 4 9 15.3 15.3 0 0 1-4 9 15.3 15.3 0 0 1-4-9 15.3 15.3 0 0 1 4-9z"/>
+        </svg>
+      </button>
+      <div class="auth-nav" data-auth-nav></div>
+    </div>
+  </div>
+  <div class="floatingbar__search-panel" id="floatingSearchPanel" hidden>
+    <div class="floatingbar__search-menu" role="group" aria-label="<%= it.t('nav.categories') %>">
       <label class="cat-toggle check-item" data-cat="plant"><span class="check-item__box"></span><span><%= it.t('category.plant') %></span></label>
+      <label class="cat-toggle check-item" data-cat="animal"><span class="check-item__box"></span><span><%= it.t('category.animal') %></span></label>
       <label class="cat-toggle check-item" data-cat="sky"><span class="check-item__box"></span><span><%= it.t('category.sky') %></span></label>
       <label class="cat-toggle check-item" data-cat="taste"><span class="check-item__box"></span><span><%= it.t('category.taste') %></span></label>
       <label class="cat-toggle check-item" data-cat="workshop"><span class="check-item__box"></span><span><%= it.t('category.workshop') %></span></label>
     </div>
-    <div class="auth-nav" data-auth-nav></div>
+  </div>
+  <div class="floatingbar__lang-panel" id="floatingLangPanel" hidden>
+    <div class="floatingbar__lang-menu" role="group" aria-label="<%= it.t('nav.lang.label') %>">
+      <button type="button" class="floatingbar__lang-option" data-locale="zh-Hant"><%= it.t('nav.lang.zh') %></button>
+      <button type="button" class="floatingbar__lang-option" data-locale="en"><%= it.t('nav.lang.en') %></button>
+    </div>
   </div>
 </div>
 
@@ -43,31 +68,69 @@
 </header>
 
 <section class="section" id="phenomena">
-  <div class="view-toggle" role="group" aria-label="<%= it.t('home.viewToggle') %>">
-    <button type="button" class="view-toggle__btn is-active" data-view="list">
-      <svg class="view-toggle__icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
-      <span><%= it.t('home.view.cards') %></span>
-    </button>
-    <button type="button" class="view-toggle__btn" data-view="map">
-      <svg class="view-toggle__icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>
-      <span><%= it.t('home.view.map') %></span>
-    </button>
-  </div>
-
-  <div class="grid-feed" id="gridFeed" aria-live="polite"></div>
-
-  <div class="map-view is-hidden" id="mapView">
-    <div class="map-frame" id="mapFrame">
-      <div class="map-sheet" id="mapSheet">
-        <button type="button" class="map-sheet__close" id="mapSheetClose" aria-label="<%= it.t('home.close') %>">
+  <div class="feed-shell" id="feedShell">
+    <div class="feed-stage" id="feedStage">
+      <aside class="feed-layout__detail" id="feedDetailPane" aria-hidden="true">
+        <header class="feed-detail__header" id="feedDetailHeader">
+          <div class="feed-detail__header-row">
+            <button type="button" class="feed-detail__menu-btn" id="feedDetailMenuBtn" aria-label="<%= it.t('home.detail.itemMenu') %>" aria-expanded="false" aria-controls="feedDetailMenuPanel">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9 L12 15 L18 9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+            </button>
+            <p class="feed-detail__header-title" id="feedDetailHeaderTitle"></p>
+            <button type="button" class="feed-detail__header-close" id="feedDetailHeaderClose" aria-label="<%= it.t('home.detail.backToList') %>">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <div class="feed-detail__menu-panel" id="feedDetailMenuPanel" hidden>
+            <div class="feed-detail__menu-list" id="feedDetailMenuList" role="listbox" aria-label="<%= it.t('home.detail.itemMenu') %>"></div>
+          </div>
+        </header>
+        <button type="button" class="feed-detail__close" id="feedDetailClose" aria-label="<%= it.t('home.close') %>">
           <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
         </button>
-        <button type="button" class="map-sheet__collapse" id="mapSheetCollapse" aria-label="<%= it.t('home.collapsePanel') %>">
-          <svg viewBox="0 0 24 24" width="14" height="14"><path d="M15 5 L8 12 L15 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
-        </button>
-        <div class="map-sheet__body" id="mapSheetBody"></div>
+        <div class="feed-detail__body" id="feedDetailBody"></div>
+      </aside>
+      <aside class="map-rail" id="mapRail" hidden aria-hidden="true">
+        <div class="map-rail__list" id="mapRailList"></div>
+      </aside>
+      <div class="feed-stage__main">
+        <div class="view-toggle" role="group" aria-label="<%= it.t('home.viewToggle') %>">
+          <button type="button" class="view-toggle__btn is-active" data-view="list">
+            <svg class="view-toggle__icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
+            <span><%= it.t('home.view.cards') %></span>
+          </button>
+          <button type="button" class="view-toggle__btn" data-view="map">
+            <svg class="view-toggle__icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>
+            <span><%= it.t('home.view.map') %></span>
+          </button>
+        </div>
+        <div class="feed-layout-host" id="feedLayoutHost">
+          <div class="feed-layout" id="feedLayout">
+            <div class="feed-layout__list">
+              <div class="grid-feed" id="gridFeed" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="map-view is-hidden" id="mapView">
+          <div class="map-frame" id="mapFrame">
+            <div class="map-sheet" id="mapSheet">
+              <button type="button" class="map-sheet__handle" id="mapSheetHandle" aria-label="<%= it.t('home.expandPanel') %>">
+                <span class="map-sheet__handle-bar" aria-hidden="true"></span>
+              </button>
+              <button type="button" class="map-sheet__close" id="mapSheetClose" aria-label="<%= it.t('home.close') %>">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+              </button>
+              <div class="map-sheet__body" id="mapSheetBody"></div>
+              <div class="map-sheet__peek-footer" id="mapSheetPeekNav" hidden aria-hidden="true">
+                <div class="map-sheet__peek-dots" id="mapSheetPinDots" aria-hidden="true"></div>
+                <span class="map-sheet__peek-counter" id="mapSheetPinCounter" aria-live="polite"></span>
+              </div>
+            </div>
+            <div class="map-view__canvas" id="mapCanvas"></div>
+          </div>
+        </div>
       </div>
-      <div class="map-view__canvas" id="mapCanvas"></div>
     </div>
   </div>
 </section>

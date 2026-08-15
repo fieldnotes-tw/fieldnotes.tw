@@ -47,6 +47,23 @@ function syncJsFile(file: string) {
   copyFileSync(file, dest);
 }
 
+function syncJsTree() {
+  for (const rel of listJsFiles(authoredJsDir)) {
+    syncJsFile(join(authoredJsDir, rel));
+  }
+}
+
+function listJsFiles(dir: string, base = dir): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(dir, { withFileTypes: true })) {
+    if (name.name.startsWith('.')) continue;
+    const path = join(dir, name.name);
+    if (name.isDirectory()) out.push(...listJsFiles(path, base));
+    else if (name.name.endsWith('.js')) out.push(relative(base, path));
+  }
+  return out;
+}
+
 async function start() {
   if (!isDev()) {
     serve({ fetch: app.fetch, port, hostname: host }, (info) => {
@@ -54,6 +71,13 @@ async function start() {
       console.log(`Static root: ${publicRoot()}`);
     });
     return;
+  }
+
+  syncLocaleFiles();
+  try {
+    syncJsTree();
+  } catch (err) {
+    console.error('[dev] initial js sync failed', err);
   }
 
   // Create the HTTP server first so Vite HMR can share it (no extra :24678).

@@ -52,6 +52,7 @@ pageRoutes.get('/confirm', (c) =>
 pageRoutes.get('/submit', (c) =>
   renderPage(c, 'submit', {
     titleKey: 'submit.pageTitle',
+    leaflet: true,
     scripts: ['/js/pages/submit.js'],
   }),
 );
