@@ -185,16 +185,11 @@ function renderAuthNav(container) {
     document.addEventListener('click', () => wrap.classList.remove('is-open'));
   } else {
     const loginLink = document.createElement('a');
-    loginLink.className = 'auth-nav__btn';
+    loginLink.className = 'auth-nav__btn auth-nav__btn--primary';
     loginLink.textContent = t('nav.login');
     loginLink.href = '/login';
 
-    const registerLink = document.createElement('a');
-    registerLink.className = 'auth-nav__btn auth-nav__btn--primary';
-    registerLink.textContent = t('nav.register');
-    registerLink.href = '/register';
-
-    container.append(loginLink, registerLink);
+    container.appendChild(loginLink);
   }
 }
 

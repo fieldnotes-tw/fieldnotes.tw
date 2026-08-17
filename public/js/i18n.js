@@ -120,11 +120,21 @@ function applyI18n(root = document) {
 
 let langSwitchDocBound = false;
 
+function getLangPanel(wrap) {
+  const btn = wrap.querySelector('.lang-switch__btn');
+  const panelId = btn?.getAttribute('aria-controls');
+  if (panelId) {
+    const panel = document.getElementById(panelId);
+    if (panel) return panel;
+  }
+  return wrap.querySelector('.lang-switch__panel');
+}
+
 function closeAllLangPanels() {
   document.querySelectorAll('.lang-switch.is-open').forEach((wrap) => {
     wrap.classList.remove('is-open');
     const btn = wrap.querySelector('.lang-switch__btn');
-    const panel = wrap.querySelector('.lang-switch__panel');
+    const panel = getLangPanel(wrap);
     btn?.classList.remove('is-open');
     btn?.setAttribute('aria-expanded', 'false');
     if (panel) panel.hidden = true;
@@ -133,11 +143,12 @@ function closeAllLangPanels() {
 
 function setLangPanelOpen(wrap, open) {
   const btn = wrap.querySelector('.lang-switch__btn');
-  const panel = wrap.querySelector('.lang-switch__panel');
+  const panel = getLangPanel(wrap);
   if (!btn || !panel) return;
   if (open) {
     closeAllLangPanels();
-    window.closeFloatingSearch?.();
+    window.closeFeedFilter?.();
+    window.closeFeedSearch?.();
   }
   wrap.classList.toggle('is-open', open);
   btn.classList.toggle('is-open', open);
@@ -149,7 +160,7 @@ function bindLangSwitchDoc() {
   if (langSwitchDocBound) return;
   langSwitchDocBound = true;
   document.addEventListener('click', (e) => {
-    if (e.target.closest('.lang-switch')) return;
+    if (e.target.closest('.lang-switch') || e.target.closest('.lang-switch__panel--sitehead')) return;
     closeAllLangPanels();
   });
   document.addEventListener('keydown', (e) => {
@@ -160,8 +171,9 @@ function bindLangSwitchDoc() {
 function renderLangSwitcher(container) {
   bindLangSwitchDoc();
 
+  const siteheadWeather = container.closest('.sitehead__weather');
   const wrap = document.createElement('div');
-  wrap.className = 'lang-switch';
+  wrap.className = 'lang-switch' + (siteheadWeather ? ' lang-switch--sitehead' : '');
 
   const panelId = `lang-panel-${Math.random().toString(36).slice(2, 9)}`;
   const btn = document.createElement('button');
@@ -173,7 +185,7 @@ function renderLangSwitcher(container) {
   btn.innerHTML = `<svg class="lang-switch__icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15.3 15.3 0 0 1 4 9 15.3 15.3 0 0 1-4 9 15.3 15.3 0 0 1-4-9 15.3 15.3 0 0 1 4-9z"/></svg>`;
 
   const panel = document.createElement('div');
-  panel.className = 'lang-switch__panel';
+  panel.className = 'lang-switch__panel' + (siteheadWeather ? ' lang-switch__panel--sitehead' : '');
   panel.id = panelId;
   panel.hidden = true;
   panel.setAttribute('role', 'menu');
@@ -188,8 +200,8 @@ function renderLangSwitcher(container) {
     option.textContent = locale === 'zh-Hant' ? t('nav.lang.zh') : t('nav.lang.en');
     option.addEventListener('click', (e) => {
       e.stopPropagation();
+      closeAllLangPanels();
       if (locale !== i18nLocale) setLocale(locale);
-      else closeAllLangPanels();
     });
     panel.appendChild(option);
   }
@@ -199,8 +211,10 @@ function renderLangSwitcher(container) {
     setLangPanelOpen(wrap, panel.hidden);
   });
 
-  wrap.append(btn, panel);
+  wrap.append(btn);
   container.appendChild(wrap);
+  if (siteheadWeather) siteheadWeather.appendChild(panel);
+  else wrap.append(panel);
 }
 
 async function loadCatalog(locale) {
