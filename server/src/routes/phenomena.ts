@@ -1,7 +1,10 @@
-import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm';
+import { eq, inArray, type SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { db } from '../db/index.js';
 import { phenomena } from '../db/schema.js';
+import {
+  getPhenomenonDetail,
+  listPhenomenaWithStats,
+} from '../lib/phenomena-query.js';
 import { localeOf, t } from '../lib/i18n.js';
 import {
   categorySchema,
@@ -40,12 +43,7 @@ phenomenaRoutes.get('/', async (c) => {
     filters.push(eq(phenomena.category, category.data));
   }
 
-  const rows = await db
-    .select()
-    .from(phenomena)
-    .where(filters.length ? and(...filters) : undefined)
-    .orderBy(desc(phenomena.lastNoticedAt), asc(phenomena.title));
-
+  const rows = await listPhenomenaWithStats(filters);
   return c.json({ data: rows });
 });
 
@@ -56,12 +54,7 @@ phenomenaRoutes.get('/:id', async (c) => {
     return c.json({ error: t(locale, 'errors.invalidId') }, 400);
   }
 
-  const [row] = await db
-    .select()
-    .from(phenomena)
-    .where(eq(phenomena.id, id.data))
-    .limit(1);
-
+  const row = await getPhenomenonDetail(id.data);
   if (!row) {
     return c.json({ error: t(locale, 'errors.notFound') }, 404);
   }

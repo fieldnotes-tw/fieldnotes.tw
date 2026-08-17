@@ -28,6 +28,7 @@ const cardModalClose = document.getElementById('cardModalClose');
 const cardModalBackdrop = document.getElementById('cardModalBackdrop');
 
 let cards = [];
+const phenomenonCache = new Map();
 let focusedCard = null;
 let highlightedCard = null;
 let detailAdvanceLock = false;
@@ -66,17 +67,43 @@ function statusLabel(status) {
 
 function applyFilters() {
   const catActive = selectedCats.size > 0;
+  const query = keywordQuery.trim().toLowerCase();
   cards.forEach((c) => {
-    c.classList.toggle('is-filtered-out', catActive && !selectedCats.has(c.dataset.category));
+    const catOk = !catActive || selectedCats.has(c.dataset.category);
+    const kwOk = !query || cardMatchesKeyword(c, query);
+    c.classList.toggle('is-filtered-out', !catOk || !kwOk);
   });
   markerRefs.forEach(({ marker, card }) => {
-    const show = !catActive || selectedCats.has(card.dataset.category);
+    const show = !card.classList.contains('is-filtered-out');
     if (!leafletMap) return;
     if (show && !leafletMap.hasLayer(marker)) marker.addTo(leafletMap);
     if (!show && leafletMap.hasLayer(marker)) marker.remove();
   });
   syncMapRail();
-  remountOpenDetail();
+
+  const sheetOpen = isPhoneLayout() && mapSheet.classList.contains('is-open');
+  const focusedHidden = focusedCard?.classList.contains('is-filtered-out');
+  if (feedStage.classList.contains('is-detail-open')) {
+    remountOpenDetail();
+  } else if (sheetOpen && focusedHidden) {
+    remountOpenDetail();
+  } else if (sheetOpen && !focusedCard && getVisibleCards().length) {
+    remountOpenDetail();
+  }
+}
+
+function cardMatchesKeyword(card, query) {
+  const item = getItemForCard(card);
+  const parts = [
+    item.title,
+    item.description,
+    item.location,
+    item.notes,
+    categoryLabel(item.category),
+    card.querySelector('.card__title')?.textContent,
+    card.querySelector('.card__desc')?.textContent,
+  ];
+  return parts.filter(Boolean).join(' ').toLowerCase().includes(query);
 }
 
 function remountOpenDetail() {
@@ -164,8 +191,14 @@ function bindCatToggle(el) {
 }
 catToggles.forEach(bindCatToggle);
 
-const floatingSearchBtn = document.getElementById('floatingSearchBtn');
-const floatingSearchPanel = document.getElementById('floatingSearchPanel');
+const feedFilterBtn = document.getElementById('feedFilterBtn');
+const feedFilterPanel = document.getElementById('feedFilterPanel');
+const feedSearchBtn = document.getElementById('feedSearchBtn');
+const feedSearchPanel = document.getElementById('feedSearchPanel');
+const feedSearchInput = document.getElementById('feedSearchInput');
+let keywordQuery = '';
+let mapSearchLock = false;
+let mapViewSnapshot = null;
 const floatingLangBtn = document.getElementById('floatingLangBtn');
 const floatingLangPanel = document.getElementById('floatingLangPanel');
 function updateFeedStickyTop() {
@@ -175,18 +208,78 @@ function updateFeedStickyTop() {
   }
   document.documentElement.style.setProperty('--feed-sticky-top', `${stickyTop}px`);
 }
-function setFloatingSearchOpen(open) {
-  if (!floatingSearchBtn || !floatingSearchPanel) return;
+function isFeedToolbarPanelOpen() {
+  return Boolean(
+    (feedSearchPanel && !feedSearchPanel.hidden)
+    || (feedFilterPanel && !feedFilterPanel.hidden),
+  );
+}
+
+function shouldDeferMapLayoutSync() {
+  return mapSearchLock
+    || isFeedToolbarPanelOpen()
+    || document.activeElement === feedSearchInput;
+}
+
+function lockMapViewForSearch() {
+  if (!leafletMap || mapView.classList.contains('is-hidden')) return;
+  mapSearchLock = true;
+  mapViewSnapshot = {
+    center: leafletMap.getCenter(),
+    zoom: leafletMap.getZoom(),
+  };
+}
+
+function unlockMapViewForSearch({ sync = true } = {}) {
+  if (!mapSearchLock) return;
+  mapSearchLock = false;
+  if (leafletMap && mapViewSnapshot && !mapView.classList.contains('is-hidden')) {
+    const { center, zoom } = mapViewSnapshot;
+    if (leafletMap.getZoom() !== zoom) {
+      leafletMap.setView(center, zoom, { animate: false });
+    }
+  }
+  mapViewSnapshot = null;
+  if (sync) syncMapLayoutOnly();
+}
+
+function syncMapLayoutOnly() {
+  if (!leafletMap || mapView.classList.contains('is-hidden') || shouldDeferMapLayoutSync()) return;
+  requestAnimationFrame(() => {
+    leafletMap.invalidateSize({ animate: false });
+  });
+}
+
+function setFeedSearchOpen(open) {
+  if (!feedSearchBtn || !feedSearchPanel) return;
+  if (open) {
+    setFeedFilterOpen(false);
+    setFloatingLangOpen(false);
+    window.closeAllLangPanels?.();
+  }
+  feedSearchPanel.hidden = !open;
+  feedSearchBtn.classList.toggle('is-open', open);
+  feedSearchBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) {
+    if (!mapView.classList.contains('is-hidden')) lockMapViewForSearch();
+    requestAnimationFrame(() => feedSearchInput?.focus({ preventScroll: true }));
+  } else if (!mapView.classList.contains('is-hidden')) {
+    unlockMapViewForSearch();
+  }
+}
+function setFeedFilterOpen(open) {
+  if (!feedFilterBtn || !feedFilterPanel) return;
+  if (open) setFeedSearchOpen(false);
   if (open) setFloatingLangOpen(false);
-  floatingSearchPanel.hidden = !open;
-  floatingSearchBtn.classList.toggle('is-open', open);
-  floatingSearchBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-  updateFeedStickyTop();
+  feedFilterPanel.hidden = !open;
+  feedFilterBtn.classList.toggle('is-open', open);
+  feedFilterBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 function setFloatingLangOpen(open) {
   if (!floatingLangBtn || !floatingLangPanel) return;
   if (open) {
-    setFloatingSearchOpen(false);
+    setFeedSearchOpen(false);
+    setFeedFilterOpen(false);
     window.closeAllLangPanels?.();
   }
   floatingLangPanel.hidden = !open;
@@ -195,13 +288,40 @@ function setFloatingLangOpen(open) {
   updateFeedStickyTop();
 }
 function closeFloatingPanels() {
-  setFloatingSearchOpen(false);
+  setFeedSearchOpen(false);
+  setFeedFilterOpen(false);
   setFloatingLangOpen(false);
 }
-window.closeFloatingSearch = () => setFloatingSearchOpen(false);
-floatingSearchBtn?.addEventListener('click', (e) => {
+window.closeFeedFilter = () => setFeedFilterOpen(false);
+window.closeFeedSearch = () => setFeedSearchOpen(false);
+feedSearchBtn?.addEventListener('click', (e) => {
   e.stopPropagation();
-  setFloatingSearchOpen(floatingSearchPanel.hidden);
+  setFeedSearchOpen(feedSearchPanel.hidden);
+});
+feedSearchInput?.addEventListener('focus', () => {
+  if (!mapView.classList.contains('is-hidden')) lockMapViewForSearch();
+});
+feedSearchInput?.addEventListener('blur', () => {
+  window.setTimeout(() => {
+    if (isFeedToolbarPanelOpen()) return;
+    unlockMapViewForSearch();
+  }, 80);
+});
+feedSearchInput?.addEventListener('input', () => {
+  keywordQuery = feedSearchInput.value;
+  applyFilters();
+});
+feedSearchInput?.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    feedSearchInput.value = '';
+    keywordQuery = '';
+    applyFilters();
+    setFeedSearchOpen(false);
+  }
+});
+feedFilterBtn?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  setFeedFilterOpen(feedFilterPanel.hidden);
 });
 floatingLangBtn?.addEventListener('click', (e) => {
   e.stopPropagation();
@@ -211,8 +331,8 @@ document.querySelectorAll('.floatingbar__lang-option').forEach((btn) => {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     const locale = btn.dataset.locale;
+    setFloatingLangOpen(false);
     if (locale && locale !== getLocale()) setLocale(locale);
-    else setFloatingLangOpen(false);
   });
 });
 function syncFloatingLangOptions() {
@@ -222,9 +342,11 @@ function syncFloatingLangOptions() {
   });
 }
 document.addEventListener('click', (e) => {
-  if (e.target.closest('.floatingbar__search-panel') || e.target.closest('.floatingbar__search-btn')) return;
+  if (e.target.closest('.feed-toolbar__search-panel') || e.target.closest('.feed-toolbar__search-btn')) return;
+  if (e.target.closest('.feed-toolbar__filter-panel') || e.target.closest('.feed-toolbar__filter-btn')) return;
   if (e.target.closest('.floatingbar__lang-panel') || e.target.closest('.floatingbar__lang-btn')) return;
-  const panelOpen = (floatingSearchPanel && !floatingSearchPanel.hidden)
+  const panelOpen = (feedSearchPanel && !feedSearchPanel.hidden)
+    || (feedFilterPanel && !feedFilterPanel.hidden)
     || (floatingLangPanel && !floatingLangPanel.hidden);
   if (panelOpen) closeFloatingPanels();
 });
@@ -237,7 +359,11 @@ function formatToday() {
   if (!todayEl) return;
   const locale = getLocale() === 'en' ? 'en-US' : 'zh-TW';
   const d = new Date();
-  const parts = new Intl.DateTimeFormat(locale, { month: 'numeric', day: 'numeric', weekday: 'long' }).formatToParts(d);
+  const parts = new Intl.DateTimeFormat(locale, {
+    month: 'numeric',
+    day: 'numeric',
+    weekday: 'short',
+  }).formatToParts(d);
   const get = (type) => parts.find((p) => p.type === type)?.value || '';
   todayEl.textContent = t('home.date', {
     month: get('month'),
@@ -271,10 +397,12 @@ async function loadWeather() {
     await i18nReady;
     const temp = Math.round(data.current.temperature_2m);
     const desc = weatherTextForCode(data.current.weather_code);
-    weatherEl.textContent = `${desc} ${temp}°C`;
+    weatherEl.textContent = t('home.weatherLine', { temp, desc });
+    weatherEl.title = t('home.weatherLine', { temp, desc });
   } catch {
     await i18nReady;
     weatherEl.textContent = t('home.weatherUnavailable');
+    weatherEl.removeAttribute('title');
   } finally {
     clearTimeout(timer);
   }
@@ -283,6 +411,89 @@ async function loadWeather() {
 function observerInitial(name) {
   if (!name) return '?';
   return Array.from(name)[0];
+}
+
+const CATEGORY_EMOJI = {
+  plant: '🌸',
+  animal: '🐦',
+  sky: '🌤',
+  taste: '🍜',
+  workshop: '🛠',
+};
+
+function categoryLabel(category) {
+  const emoji = CATEGORY_EMOJI[category] || '';
+  const name = t(`category.${category}`) || category;
+  return emoji ? `${emoji} ${name}` : name;
+}
+
+function cachePhenomena(items) {
+  items.forEach((item) => phenomenonCache.set(item.id, item));
+}
+
+function getItemForCard(card) {
+  return phenomenonCache.get(card.dataset.id) ?? cardToFallbackItem(card);
+}
+
+function cardToFallbackItem(card) {
+  return {
+    id: card.dataset.id,
+    status: card.dataset.status,
+    category: card.dataset.category,
+    title: card.querySelector('.card__title')?.textContent || '',
+    description: card.querySelector('.card__desc')?.textContent || '',
+    location: card.dataset.location || '',
+    notes: card.dataset.notes || '',
+    lat: card.dataset.lat ? parseFloat(card.dataset.lat) : null,
+    lng: card.dataset.lng ? parseFloat(card.dataset.lng) : null,
+    imageAlt: card.querySelector('.card__photo img')?.alt || '',
+    imageUrl: card.querySelector('.card__photo img')?.src || null,
+    observerName: card.querySelector('.card__observer span:last-child')?.textContent || null,
+    sightingCount: Number(card.dataset.sightingCount || 0),
+    observerCount: Number(card.dataset.observerCount || 0),
+    lastSeenAt: card.dataset.lastSeenAt || null,
+  };
+}
+
+async function ensurePhenomenonDetail(id) {
+  const cached = phenomenonCache.get(id);
+  if (cached?.recentSightings) return cached;
+  try {
+    const res = await fetch(`/api/phenomena/${id}`, {
+      headers: { 'Accept-Language': getLocale() },
+    });
+    if (!res.ok) return cached ?? null;
+    const payload = await res.json();
+    if (payload.data) phenomenonCache.set(id, payload.data);
+    return payload.data ?? cached ?? null;
+  } catch {
+    return cached ?? null;
+  }
+}
+
+function formatRelativeTime(iso) {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  const diffMs = Date.now() - date.getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return t('home.relative.justNow');
+  if (minutes < 60) return t('home.relative.minutesAgo', { count: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t('home.relative.hoursAgo', { count: hours });
+  const days = Math.floor(hours / 24);
+  return t('home.relative.daysAgo', { count: days });
+}
+
+function formatSightingDate(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return t('home.sighting.date', { month: date.getMonth() + 1, day: date.getDate() });
+}
+
+function conditionLabel(condition) {
+  if (!condition) return '';
+  return t(`sighting.condition.${condition}`) || condition;
 }
 
 function resolveImageUrls(item) {
@@ -403,16 +614,17 @@ function initPhotoGallery(gallery) {
 }
 
 function mountDetailContent(container, card) {
-  container.replaceChildren(...buildDetailNodes(card));
+  const item = getItemForCard(card);
+  container.replaceChildren(...buildDetailNodes(item));
   container.querySelectorAll('.photo-gallery').forEach(initPhotoGallery);
 }
 
-function buildDetailSection(card, { loop = '' } = {}) {
+function buildDetailSection(item, { loop = '' } = {}) {
   const section = document.createElement('section');
   section.className = 'feed-detail__section';
-  section.dataset.id = card.dataset.id;
+  section.dataset.id = item.id;
   if (loop) section.dataset.loop = loop;
-  section.append(...buildDetailNodes(card));
+  section.append(...buildDetailNodes(item));
   return section;
 }
 
@@ -450,7 +662,8 @@ function mountMapSheetDetail(card) {
   mapSheetBody.style.paddingBottom = '';
   mapSheetBody.scrollTop = 0;
   if (!card) return;
-  const section = buildDetailSection(card);
+  const item = getItemForCard(card);
+  const section = buildDetailSection(item);
   mapSheetBody.appendChild(section);
   section.querySelectorAll('.photo-gallery').forEach(initPhotoGallery);
 }
@@ -472,7 +685,7 @@ function mountMapSheetPeek(card, { direction = 0 } = {}) {
 
   if (multi) row.appendChild(createPeekColButton(-1));
 
-  row.appendChild(buildDetailSection(card));
+  row.appendChild(buildDetailSection(getItemForCard(card)));
 
   if (multi) row.appendChild(createPeekColButton(1));
 
@@ -489,9 +702,9 @@ function mountContinuousDetail(container, { scrollTo } = {}) {
   container.replaceChildren();
   container.style.paddingBottom = '';
   const visible = getVisibleCards();
-  visible.forEach((card) => container.appendChild(buildDetailSection(card)));
+  visible.forEach((card) => container.appendChild(buildDetailSection(getItemForCard(card))));
   if (!isPhoneLayout()) {
-    visible.forEach((card) => container.appendChild(buildDetailSection(card, { loop: 'after' })));
+    visible.forEach((card) => container.appendChild(buildDetailSection(getItemForCard(card), { loop: 'after' })));
   }
   container.querySelectorAll('.photo-gallery').forEach(initPhotoGallery);
   requestAnimationFrame(() => {
@@ -588,6 +801,17 @@ function onDetailPaneScroll() {
   if (!detailScrollRaf) detailScrollRaf = requestAnimationFrame(updateDetailScrollSpy);
 }
 
+function buildCardSeenText(iso) {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  const diffMs = Date.now() - date.getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return t('home.card.seenJustNow');
+  const time = formatRelativeTime(iso);
+  return time ? t('home.card.someoneSeen', { time }) : null;
+}
+
 function renderCard(item) {
   const card = document.createElement('article');
   card.className = 'card';
@@ -598,6 +822,9 @@ function renderCard(item) {
   if (item.lng != null) card.dataset.lng = String(item.lng);
   if (item.location) card.dataset.location = item.location;
   if (item.notes) card.dataset.notes = item.notes;
+  card.dataset.sightingCount = String(item.sightingCount ?? 0);
+  card.dataset.observerCount = String(item.observerCount ?? 0);
+  if (item.lastSeenAt) card.dataset.lastSeenAt = item.lastSeenAt;
 
   const imageUrls = resolveImageUrls(item);
   if (imageUrls.length) card.dataset.imageUrls = JSON.stringify(imageUrls);
@@ -615,40 +842,49 @@ function renderCard(item) {
   const body = document.createElement('div');
   body.className = 'card__body';
 
-  const pill = document.createElement('span');
-  pill.className = 'pill';
-  pill.innerHTML = '<span class="dot"></span>';
-  pill.append(statusLabel(item.status));
+  const category = document.createElement('p');
+  category.className = 'card__category';
+  category.textContent = categoryLabel(item.category);
 
   const title = document.createElement('h3');
   title.className = 'card__title';
   title.textContent = item.title;
 
+  body.append(category, title);
+
+  if (item.location) {
+    const location = document.createElement('p');
+    location.className = 'card__location';
+    location.textContent = item.location;
+    body.appendChild(location);
+  }
+
   const desc = document.createElement('p');
   desc.className = 'card__desc';
   desc.textContent = item.description;
+  body.appendChild(desc);
 
-  body.append(pill, title, desc);
-
-  if (item.observerName) {
-    const observer = document.createElement('div');
-    observer.className = 'card__observer';
-    const avatar = document.createElement('span');
-    avatar.className = 'avatar';
-    avatar.dataset.cat = item.category;
-    avatar.textContent = observerInitial(item.observerName);
-    const name = document.createElement('span');
-    name.textContent = item.observerName;
-    observer.append(avatar, name);
-    body.appendChild(observer);
+  const activity = document.createElement('div');
+  activity.className = 'card__activity';
+  const seenText = buildCardSeenText(item.lastSeenAt);
+  if (seenText) {
+    const recent = document.createElement('p');
+    recent.className = 'card__activity-recent';
+    recent.textContent = seenText;
+    activity.appendChild(recent);
   }
-
-  if (item.metaLabel) {
-    const meta = document.createElement('p');
-    meta.className = 'card__meta';
-    meta.textContent = item.metaLabel;
-    body.appendChild(meta);
+  const updates = item.sightingCount ?? 0;
+  const observers = item.observerCount ?? 0;
+  if (updates > 0 || observers > 0) {
+    const stats = document.createElement('p');
+    stats.className = 'card__activity-stats';
+    stats.textContent = t('home.card.observerStats', {
+      observers,
+      updates,
+    });
+    activity.appendChild(stats);
   }
+  if (activity.childElementCount) body.appendChild(activity);
 
   card.append(photo, body);
   return card;
@@ -697,68 +933,211 @@ function initMap() {
   addMapMarkers();
 }
 
-// Builds the [gallery, body] nodes shared by the map sheet, card modal, and split detail.
-function buildDetailNodes(card) {
-  const alt = card.querySelector('.card__photo img')?.alt || '';
-  const photoWrap = buildPhotoGallery(getCardImageUrls(card), alt);
+function openPhenomenonOnMap(item) {
+  const card = cards.find((c) => c.dataset.id === item.id);
+  if (!card) return;
+  const mapBtn = document.querySelector('.view-toggle__btn[data-view="map"]');
+  if (mapView.classList.contains('is-hidden') && mapBtn) mapBtn.click();
+  const entry = findMarkerEntry(card);
+  if (entry) openMapSheet(card, entry.marker);
+  else openSplitDetail(card);
+}
+
+function buildDetailActions(item) {
+  const actions = document.createElement('div');
+  actions.className = 'detail__actions';
+
+  if (item.lat != null && item.lng != null) {
+    const mapBtn = document.createElement('button');
+    mapBtn.type = 'button';
+    mapBtn.className = 'detail__action detail__action--secondary';
+    mapBtn.textContent = t('home.detail.viewLocation');
+    mapBtn.addEventListener('click', () => openPhenomenonOnMap(item));
+    actions.appendChild(mapBtn);
+  }
+
+  const wentBtn = document.createElement('a');
+  wentBtn.className = 'detail__action detail__action--primary';
+  wentBtn.href = `/submit?phenomenon=${encodeURIComponent(item.id)}`;
+  wentBtn.textContent = t('home.detail.iAlsoWent');
+  actions.appendChild(wentBtn);
+
+  return actions;
+}
+
+function buildObserverGroup(item) {
+  const observers = item.observers?.length
+    ? item.observers
+    : (item.observerName ? [{ name: item.observerName }] : []);
+  if (!observers.length) return null;
+
+  const row = document.createElement('div');
+  row.className = 'detail__observers';
+  const avatars = document.createElement('div');
+  avatars.className = 'detail__observer-avatars';
+  observers.slice(0, 4).forEach((observer) => {
+    const avatar = document.createElement('span');
+    avatar.className = 'avatar';
+    avatar.dataset.cat = item.category;
+    avatar.textContent = observerInitial(observer.name);
+    avatars.appendChild(avatar);
+  });
+  if (observers.length > 4) {
+    const more = document.createElement('span');
+    more.className = 'detail__observer-more';
+    more.textContent = `+${observers.length - 4}`;
+    avatars.appendChild(more);
+  }
+  const label = document.createElement('p');
+  label.className = 'detail__observer-label';
+  label.textContent = t('home.detail.observersTogether', { count: observers.length });
+  row.append(avatars, label);
+  return row;
+}
+
+function buildSightingsTimeline(item) {
+  const sightings = item.recentSightings ?? [];
+  if (!sightings.length) return null;
+
+  const wrap = document.createElement('section');
+  wrap.className = 'detail__sightings';
+
+  const heading = document.createElement('h4');
+  heading.className = 'detail__section-title';
+  heading.textContent = t('home.detail.recentSightings');
+  wrap.appendChild(heading);
+
+  sightings.forEach((sighting, index) => {
+    const entry = document.createElement('article');
+    entry.className = 'detail__sighting';
+
+    const meta = document.createElement('p');
+    meta.className = 'detail__sighting-meta';
+    const name = sighting.observerName || t('home.detail.anonymousObserver');
+    meta.textContent = `${formatSightingDate(sighting.seenAt)} · ${name}`;
+    entry.appendChild(meta);
+
+    if (sighting.note) {
+      const note = document.createElement('p');
+      note.className = 'detail__sighting-note';
+      note.textContent = sighting.note;
+      entry.appendChild(note);
+    }
+
+    if (sighting.condition) {
+      const chip = document.createElement('span');
+      chip.className = 'detail__sighting-condition';
+      chip.textContent = conditionLabel(sighting.condition);
+      entry.appendChild(chip);
+    }
+
+    if (sighting.images?.length) {
+      const photos = document.createElement('div');
+      photos.className = 'detail__sighting-photos';
+      sighting.images.forEach((image) => {
+        const img = document.createElement('img');
+        img.src = image.imageUrl;
+        img.alt = image.imageAlt || '';
+        img.loading = 'lazy';
+        photos.appendChild(img);
+      });
+      entry.appendChild(photos);
+    }
+
+    wrap.appendChild(entry);
+    if (index < sightings.length - 1) {
+      const rule = document.createElement('hr');
+      rule.className = 'detail__sighting-rule';
+      wrap.appendChild(rule);
+    }
+  });
+
+  const footer = document.createElement('a');
+  footer.className = 'detail__sightings-footer';
+  footer.href = `/submit?phenomenon=${encodeURIComponent(item.id)}`;
+  footer.textContent = `＋ ${t('home.detail.iAlsoWent')}`;
+  wrap.appendChild(footer);
+
+  return wrap;
+}
+
+function buildAboutSection(item) {
+  if (!item.notes) return null;
+  const about = document.createElement('section');
+  about.className = 'detail__about';
+  const heading = document.createElement('h4');
+  heading.className = 'detail__section-title';
+  heading.textContent = t('home.detail.aboutObservation');
+  const body = document.createElement('p');
+  body.className = 'detail__about-body';
+  body.textContent = item.notes;
+  about.append(heading, body);
+  return about;
+}
+
+// Builds detail nodes shared by the map sheet, card modal, and split detail.
+function buildDetailNodes(item) {
+  const imageUrls = resolveImageUrls(item);
+  const photoWrap = buildPhotoGallery(imageUrls, item.imageAlt || '');
 
   const body = document.createElement('div');
-  body.className = 'card__body';
-  const pill = card.querySelector('.pill');
-  if (pill) body.appendChild(pill.cloneNode(true));
+  body.className = 'card__body detail__hero';
 
-  const title = document.createElement('h3');
-  title.className = 'card__title';
-  title.textContent = card.querySelector('.card__title')?.textContent || '';
-  const desc = document.createElement('p');
-  desc.className = 'card__desc';
-  desc.textContent = card.querySelector('.card__desc')?.textContent || '';
-  body.append(title, desc);
-
-  const observer = card.querySelector('.card__observer');
-  if (observer) {
-    const observerRow = observer.cloneNode(true);
-    observerRow.classList.add('detail__observer');
-    body.appendChild(observerRow);
-  }
-
-  if (card.dataset.location) {
-    const locationRow = document.createElement('p');
-    locationRow.className = 'detail__row';
-    const strong = document.createElement('strong');
-    strong.textContent = t('home.detail.location');
-    locationRow.append(strong, ' ' + card.dataset.location);
-    body.appendChild(locationRow);
-  }
-
-  const metaText = card.querySelector('.card__meta')?.textContent;
-  if (metaText) {
+  if (item.location) {
     const meta = document.createElement('p');
-    meta.className = 'detail__row';
-    const strong = document.createElement('strong');
-    strong.textContent = t('home.detail.lastSeen');
-    meta.append(strong, ' ' + metaText);
+    meta.className = 'detail__category-location';
+    meta.textContent = t('home.detail.categoryLocation', {
+      category: categoryLabel(item.category),
+      location: item.location,
+    });
+    body.appendChild(meta);
+  } else {
+    const meta = document.createElement('p');
+    meta.className = 'detail__category-location';
+    meta.textContent = categoryLabel(item.category);
     body.appendChild(meta);
   }
 
-  if (card.dataset.notes) {
-    const notesRow = document.createElement('p');
-    notesRow.className = 'detail__row';
-    const strong = document.createElement('strong');
-    strong.textContent = t('home.detail.notes');
-    notesRow.append(strong, ' ' + card.dataset.notes);
-    body.appendChild(notesRow);
+  const title = document.createElement('h3');
+  title.className = 'card__title';
+  title.textContent = item.title;
+
+  const desc = document.createElement('p');
+  desc.className = 'card__desc';
+  desc.textContent = item.description;
+  body.append(title, desc);
+
+  const seenRelative = formatRelativeTime(item.lastSeenAt);
+  if (item.lastSeenAt) {
+    const status = document.createElement('p');
+    status.className = 'detail__status-line';
+    status.textContent = t('home.detail.stillSeen', { time: seenRelative || t('home.relative.justNow') });
+    body.appendChild(status);
+
+    const latest = item.recentSightings?.[0];
+    if (latest?.condition) {
+      const detail = document.createElement('p');
+      detail.className = 'detail__status-detail';
+      detail.textContent = t('home.detail.latestNote', {
+        time: formatRelativeTime(latest.seenAt) || t('home.relative.justNow'),
+        detail: conditionLabel(latest.condition),
+      });
+      body.appendChild(detail);
+    }
   }
 
-  const cta = document.createElement('a');
-  cta.className = 'detail__cta';
-  cta.href = REPORT_FORM_URL;
-  cta.target = '_blank';
-  cta.rel = 'noopener';
-  cta.textContent = t('home.detail.reportCta');
-  body.appendChild(cta);
+  const observerGroup = buildObserverGroup(item);
+  if (observerGroup) body.appendChild(observerGroup);
 
-  return [photoWrap, body];
+  body.appendChild(buildDetailActions(item));
+
+  const nodes = [photoWrap, body];
+  const timeline = buildSightingsTimeline(item);
+  if (timeline) nodes.push(timeline);
+  const about = buildAboutSection(item);
+  if (about) nodes.push(about);
+
+  return nodes;
 }
 
 function setFocusedCard(card) {
@@ -785,9 +1164,15 @@ function navigateMapSheetPin(step) {
 
   setFocusedCard(nextCard);
   setActiveMapPin(entry.marker);
-  mountMapSheetPeek(nextCard, { direction: step });
+  if (mapSheet.classList.contains('is-expanded')) {
+    void ensurePhenomenonDetail(nextCard.dataset.id).then(() => {
+      if (focusedCard === nextCard) mountMapSheetDetail(nextCard);
+    });
+  } else {
+    mountMapSheetPeek(nextCard, { direction: step });
+  }
   updateMapSheetPeekNav();
-  scheduleCenterMapOnCard(nextCard, { animate: false });
+  scheduleCenterMapOnCard(nextCard, { animate: true });
   scrollRailToFocusedCard();
 }
 
@@ -939,6 +1324,7 @@ function syncMapRail() {
 }
 
 function settleMapLayout({ pan = false, animate = false } = {}) {
+  if (shouldDeferMapLayoutSync()) return;
   window.clearTimeout(mapLayoutTimer);
   mapLayoutTimer = window.setTimeout(() => {
     requestAnimationFrame(() => {
@@ -981,30 +1367,69 @@ function getMapPinScreenBand() {
   return { mapRect, visibleTop, visibleBottom, visibleHeight };
 }
 
-function alignMapPinToVisibleBand(latlng) {
+function alignMapPinToVisibleBand(latlng, { animate = false } = {}) {
   const band = getMapPinScreenBand();
   if (!leafletMap || !latlng || !band || !mapSheet.classList.contains('is-open')) return;
   const { mapRect, visibleTop, visibleHeight } = band;
   const targetY = (visibleTop + visibleHeight * MAP_PIN_VISIBLE_RATIO) - mapRect.top;
   const pinY = leafletMap.latLngToContainerPoint(latlng).y;
   const panY = pinY - targetY;
-  if (Math.abs(panY) > 1) leafletMap.panBy([0, panY], { animate: false });
+  if (Math.abs(panY) > 1) {
+    leafletMap.panBy([0, panY], { animate, duration: animate ? 0.32 : 0 });
+  }
+}
+
+function focusMapPinOnBand(latlng, { animate = true } = {}) {
+  const band = getMapPinScreenBand();
+  if (!leafletMap || !latlng || !band || !mapSheet.classList.contains('is-open')) return false;
+
+  const { mapRect, visibleTop, visibleHeight } = band;
+  const targetX = mapRect.width / 2;
+  const targetY = (visibleTop + visibleHeight * MAP_PIN_VISIBLE_RATIO) - mapRect.top;
+  const pinPoint = leafletMap.latLngToContainerPoint(latlng);
+  const panX = pinPoint.x - targetX;
+  const panY = pinPoint.y - targetY;
+
+  if (Math.abs(panX) <= 1 && Math.abs(panY) <= 1) return true;
+
+  const margin = 72;
+  const onScreen = pinPoint.x >= -margin
+    && pinPoint.x <= mapRect.width + margin
+    && pinPoint.y >= -margin
+    && pinPoint.y <= mapRect.height + margin;
+  const maxPan = Math.max(mapRect.width, visibleHeight) * 0.72;
+
+  if (onScreen && Math.abs(panX) <= maxPan && Math.abs(panY) <= maxPan) {
+    leafletMap.panBy([panX, panY], { animate, duration: animate ? 0.32 : 0 });
+    return true;
+  }
+
+  return false;
 }
 
 function centerMapOnCard(card, { animate = true, resize = true } = {}) {
   if (!leafletMap || !card?.dataset.lat || !card?.dataset.lng) return;
   const latlng = L.latLng(parseFloat(card.dataset.lat), parseFloat(card.dataset.lng));
-  const zoom = Math.max(leafletMap.getZoom(), 15);
-  const alignAfterMove = isPhoneLayout() && mapSheet.classList.contains('is-open');
+  const zoom = leafletMap.getZoom();
+  const sheetOpen = isPhoneLayout() && mapSheet.classList.contains('is-open');
   const run = () => {
-    leafletMap.invalidateSize({ animate: false });
-    if (animate && !alignAfterMove) {
+    if (!shouldDeferMapLayoutSync()) leafletMap.invalidateSize({ animate: false });
+    if (sheetOpen) {
+      if (focusMapPinOnBand(latlng, { animate })) return;
+      const flyDuration = animate ? 0.45 : 0;
+      leafletMap.flyTo(latlng, zoom, { duration: flyDuration });
+      if (animate) {
+        leafletMap.once('moveend', () => alignMapPinToVisibleBand(latlng, { animate: true }));
+      } else {
+        leafletMap.once('moveend', () => alignMapPinToVisibleBand(latlng, { animate: false }));
+      }
+      return;
+    }
+    if (animate) {
       leafletMap.flyTo(latlng, zoom, { duration: 0.45 });
-      leafletMap.once('moveend', () => alignMapPinToVisibleBand(latlng));
       return;
     }
     leafletMap.setView(latlng, zoom, { animate: false });
-    alignMapPinToVisibleBand(latlng);
   };
   if (resize) requestAnimationFrame(() => requestAnimationFrame(run));
   else run();
@@ -1043,19 +1468,21 @@ function afterMapSheetLayout(callback) {
 function expandMapSheet() {
   if (!mapSheet.classList.contains('is-open') || mapSheet.classList.contains('is-expanded')) return;
   mapSheet.classList.add('is-expanded');
-  mapSheetHandle?.setAttribute('aria-label', t('home.collapsePanel'));
-  if (focusedCard) mountMapSheetDetail(focusedCard);
-  updateMapSheetPeekNav();
-  settleMapLayout({ pan: Boolean(focusedCard), animate: false });
+  mapSheetHandle?.setAttribute('aria-label', t('home.close'));
+  void (async () => {
+    if (focusedCard) {
+      await ensurePhenomenonDetail(focusedCard.dataset.id);
+      mountMapSheetDetail(focusedCard);
+    }
+    updateMapSheetPeekNav();
+    settleMapLayout({ pan: Boolean(focusedCard), animate: false });
+    syncPhoneSheetBodyLock();
+  })();
 }
 
 function collapseMapSheet() {
   if (!mapSheet.classList.contains('is-expanded')) return;
-  mapSheet.classList.remove('is-expanded');
-  mapSheetHandle?.setAttribute('aria-label', t('home.expandPanel'));
-  if (focusedCard) mountMapSheetPeek(focusedCard);
-  updateMapSheetPeekNav();
-  settleMapLayout({ pan: Boolean(focusedCard), animate: false });
+  closeMapSheet();
 }
 
 function pickInitialMapPinCard() {
@@ -1070,7 +1497,9 @@ function openInitialMapPinPreview() {
   if (!card) return;
   const entry = findMarkerEntry(card);
   if (!entry) return;
-  openMapSheet(card, entry.marker, { pan: true });
+  setFocusedCard(card);
+  setActiveMapPin(entry.marker);
+  scheduleCenterMapOnCard(card, { animate: false, waitForSheet: false });
 }
 
 function panToFocusedCard() {
@@ -1082,20 +1511,46 @@ function panToFocusedCard() {
   centerMapOnCard(focusedCard, { animate });
 }
 
-function openMapSheet(card, marker, { pan = true } = {}) {
+function syncPhoneSheetBodyLock() {
+  if (!isPhoneLayout()) return;
+  const lock = mapSheet.classList.contains('is-open') && mapSheet.classList.contains('is-expanded');
+  document.body.classList.toggle('is-detail-open', lock);
+}
+
+async function openPhoneDetailSheet(card, { mode = 'expanded', pan = false, marker = null } = {}) {
+  hideCardModal();
+  hideSplitDetail();
   setFocusedCard(card);
-  setActiveMapPin(marker);
+  if (marker) setActiveMapPin(marker);
+  else if (mode === 'expanded' && mapView.classList.contains('is-hidden')) clearMapPinActive();
+
+  await ensurePhenomenonDetail(card.dataset.id);
+
+  const expanded = mode !== 'peek';
+  mapSheet.classList.toggle('is-expanded', expanded);
+  mapSheet.classList.add('is-open');
+  mapSheetHandle?.setAttribute('aria-label', t(expanded ? 'home.close' : 'home.expandPanel'));
+
+  if (expanded) mountMapSheetDetail(card);
+  else mountMapSheetPeek(card);
+
+  updateMapSheetPeekNav();
+
+  if (pan && !mapView.classList.contains('is-hidden')) {
+    scheduleCenterMapOnCard(card, { animate: false, waitForSheet: true });
+  } else if (!mapView.classList.contains('is-hidden')) {
+    settleMapLayout({ pan: false, animate: false });
+  }
+  syncPhoneSheetBodyLock();
+}
+
+function openMapSheet(card, marker, { pan = true } = {}) {
   if (isPhoneLayout()) {
-    hideSplitDetail();
-    mapSheet.classList.remove('is-expanded');
-    mapSheetHandle?.setAttribute('aria-label', t('home.expandPanel'));
-    mountMapSheetPeek(card);
-    mapSheet.classList.add('is-open');
-    updateMapSheetPeekNav();
-    if (pan) scheduleCenterMapOnCard(card, { animate: false, waitForSheet: true });
-    else settleMapLayout({ pan: false, animate: false });
+    void openPhoneDetailSheet(card, { mode: 'peek', pan, marker });
     return;
   }
+  setFocusedCard(card);
+  setActiveMapPin(marker);
   hideMapSheet();
   openSplitDetail(card);
   if (pan && !mapView.classList.contains('is-hidden')) {
@@ -1113,6 +1568,7 @@ function hideMapSheet() {
   }
   clearMapPinActive();
   updateMapSheetPeekNav();
+  syncPhoneSheetBodyLock();
   if (!mapView.classList.contains('is-hidden')) settleMapLayout({ pan: false, animate: false });
 }
 
@@ -1124,7 +1580,7 @@ function closeMapSheet() {
 mapSheetClose.addEventListener('click', closeMapSheet);
 mapSheetHandle?.addEventListener('click', () => {
   if (!isPhoneLayout() || !mapSheet.classList.contains('is-open')) return;
-  if (mapSheet.classList.contains('is-expanded')) collapseMapSheet();
+  if (mapSheet.classList.contains('is-expanded')) closeMapSheet();
   else expandMapSheet();
 });
 
@@ -1139,7 +1595,7 @@ function mapSheetPeekOpen() {
 function updateMapSheetPeekNav() {
   if (!mapSheetPeekNav) return;
   const pinCards = getMapPinCards();
-  const show = mapSheetPeekOpen() && pinCards.length > 1;
+  const show = isPhoneLayout() && mapSheet.classList.contains('is-open') && pinCards.length > 1;
   mapSheetPeekNav.hidden = !show;
   mapSheetPeekNav.setAttribute('aria-hidden', show ? 'false' : 'true');
   mapSheet?.classList.toggle('is-peek-multi', show);
@@ -1172,10 +1628,13 @@ function onMapSheetSwipeEnd(startX, startY, e) {
   const peek = !expanded;
   mapSheetGestureMoved = Math.abs(dx) > 8 || Math.abs(dy) > 8;
 
-  if (peek && !mapSheetTouchOnGallery && (mapSheetTouchAxis === 'x' || (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 36))) {
-    navigateMapSheetPin(dx < 0 ? 1 : -1);
-    mapSheetTouchAxis = '';
-    return;
+  if (!mapSheetTouchOnGallery && (mapSheetTouchAxis === 'x' || (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 36))) {
+    const pinCards = getMapPinCards();
+    if (mapSheet.classList.contains('is-open') && pinCards.length > 1) {
+      navigateMapSheetPin(dx < 0 ? 1 : -1);
+      mapSheetTouchAxis = '';
+      return;
+    }
   }
 
   if (dy < -52 && peek && mapSheetTouchAxis !== 'x') expandMapSheet();
@@ -1192,7 +1651,7 @@ function bindMapSheetSwipe(el, { trackAxis = false } = {}) {
     mapSheetTouchAxis = '';
   }, { passive: true });
   el?.addEventListener('touchmove', (e) => {
-    if (!mapSheetPeekOpen() || mapSheetTouchOnGallery) return;
+    if (!isPhoneLayout() || !mapSheet.classList.contains('is-open') || mapSheetTouchOnGallery) return;
     const dx = e.touches[0].clientX - mapSheetTouchStartX;
     const dy = e.touches[0].clientY - mapSheetTouchStartY;
     if (!mapSheetTouchAxis && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
@@ -1270,6 +1729,16 @@ function scrollToSiteheadMenu({ instant = false } = {}) {
   window.scrollTo({ top: Math.max(0, top), behavior: instant ? 'instant' : 'smooth' });
 }
 
+function enterMapView() {
+  hideSplitDetail();
+  hideMapSheet();
+  scrollToSiteheadMenu({ instant: true });
+  initMap();
+  syncMapRail();
+  openInitialMapPinPreview();
+  updateMapRailVisibility({ pan: false, animate: false });
+}
+
 const viewToggleBtns = document.querySelectorAll('.view-toggle__btn');
 viewToggleBtns.forEach((btn) => btn.addEventListener('click', () => {
   if (btn.classList.contains('is-active')) return;
@@ -1280,11 +1749,8 @@ viewToggleBtns.forEach((btn) => btn.addEventListener('click', () => {
   mapView.classList.toggle('is-hidden', !isMap);
   if (isMap) {
     hideCardModal();
-    scrollToSiteheadMenu({ instant: true });
-    initMap();
-    syncMapRail();
-    openInitialMapPinPreview();
-    updateMapRailVisibility({ pan: false, animate: false });
+    hideSplitDetail();
+    enterMapView();
   } else {
     hideMapSheet();
     clearMapPinActive();
@@ -1305,6 +1771,10 @@ function hideSplitDetail() {
 }
 
 function openSplitDetail(card) {
+  if (isPhoneLayout()) {
+    void openPhoneDetailSheet(card, { mode: 'expanded' });
+    return;
+  }
   hideCardModal();
   hideMapSheet();
   const wasOpen = feedStage.classList.contains('is-detail-open');
@@ -1312,25 +1782,32 @@ function openSplitDetail(card) {
   updateDetailHeaderTitle(card);
   feedDetailPane.setAttribute('aria-hidden', 'false');
   feedStage.classList.add('is-detail-open');
-  if (isPhoneLayout()) document.body.classList.add('is-detail-open');
-  else document.body.classList.remove('is-detail-open');
+  if (!isPhoneLayout()) document.body.classList.remove('is-detail-open');
   updateMapRailVisibility();
-  const hasStream = feedDetailBody.querySelector('.feed-detail__section');
-  if (!wasOpen || !hasStream) {
-    mountContinuousDetail(feedDetailBody, { scrollTo: card });
-  } else {
-    detailScrollRoot = feedDetailBody;
-    scrollDetailToCard(card);
-  }
-  renderFeedDetailMenu();
-  setFeedDetailMenuOpen(false);
-  if (!mapView.classList.contains('is-hidden')) {
-    panToFocusedCard();
-    requestAnimationFrame(() => scrollRailToFocusedCard());
-  }
+  void (async () => {
+    const visible = getVisibleCards();
+    await Promise.all(visible.map((c) => ensurePhenomenonDetail(c.dataset.id)));
+    const hasStream = feedDetailBody.querySelector('.feed-detail__section');
+    if (!wasOpen || !hasStream) {
+      mountContinuousDetail(feedDetailBody, { scrollTo: card });
+    } else {
+      detailScrollRoot = feedDetailBody;
+      scrollDetailToCard(card);
+    }
+    renderFeedDetailMenu();
+    setFeedDetailMenuOpen(false);
+    if (!mapView.classList.contains('is-hidden')) {
+      panToFocusedCard();
+      requestAnimationFrame(() => scrollRailToFocusedCard());
+    }
+  })();
 }
 
 function closeSplitDetail() {
+  if (isPhoneLayout() && mapSheet.classList.contains('is-open')) {
+    closeMapSheet();
+    return;
+  }
   if (!focusedCard && !feedStage.classList.contains('is-detail-open')) return;
   const returnToMap = isPhoneLayout() && !mapView.classList.contains('is-hidden');
   hideSplitDetail();
@@ -1357,6 +1834,16 @@ function resetHomeView() {
 }
 
 function openCardDetail(card) {
+  if (isPhoneLayout()) {
+    const inMap = !mapView.classList.contains('is-hidden');
+    const entry = inMap ? findMarkerEntry(card) : null;
+    if (entry) {
+      void openPhoneDetailSheet(card, { mode: 'expanded', pan: true, marker: entry.marker });
+    } else {
+      void openPhoneDetailSheet(card, { mode: 'expanded' });
+    }
+    return;
+  }
   if (!mapView.classList.contains('is-hidden')) {
     const entry = findMarkerEntry(card);
     if (entry) {
@@ -1425,11 +1912,24 @@ document.querySelectorAll('.observer-item__toggle').forEach((btn) => btn.addEven
 }));
 
 const floatingbar = document.getElementById('floatingbar');
+const feedControls = document.getElementById('feedControls');
 const sitehead = document.querySelector('.sitehead');
 const onScroll = () => {
   const floatingVisible = window.scrollY > sitehead.offsetHeight - 48;
+  const toolbarPanelOpen = isFeedToolbarPanelOpen();
   floatingbar.classList.toggle('is-visible', floatingVisible);
-  if (!floatingVisible) {
+  if (!toolbarPanelOpen) {
+    feedControls?.classList.toggle('is-floating-nav', floatingVisible);
+  }
+  if (!toolbarPanelOpen && floatingVisible !== onScroll.lastFloatingVisible) {
+    onScroll.lastFloatingVisible = floatingVisible;
+    if (!mapView.classList.contains('is-hidden') && leafletMap) {
+      settleMapLayout({ pan: false, animate: false });
+    }
+  } else if (toolbarPanelOpen) {
+    onScroll.lastFloatingVisible = feedControls?.classList.contains('is-floating-nav');
+  }
+  if (!floatingVisible && !toolbarPanelOpen) {
     closeFloatingPanels();
     window.closeAllLangPanels?.();
   }
@@ -1439,6 +1939,11 @@ onScroll();
 window.addEventListener('scroll', onScroll, { passive: true });
 window.addEventListener('resize', () => {
   if (detailScrollRoot) detailLoopHeight = measureDetailLoopHeight();
+  syncMapLayoutOnly();
+}, { passive: true });
+window.visualViewport?.addEventListener('resize', () => {
+  if (shouldDeferMapLayoutSync()) return;
+  syncMapLayoutOnly();
 }, { passive: true });
 
 document.querySelectorAll('a.brand-mark[href="#top"]').forEach((el) => {
@@ -1473,6 +1978,7 @@ async function loadPhenomena() {
       showFeedMessage(t('home.feed.empty'));
       return;
     }
+    cachePhenomena(items);
     const nodes = items.map(renderCard);
     gridFeed.replaceChildren(...nodes);
     cards = nodes;
@@ -1491,4 +1997,5 @@ loadWeather();
 await i18nReady;
 formatToday();
 syncFloatingLangOptions();
-loadPhenomena();
+await loadPhenomena();
+if (feedStage.classList.contains('is-map-view')) enterMapView();

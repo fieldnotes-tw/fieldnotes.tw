@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm';
 import { db } from './index.js';
-import { phenomena, users } from './schema.js';
+import { phenomena, sightingImages, sightings, users } from './schema.js';
 import { hashPassword } from '../lib/auth.js';
 
 const seedData = [
@@ -133,8 +133,8 @@ async function seedPhenomena() {
   const reset = process.env.SEED_RESET === '1';
 
   if (reset) {
-    await db.execute(sql`TRUNCATE TABLE phenomena`);
-    console.log('Truncated phenomena.');
+    await db.execute(sql`TRUNCATE TABLE sightings, phenomena CASCADE`);
+    console.log('Truncated phenomena and sightings.');
   } else {
     const existing = await db.select({ id: phenomena.id }).from(phenomena).limit(1);
     if (existing.length > 0) {
@@ -147,9 +147,116 @@ async function seedPhenomena() {
   console.log(`Seeded ${seedData.length} demo phenomena.`);
 }
 
+const sightingSeedByTitle: Record<string, {
+  sightings: {
+    observerName: string;
+    seenAt: Date;
+    condition?: 'abundant' | 'fewer' | 'gone' | 'unsure';
+    note: string;
+    imageUrl?: string;
+    imageAlt?: string;
+  }[];
+}> = {
+  '棋盤腳進入花季': {
+    sightings: [
+      {
+        observerName: 'Chao',
+        seenAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+        condition: 'abundant',
+        note: '現在花量很多，六點半左右開始開。',
+        imageUrl: '/media/phenomena/qipan-jiao.jpg',
+        imageAlt: '棋盤腳的花與果實',
+      },
+      {
+        observerName: '陳恩',
+        seenAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
+        condition: 'abundant',
+        note: '靠水邊的幾棵已經開始了，大概六點左右陸續綻放。',
+        imageUrl: '/media/phenomena/qipan-jiao.jpg',
+      },
+      {
+        observerName: '美妃',
+        seenAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+        note: '看到今年第一批花苞出現了。',
+        imageUrl: '/media/phenomena/qipan-jiao.jpg',
+      },
+    ],
+  },
+  '紅冠水雞生寶寶了': {
+    sightings: [
+      {
+        observerName: '阿明',
+        seenAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+        condition: 'abundant',
+        note: '幼鳥還跟在成鳥旁邊，請保持距離。',
+        imageUrl: '/media/phenomena/moorhen-chick.jpg',
+      },
+      {
+        observerName: '金蓮',
+        seenAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+        note: '龍虎塔旁水雞家族活動中。',
+        imageUrl: '/media/phenomena/moorhen-chick.jpg',
+      },
+    ],
+  },
+  '九重葛盛開': {
+    sightings: [
+      {
+        observerName: '里長伯',
+        seenAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
+        condition: 'abundant',
+        note: '果貿社區幾條巷子都開得很滿。',
+        imageUrl: '/media/phenomena/bougainvillea.jpg',
+      },
+    ],
+  },
+};
+
+async function seedSightings() {
+  const existing = await db.select({ id: sightings.id }).from(sightings).limit(1);
+  if (existing.length > 0) {
+    console.log('Sightings already seeded; skipping.');
+    return;
+  }
+
+  const rows = await db
+    .select({ id: phenomena.id, title: phenomena.title })
+    .from(phenomena);
+
+  for (const row of rows) {
+    const bundle = sightingSeedByTitle[row.title];
+    if (!bundle) continue;
+
+    for (const entry of bundle.sightings) {
+      const [inserted] = await db
+        .insert(sightings)
+        .values({
+          phenomenonId: row.id,
+          observerName: entry.observerName,
+          seenAt: entry.seenAt,
+          condition: entry.condition,
+          note: entry.note,
+        })
+        .returning({ id: sightings.id });
+
+      if (entry.imageUrl) {
+        await db.insert(sightingImages).values({
+          sightingId: inserted.id,
+          imageUrl: entry.imageUrl,
+          imageAlt: entry.imageAlt ?? null,
+          sortOrder: 0,
+        });
+      }
+    }
+  }
+
+  console.log('Seeded demo sightings.');
+}
+
 async function seed() {
   await seedAdmin();
   await seedPhenomena();
+  if (process.env.SEED_DEMO === '1') await seedSightings();
   process.exit(0);
 }
 
