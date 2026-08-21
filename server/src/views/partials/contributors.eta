@@ -1,6 +1,6 @@
 <section class="contributors" id="contributors">
   <div class="contributors__head"><%= it.t('home.contributors.title') %></div>
-  <p class="contributors__intro">這些是目前參與觀察、和我們分享左營生活與生態的在地朋友，點名字看更多介紹：</p>
+  <p class="contributors__intro">這些是目前參與觀察、和我們分享高雄生活與生態的在地朋友，點名字看更多介紹：</p>
   <ul class="observer-list">
     <li class="observer-item">
       <button type="button" class="observer-item__toggle" aria-expanded="false">
@@ -71,5 +71,5 @@
       </div>
     </li>
   </ul>
-  <p class="contributors__note-full">網站上的示範照片，目前向 Mmsmr（CC0）、Yuksing（Public Domain）、Gaurav Dhwaj Khadka（CC BY-SA 4.0）、Rhododendrites（CC BY-SA 4.0）、Forest &amp; Kim Starr（CC BY 3.0）、Arthur Taksin（CC BY 4.0）等攝影師借用做示範，之後會逐步換成在地觀察員實際在左營拍到的畫面。</p>
+  <p class="contributors__note-full">網站上的示範照片，目前向 Mmsmr（CC0）、Yuksing（Public Domain）、Gaurav Dhwaj Khadka（CC BY-SA 4.0）、Rhododendrites（CC BY-SA 4.0）、Forest &amp; Kim Starr（CC BY 3.0）、Arthur Taksin（CC BY 4.0）等攝影師借用做示範，之後會逐步換成在地觀察員實際在高雄拍到的畫面。</p>
 </section>

@@ -1,4 +1,4 @@
-# fieldnotes.tw · 最近左營
+# fieldnotes.tw · 最近高雄
 
 A local phenomena guide — what’s blooming, fruiting, in season, or happening right now. Not a tourist map of sights, but a living notebook of place.
 

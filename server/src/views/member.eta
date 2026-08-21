@@ -1,5 +1,5 @@
 <header class="auth-page-head">
-  <a href="/" class="brand-mark" aria-label="<%= it.t('brand.name') %>"><span>最</span><span>近</span><span>左</span><span>營</span></a>
+  <a href="/" class="brand-mark" aria-label="<%= it.t('brand.name') %>"><span>最</span><span>近</span><span>高</span><span>雄</span></a>
   <div class="auth-nav" data-auth-nav></div>
 </header>
 
