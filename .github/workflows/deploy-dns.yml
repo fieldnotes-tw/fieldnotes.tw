@@ -1,0 +1,76 @@
+name: Deploy DNS
+
+on:
+  workflow_dispatch:
+    inputs:
+      wait_for_acm_validation:
+        description: Block until ACM issues (only after staging NS and/or GoDaddy ACM CNAMEs exist)
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  DEPLOY_REGION: ap-east-2
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform apply
+        id: tf
+        working-directory: infra/dns
+        env:
+          AWS_REGION: ${{ env.DEPLOY_REGION }}
+          AWS_DEFAULT_REGION: ${{ env.DEPLOY_REGION }}
+          TF_BACKEND_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          TF_VAR_wait_for_acm_validation: ${{ inputs.wait_for_acm_validation && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          cat > backend.hcl <<EOF
+          bucket = "${TF_BACKEND_BUCKET}"
+          EOF
+
+          tokens='[]'
+          if aws s3api head-object --bucket "$TF_BACKEND_BUCKET" --key production/terraform.tfstate >/dev/null 2>&1; then
+            tokens=$(aws s3 cp "s3://${TF_BACKEND_BUCKET}/production/terraform.tfstate" - \
+              | jq -c '.outputs.ses_dkim_tokens.value // []')
+          fi
+          export TF_VAR_ses_dkim_tokens="$tokens"
+
+          terraform init -input=false -backend-config=backend.hcl
+          terraform apply -auto-approve -input=false
+
+          {
+            echo '## GoDaddy (staging only — do not change domain nameservers)'
+            echo
+            echo 'Add **four NS records**, host `staging`, values:'
+            echo
+            echo '```'
+            terraform output -json name_servers | jq -r '.[]'
+            echo '```'
+            echo
+            echo "ACM status: $(terraform output -raw acm_certificate_status)"
+            echo
+            echo 'ACM validation CNAMEs (also add apex/`www` at GoDaddy until those names use this zone):'
+            echo
+            echo '```json'
+            terraform output -json acm_validation_records
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

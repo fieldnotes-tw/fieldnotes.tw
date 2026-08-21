@@ -93,36 +93,21 @@ Registration stays at GoDaddy. Goal hostnames:
 
 ### 1. Apply the shared DNS stack
 
-```bash
-cd infra/dns
-cp ../backend.hcl.example backend.hcl   # same state bucket as staging/production
-cp terraform.tfvars.example terraform.tfvars
-
-# Pull DKIM tokens from production (after production has been applied at least once):
-terraform -chdir=../production output -json ses_dkim_tokens
-# paste into terraform.tfvars as ses_dkim_tokens = ["...", "...", "..."]
-
-terraform init -backend-config=backend.hcl
-terraform apply
-terraform output name_servers
-```
+GitHub Actions → **Deploy DNS** → Run workflow (uses the **staging** environment). First run: leave `wait_for_acm_validation` off. The job summary prints Route 53 nameservers and ACM validation CNAMEs. SES DKIM tokens are read from production state.
 
 This creates the hosted zone, ACM cert (pending validation), ACM DNS records, DMARC, SES DKIM, and **temporary GitHub Pages** apex/`www` records so the public site keeps working when nameservers flip.
 
-### 2. Point GoDaddy nameservers at Route 53
+### 2. Delegate staging (keep apex on GoDaddy)
 
-At GoDaddy, replace `ns57/58.domaincontrol.com` with the four `name_servers` from the dns stack. Do **not** flip NS while the Route 53 zone is empty of the current GitHub Pages records.
+Do **not** replace `ns57/58.domaincontrol.com` yet.
+
+At GoDaddy DNS, add four **NS** records, host `staging`, values = the four `name_servers` from the job summary. Also add the ACM validation CNAMEs for `fieldnotes.tw` and `www.fieldnotes.tw` (those names are still served by GoDaddy).
+
+Full-domain NS cutover is later: replace GoDaddy nameservers with the same four Route 53 nameservers only after the zone already has the GitHub Pages apex/`www` records (default `legacy_github_pages = true`).
 
 ### 3. Wait for ACM
 
-```bash
-# After NS have propagated:
-cd infra/dns
-# in terraform.tfvars:
-#   wait_for_acm_validation = true
-terraform apply
-terraform output acm_certificate_status   # expect ISSUED
-```
+After the GoDaddy records have propagated, re-run **Deploy DNS** with `wait_for_acm_validation` enabled. Job summary ACM status should be `ISSUED`.
 
 ### 4. Attach custom domains to CloudFront
 
