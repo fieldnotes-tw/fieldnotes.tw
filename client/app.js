@@ -3121,17 +3121,19 @@ async function loadPhenomena() {
 // Start weather immediately (do not await) so it never gates the feed.
 loadWeather();
 
-await i18nReady;
-formatToday();
-syncFloatingLangOptions();
-document.addEventListener('fn:user-updated', () => {
-  remountOpenDetailForAuth();
-});
-await loadPhenomena();
-void syncTrackedFromServer();
-const deepLinkId = new URLSearchParams(location.search).get('phenomenon');
-if (deepLinkId) {
-  const card = cards.find((c) => c.dataset.id === deepLinkId);
-  if (card) openCardDetail(card);
-}
-updateDetailRailBtn();
+(async () => {
+  await i18nReady;
+  formatToday();
+  syncFloatingLangOptions();
+  document.addEventListener('fn:user-updated', () => {
+    remountOpenDetailForAuth();
+  });
+  await loadPhenomena();
+  void syncTrackedFromServer();
+  const deepLinkId = new URLSearchParams(location.search).get('phenomenon');
+  if (deepLinkId) {
+    const card = cards.find((c) => c.dataset.id === deepLinkId);
+    if (card) openCardDetail(card);
+  }
+  updateDetailRailBtn();
+})();
