@@ -12,7 +12,7 @@ output "name_servers" {
 }
 
 output "acm_certificate_arn" {
-  description = "us-east-1 cert for CloudFront (currently staging.fieldnotes.tw only until apex NS cutover)."
+  description = "Cert attached to CloudFront. Staging-only until cdn cert is ISSUED and stacks are switched."
   value       = aws_acm_certificate.site.arn
 }
 
@@ -20,15 +20,33 @@ output "acm_certificate_status" {
   value = aws_acm_certificate.site.status
 }
 
+output "cdn_acm_certificate_arn" {
+  description = "Apex+www+staging cert. Switch stacks to this ARN after it is ISSUED (after GoDaddy NS cutover)."
+  value       = aws_acm_certificate.cdn.arn
+}
+
+output "cdn_acm_certificate_status" {
+  value = aws_acm_certificate.cdn.status
+}
+
 output "acm_validation_records" {
-  description = "Copy these CNAMEs into GoDaddy for names that are not yet delegated to this zone (apex and www until full NS cutover)."
-  value = {
-    for name, record in aws_route53_record.acm_validation : name => {
-      type  = record.type
-      name  = record.name
-      value = one(record.records)
-    }
-  }
+  description = "ACM CNAMEs in this zone (become public after nameservers point here)."
+  value = merge(
+    {
+      for name, record in aws_route53_record.acm_validation : name => {
+        type  = record.type
+        name  = record.name
+        value = one(record.records)
+      }
+    },
+    {
+      for name, record in aws_route53_record.cdn_acm_validation : "cdn:${name}" => {
+        type  = record.type
+        name  = record.name
+        value = one(record.records)
+      }
+    },
+  )
 }
 
 output "legacy_github_pages" {
