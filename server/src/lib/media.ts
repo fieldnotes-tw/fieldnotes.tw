@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { mkdir, rename, unlink, writeFile } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
+import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -9,12 +11,46 @@ const ALLOWED_TYPES: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
+  'video/mp4': 'mp4',
+  'video/webm': 'webm',
+  'video/quicktime': 'mov',
 };
 
-const FILENAME_RE = /^[0-9a-f-]{36}\.(jpg|png|webp)$/i;
+const FILENAME_RE = /^[0-9a-f-]{36}\.(jpg|png|webp|mp4|webm|mov)$/i;
+/** Seed / legacy filenames (e.g. moorhen-chick.jpg) — serving only, not uploads. */
+const SERVE_FILENAME_RE = /^[a-z0-9][a-z0-9-]{0,62}\.(jpg|jpeg|png|webp|mp4|webm|mov)$/i;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const localMediaRoot = join(here, '../../public');
+const execFileAsync = promisify(execFile);
+
+async function transcodeVideoToMp4(sourceAbs: string) {
+  const dir = dirname(sourceAbs);
+  const base = basename(sourceAbs).replace(/\.(mov|webm|mp4)$/i, '');
+  const destAbs = join(dir, `${base}.mp4`);
+  const tempAbs = join(dir, `${base}.tmp.mp4`);
+
+  try {
+    // Re-encode (not stream copy) so iPhone rotation metadata is baked in.
+    await execFileAsync('ffmpeg', [
+      '-i', sourceAbs,
+      '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+      '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac', '-b:a', '128k',
+      '-movflags', '+faststart',
+      '-y', tempAbs,
+    ], { timeout: 600_000 });
+    if (sourceAbs !== tempAbs) await unlink(sourceAbs).catch(() => {});
+    await unlink(destAbs).catch(() => {});
+    await rename(tempAbs, destAbs);
+    return destAbs;
+  } catch {
+    await unlink(tempAbs).catch(() => {});
+    return null;
+  }
+}
+
+export { transcodeVideoToMp4 };
 
 export function mediaBucket() {
   return process.env.MEDIA_BUCKET?.trim() || '';
@@ -36,6 +72,10 @@ export function isAllowedContentType(contentType: string) {
 
 export function isSafeMediaFilename(filename: string) {
   return FILENAME_RE.test(filename);
+}
+
+export function isSafeServeMediaFilename(filename: string) {
+  return isSafeMediaFilename(filename) || SERVE_FILENAME_RE.test(filename);
 }
 
 function newObjectName(contentType: string) {
@@ -104,5 +144,12 @@ export async function saveLocalUpload(filename: string, body: ArrayBuffer, conte
   const abs = join(localMediaRoot, 'media', 'phenomena', filename);
   await mkdir(dirname(abs), { recursive: true });
   await writeFile(abs, Buffer.from(body));
-  return `${mediaPublicPrefix()}/phenomena/${filename}`;
+
+  let finalFilename = filename;
+  if (contentType.startsWith('video/')) {
+    const mp4Abs = await transcodeVideoToMp4(abs);
+    if (mp4Abs) finalFilename = basename(mp4Abs);
+  }
+
+  return `${mediaPublicPrefix()}/phenomena/${finalFilename}`;
 }

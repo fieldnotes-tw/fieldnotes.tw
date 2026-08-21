@@ -1,6 +1,13 @@
+function loginRedirectTarget(user) {
+  const params = new URLSearchParams(location.search);
+  const next = params.get('next');
+  if (next && next.startsWith('/') && !next.startsWith('//')) return next;
+  return user.role === 'admin' ? '/admin' : '/';
+}
+
 i18nReady.then(() => {
   refreshCurrentUser().then((user) => {
-    if (user) location.href = user.role === 'admin' ? '/admin' : '/';
+    if (user) location.href = loginRedirectTarget(user);
   }).catch(() => {});
 
   const form = document.getElementById('loginForm');
@@ -14,7 +21,7 @@ i18nReady.then(() => {
     if (!email || !password) return;
     try {
       const user = await login(email, password);
-      location.href = user.role === 'admin' ? '/admin' : '/';
+      location.href = loginRedirectTarget(user);
     } catch (err) {
       errorEl.textContent = err.message || t('auth.login.failed');
       errorEl.hidden = false;

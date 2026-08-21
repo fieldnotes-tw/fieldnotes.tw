@@ -13,11 +13,14 @@ const feedDetailMenuBtn = document.getElementById('feedDetailMenuBtn');
 const feedDetailMenuPanel = document.getElementById('feedDetailMenuPanel');
 const feedDetailMenuList = document.getElementById('feedDetailMenuList');
 const feedDetailHeaderClose = document.getElementById('feedDetailHeaderClose');
-const feedDetailClose = document.getElementById('feedDetailClose');
+const feedDetailRailBtn = document.getElementById('feedDetailRailBtn');
 const mapView = document.getElementById('mapView');
 const mapSheet = document.getElementById('mapSheet');
 const mapSheetBody = document.getElementById('mapSheetBody');
 const mapSheetClose = document.getElementById('mapSheetClose');
+const mapSheetHeader = document.getElementById('mapSheetHeader');
+const mapSheetBack = document.getElementById('mapSheetBack');
+const mapSheetBackLabel = document.getElementById('mapSheetBackLabel');
 const mapSheetHandle = document.getElementById('mapSheetHandle');
 const mapSheetPeekNav = document.getElementById('mapSheetPeekNav');
 const mapSheetPinDots = document.getElementById('mapSheetPinDots');
@@ -42,7 +45,7 @@ let detailLoopHeight = 0;
 let detailScrollRoot = null;
 const selectedCats = new Set();
 const TABLET_SPLIT_MQ = window.matchMedia('(min-width: 760px)');
-const DESKTOP_SPLIT_MQ = window.matchMedia('(min-width: 980px)');
+const DESKTOP_SPLIT_MQ = window.matchMedia('(min-width: 1200px)');
 
 function prefersSplitDetail() {
   return TABLET_SPLIT_MQ.matches;
@@ -54,6 +57,10 @@ function prefersMapRail() {
 
 function isPhoneLayout() {
   return !TABLET_SPLIT_MQ.matches;
+}
+
+function usesSheetDetail() {
+  return !DESKTOP_SPLIT_MQ.matches;
 }
 
 // Zuoying (左營), Kaohsiung — placeholder until a Google Maps API key replaces this OSM view.
@@ -81,7 +88,7 @@ function applyFilters() {
   });
   syncMapRail();
 
-  const sheetOpen = isPhoneLayout() && mapSheet.classList.contains('is-open');
+  const sheetOpen = usesSheetDetail() && mapSheet.classList.contains('is-open');
   const focusedHidden = focusedCard?.classList.contains('is-filtered-out');
   if (feedStage.classList.contains('is-detail-open')) {
     remountOpenDetail();
@@ -111,10 +118,10 @@ function remountOpenDetail() {
     ? focusedCard
     : getVisibleCards()[0];
   if (feedStage.classList.contains('is-detail-open')) {
-    mountContinuousDetail(feedDetailBody, { scrollTo: keep });
+    mountSplitDetail(keep);
     if (keep) syncFocusedFromDetailScroll(keep);
     renderFeedDetailMenu();
-  } else if (isPhoneLayout() && mapSheet.classList.contains('is-open') && keep) {
+  } else if (usesSheetDetail() && mapSheet.classList.contains('is-open') && keep) {
     if (mapSheet.classList.contains('is-expanded')) {
       mountMapSheetDetail(keep);
       setFocusedCard(keep);
@@ -164,6 +171,14 @@ function renderFeedDetailMenu() {
     if (card === focusedCard) item.classList.add('is-active');
     item.setAttribute('aria-selected', card === focusedCard ? 'true' : 'false');
     item.addEventListener('click', () => {
+      if (prefersMapRail()) {
+        void ensurePhenomenonDetail(card.dataset.id).then(() => {
+          mountSplitDetail(card);
+          syncFocusedFromDetailScroll(card);
+          setFeedDetailMenuOpen(false);
+        });
+        return;
+      }
       scrollDetailToCard(card);
       syncFocusedFromDetailScroll(card);
       setFeedDetailMenuOpen(false);
@@ -413,18 +428,105 @@ function observerInitial(name) {
   return Array.from(name)[0];
 }
 
-const CATEGORY_EMOJI = {
-  plant: '🌸',
-  animal: '🐦',
-  sky: '🌤',
-  taste: '🍜',
-  workshop: '🛠',
-};
+function isVideoMediaUrl(url) {
+  return /\.(mp4|webm|mov)(\?|#|$)/i.test(String(url || ''));
+}
+
+function resolvePlayableMediaUrl(url) {
+  return String(url || '').replace(/\.mov(?=($|[?#]))/i, '.mp4');
+}
+
+function mediaUrlMatches(video, url) {
+  if (!url) return Boolean(video.src);
+  try {
+    return new URL(url, location.origin).href === video.src;
+  } catch {
+    return video.src.endsWith(url);
+  }
+}
+
+function playLightboxVideo(video) {
+  const tryPlay = () => video.play().catch(() => {});
+  if (video.readyState >= 2) tryPlay();
+  else video.addEventListener('loadeddata', tryPlay, { once: true });
+}
+
+function appendMediaPreview(parent, url, { alt = '', loading = 'lazy', className = '' } = {}) {
+  const src = isVideoMediaUrl(url) ? resolvePlayableMediaUrl(url) : url;
+  if (isVideoMediaUrl(url)) {
+    const video = document.createElement('video');
+    video.className = className || 'photo-mosaic__video';
+    video.src = src;
+    video.muted = true;
+    video.loop = true;
+    video.playsInline = true;
+    video.preload = loading === 'eager' ? 'auto' : 'metadata';
+    video.addEventListener('loadedmetadata', () => {
+      try {
+        if (video.duration > 0) {
+          video.currentTime = Math.min(0.05, video.duration * 0.01);
+        }
+      } catch {
+        /* noop */
+      }
+    }, { once: true });
+    if (alt) video.setAttribute('aria-label', alt);
+    parent.appendChild(video);
+    return video;
+  }
+  const img = document.createElement('img');
+  img.className = className || 'photo-mosaic__img';
+  img.src = url;
+  img.alt = alt;
+  img.loading = loading;
+  img.draggable = false;
+  parent.appendChild(img);
+  return img;
+}
+
+function memberProfileUrl(userId) {
+  return userId ? `/members/${encodeURIComponent(userId)}` : null;
+}
+
+function buildMemberAvatar({ userId, name, avatarUrl, category }, { className = 'detail__member-avatar' } = {}) {
+  const shell = document.createElement(userId ? 'a' : 'span');
+  if (userId) {
+    shell.href = memberProfileUrl(userId);
+    shell.className = 'detail__member-avatar-link';
+  }
+  const avatar = document.createElement('span');
+  avatar.className = `avatar ${className}`;
+  if (avatarUrl) {
+    const img = document.createElement('img');
+    img.src = avatarUrl;
+    img.alt = '';
+    img.className = 'detail__member-avatar-img';
+    avatar.appendChild(img);
+  } else {
+    avatar.dataset.cat = category || 'plant';
+    avatar.textContent = observerInitial(name);
+  }
+  shell.appendChild(avatar);
+  return shell;
+}
+
+function buildMemberName({ userId, name, className = 'detail__sighting-name' }) {
+  const label = name || t('home.detail.anonymousObserver');
+  if (!userId) {
+    const el = document.createElement('strong');
+    el.className = className;
+    el.textContent = label;
+    return el;
+  }
+  const link = document.createElement('a');
+  link.className = `${className} detail__member-link`;
+  link.href = memberProfileUrl(userId);
+  link.textContent = label;
+  return link;
+}
 
 function categoryLabel(category) {
-  const emoji = CATEGORY_EMOJI[category] || '';
-  const name = t(`category.${category}`) || category;
-  return emoji ? `${emoji} ${name}` : name;
+  return t(`category.${category}`) || category;
 }
 
 function cachePhenomena(items) {
@@ -444,11 +546,15 @@ function cardToFallbackItem(card) {
     description: card.querySelector('.card__desc')?.textContent || '',
     location: card.dataset.location || '',
     notes: card.dataset.notes || '',
+    findingHint: card.dataset.findingHint || '',
+    userId: card.dataset.userId || null,
     lat: card.dataset.lat ? parseFloat(card.dataset.lat) : null,
     lng: card.dataset.lng ? parseFloat(card.dataset.lng) : null,
     imageAlt: card.querySelector('.card__photo img')?.alt || '',
     imageUrl: card.querySelector('.card__photo img')?.src || null,
     observerName: card.querySelector('.card__observer span:last-child')?.textContent || null,
+    creatorName: card.dataset.creatorName || null,
+    creatorAvatarUrl: card.dataset.creatorAvatarUrl || null,
     sightingCount: Number(card.dataset.sightingCount || 0),
     observerCount: Number(card.dataset.observerCount || 0),
     lastSeenAt: card.dataset.lastSeenAt || null,
@@ -491,20 +597,14 @@ function formatSightingDate(iso) {
   return t('home.sighting.date', { month: date.getMonth() + 1, day: date.getDate() });
 }
 
-function conditionLabel(condition) {
-  if (!condition) return '';
-  return t(`sighting.condition.${condition}`) || condition;
-}
-
 function resolveImageUrls(item) {
   if (Array.isArray(item.imageUrls) && item.imageUrls.length) return item.imageUrls;
   const urls = item.imageUrl ? [item.imageUrl] : [];
-  // Demo: multi-photo gallery until submissions store imageUrls[].
-  if (item.title === '棋盤腳進入花季' && urls.length === 1) {
+  // Demo: second photo until submissions store imageUrls[].
+  if (item.title === '來找羅漢松的「小羅漢」，會慢慢變紅哦' && urls.length === 1) {
     return [
       urls[0],
-      '/media/phenomena/bougainvillea.jpg',
-      '/media/phenomena/longan.jpg',
+      '/media/phenomena/podocarpus-seeds.jpg',
     ];
   }
   return urls;
@@ -523,100 +623,408 @@ function getCardImageUrls(card) {
   return img?.src ? [img.src] : [];
 }
 
-function buildPhotoGallery(urls, alt = '') {
-  const gallery = document.createElement('div');
-  gallery.className = 'photo-gallery';
-  if (urls.length <= 1) gallery.classList.add('photo-gallery--single');
-
-  const track = document.createElement('div');
-  track.className = 'photo-gallery__track';
-  track.setAttribute('role', 'region');
-  track.setAttribute('aria-roledescription', 'carousel');
-  track.setAttribute('aria-label', alt || t('home.detail.photos'));
-
-  urls.forEach((url, i) => {
-    const slide = document.createElement('div');
-    slide.className = 'photo-gallery__slide';
-    slide.setAttribute('role', 'group');
-    slide.setAttribute('aria-roledescription', 'slide');
-    slide.setAttribute('aria-label', `${i + 1} / ${urls.length}`);
-    const img = document.createElement('img');
-    img.src = url;
-    img.alt = i === 0 ? alt : '';
-    img.loading = i === 0 ? 'eager' : 'lazy';
-    slide.appendChild(img);
-    track.appendChild(slide);
-  });
-
-  gallery.appendChild(track);
-
-  if (urls.length > 1) {
-    const prev = document.createElement('button');
-    prev.type = 'button';
-    prev.className = 'photo-gallery__nav photo-gallery__nav--prev';
-    prev.setAttribute('aria-label', t('home.detail.prevPhoto'));
-    prev.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M14 6 L8 12 L14 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
-
-    const next = document.createElement('button');
-    next.type = 'button';
-    next.className = 'photo-gallery__nav photo-gallery__nav--next';
-    next.setAttribute('aria-label', t('home.detail.nextPhoto'));
-    next.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M10 6 L16 12 L10 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
-
-    const counter = document.createElement('span');
-    counter.className = 'photo-gallery__counter';
-    counter.textContent = `1 / ${urls.length}`;
-
-    gallery.append(prev, next, counter);
-  }
-
-  return gallery;
+function photoOrientation(w, h) {
+  if (!w || !h) return 'square';
+  const ratio = w / h;
+  if (ratio < 0.92) return 'portrait';
+  if (ratio > 1.08) return 'landscape';
+  return 'square';
 }
 
-function initPhotoGallery(gallery) {
-  const track = gallery.querySelector('.photo-gallery__track');
-  const slides = [...gallery.querySelectorAll('.photo-gallery__slide')];
-  if (!track || slides.length <= 1) return;
+function syncMosaicGalleryHeight(mosaic) {
+  if (mosaic.classList.contains('photo-mosaic--single')) {
+    mosaic.removeAttribute('data-gallery-shape');
+    return;
+  }
+  const main = mosaic.querySelector('.photo-mosaic__cell--main img, .photo-mosaic__cell--main video');
+  if (!main) return;
+  const w = main.naturalWidth || main.videoWidth;
+  const h = main.naturalHeight || main.videoHeight;
+  if (!w || !h) return;
+  mosaic.dataset.galleryShape = photoOrientation(w, h);
+}
 
-  const prev = gallery.querySelector('.photo-gallery__nav--prev');
-  const next = gallery.querySelector('.photo-gallery__nav--next');
-  const counter = gallery.querySelector('.photo-gallery__counter');
-  let index = 0;
-  let scrollTimer = 0;
+function tuneCardPhoto(mediaEl) {
+  const wrap = mediaEl.closest('.card__photo');
+  if (!wrap) return;
+  const apply = () => {
+    const w = mediaEl.naturalWidth || mediaEl.videoWidth;
+    const h = mediaEl.naturalHeight || mediaEl.videoHeight;
+    if (!w || !h) return;
+    const orient = photoOrientation(w, h);
+    wrap.classList.remove('card__photo--portrait', 'card__photo--landscape', 'card__photo--square');
+    wrap.classList.add(`card__photo--${orient}`);
+  };
+  if (mediaEl.tagName === 'VIDEO') {
+    if (mediaEl.readyState >= 1) apply();
+    else mediaEl.addEventListener('loadedmetadata', apply, { once: true });
+    return;
+  }
+  if (mediaEl.complete && mediaEl.naturalWidth) apply();
+  else mediaEl.addEventListener('load', apply, { once: true });
+}
 
-  const syncIndex = () => {
-    const anchor = track.scrollLeft + track.clientWidth * 0.15;
-    index = slides.reduce((best, slide, i) => {
-      const dist = Math.abs(slide.offsetLeft - anchor);
-      return dist < best.dist ? { i, dist } : best;
-    }, { i: 0, dist: Infinity }).i;
-    counter.textContent = `${index + 1} / ${slides.length}`;
-    prev.disabled = index === 0;
-    next.disabled = index === slides.length - 1;
+function applyPhotoSlideOrientation(cell, mediaEl) {
+  const mosaic = cell.closest('.photo-mosaic');
+  const apply = () => {
+    const w = mediaEl.naturalWidth || mediaEl.videoWidth;
+    const h = mediaEl.naturalHeight || mediaEl.videoHeight;
+    if (!w || !h) return;
+
+    cell.style.setProperty('--slide-aspect', `${w} / ${h}`);
+    cell.classList.remove('photo-mosaic__cell--portrait', 'photo-mosaic__cell--landscape', 'photo-mosaic__cell--square');
+    cell.classList.add(`photo-mosaic__cell--${photoOrientation(w, h)}`);
+
+    if (mosaic && cell.classList.contains('photo-mosaic__cell--main')) {
+      syncMosaicGalleryHeight(mosaic);
+    }
   };
 
-  const goTo = (i) => {
-    index = Math.max(0, Math.min(slides.length - 1, i));
-    track.scrollTo({ left: slides[index].offsetLeft, behavior: 'smooth' });
-    counter.textContent = `${index + 1} / ${slides.length}`;
-    prev.disabled = index === 0;
-    next.disabled = index === slides.length - 1;
-  };
+  if (mediaEl.tagName === 'VIDEO') {
+    if (mediaEl.readyState >= 1) apply();
+    else mediaEl.addEventListener('loadedmetadata', apply, { once: true });
+    return;
+  }
+  if (mediaEl.complete && mediaEl.naturalWidth) apply();
+  else mediaEl.addEventListener('load', apply, { once: true });
+}
 
-  prev.addEventListener('click', () => goTo(index - 1));
-  next.addEventListener('click', () => goTo(index + 1));
-  track.addEventListener('scroll', () => {
-    window.clearTimeout(scrollTimer);
-    scrollTimer = window.setTimeout(syncIndex, 80);
+function buildPhotoMosaic(urls, alt = '', { phenomenonId = '' } = {}) {
+  const mosaic = document.createElement('div');
+  mosaic.className = 'photo-mosaic';
+  if (!urls.length) {
+    mosaic.classList.add('photo-mosaic--empty');
+    mosaic.hidden = true;
+    return mosaic;
+  }
+
+  mosaic.dataset.allUrls = JSON.stringify(urls);
+  mosaic.dataset.imageAlt = alt;
+  if (phenomenonId) mosaic.dataset.phenomenonId = phenomenonId;
+  if (urls.length === 1) mosaic.classList.add('photo-mosaic--single');
+
+  const track = document.createElement('div');
+  track.className = 'photo-mosaic__track';
+
+  urls.forEach((url, i) => {
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = 'photo-mosaic__cell';
+    if (i === 0) cell.classList.add('photo-mosaic__cell--main');
+    cell.setAttribute('aria-label', t('home.detail.openPhoto', { index: i + 1, total: urls.length }));
+
+    const media = appendMediaPreview(cell, url, {
+      alt: i === 0 ? alt : '',
+      loading: i === 0 ? 'eager' : 'lazy',
+    });
+    if (media.tagName === 'VIDEO') {
+      cell.classList.add('photo-mosaic__cell--video');
+      media.addEventListener('loadedmetadata', () => applyPhotoSlideOrientation(cell, media), { once: true });
+    } else {
+      media.addEventListener('load', () => applyPhotoSlideOrientation(cell, media), { once: true });
+    }
+    track.appendChild(cell);
+  });
+
+  mosaic.appendChild(track);
+
+  if (urls.length > 1) {
+    const counter = document.createElement('span');
+    counter.className = 'photo-mosaic__counter';
+    counter.setAttribute('aria-hidden', 'true');
+    counter.textContent = `1 / ${urls.length}`;
+    mosaic.appendChild(counter);
+  }
+
+  return mosaic;
+}
+
+const GALLERY_TAP_MOVE_PX = 10;
+const GALLERY_SCROLL_MOVE_PX = 6;
+
+/** Open lightbox on tap, not when the user was scrolling the gallery strip. */
+function bindGalleryTap(el, onTap, { scrollRoot = null } = {}) {
+  let gesture = null;
+
+  scrollRoot?.addEventListener('scroll', () => {
+    if (gesture) gesture.scrolled = true;
   }, { passive: true });
 
-  syncIndex();
+  el.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    gesture = {
+      x: e.clientX,
+      y: e.clientY,
+      scrollLeft: scrollRoot?.scrollLeft ?? 0,
+      scrolled: false,
+    };
+  }, { capture: true });
+
+  el.addEventListener('pointerup', (e) => {
+    if (!gesture || e.button !== 0) return;
+    const g = gesture;
+    gesture = null;
+    const dx = Math.abs(e.clientX - g.x);
+    const dy = Math.abs(e.clientY - g.y);
+    const scrollMoved = scrollRoot
+      && Math.abs(scrollRoot.scrollLeft - g.scrollLeft) > GALLERY_SCROLL_MOVE_PX;
+    if (g.scrolled || scrollMoved || dx > GALLERY_TAP_MOVE_PX || dy > GALLERY_TAP_MOVE_PX) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onTap(e);
+  }, { capture: true });
+
+  el.addEventListener('pointercancel', () => {
+    gesture = null;
+  }, { capture: true });
+
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+}
+
+let photoLightboxEl = null;
+let photoLightboxIndex = 0;
+let photoLightboxUrls = [];
+let photoLightboxAlt = '';
+let photoLightboxScrollLock = '';
+
+function requestVideoFullscreen(video) {
+  if (!video) return;
+  if (video.requestFullscreen) {
+    video.requestFullscreen().catch(() => {});
+    return;
+  }
+  if (video.webkitEnterFullscreen) {
+    video.webkitEnterFullscreen();
+    return;
+  }
+  if (video.webkitRequestFullscreen) {
+    video.webkitRequestFullscreen();
+  }
+}
+
+function prepareLightboxVideo(video) {
+  video.controls = true;
+  video.playsInline = true;
+  video.setAttribute('playsinline', '');
+  video.setAttribute('webkit-playsinline', '');
+  video.preload = 'auto';
+  video.controlsList = 'nodownload';
+}
+
+function setLightboxVideoSource(video, url) {
+  prepareLightboxVideo(video);
+  const src = resolvePlayableMediaUrl(url);
+  if (!mediaUrlMatches(video, src)) {
+    video.pause();
+    video.removeAttribute('src');
+    video.src = src;
+    video.load();
+  }
+  video.onerror = () => {
+    if (/\.mov(?=($|[?#]))/i.test(url) && !mediaUrlMatches(video, url)) {
+      video.src = url;
+      video.load();
+    }
+  };
+  playLightboxVideo(video);
+}
+
+function ensurePhotoLightbox() {
+  if (photoLightboxEl) return photoLightboxEl;
+
+  const lightbox = document.createElement('div');
+  lightbox.className = 'photo-lightbox';
+  lightbox.hidden = true;
+  lightbox.innerHTML = `
+    <div class="photo-lightbox__backdrop" data-lightbox-close></div>
+    <div class="photo-lightbox__stage" role="dialog" aria-modal="true">
+      <button type="button" class="photo-lightbox__close" data-lightbox-close aria-label="">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6 L18 18 M18 6 L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+      <button type="button" class="photo-lightbox__nav photo-lightbox__nav--prev" aria-label="">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M14 6 L8 12 L14 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+      </button>
+      <img class="photo-lightbox__img" alt="">
+      <button type="button" class="photo-lightbox__nav photo-lightbox__nav--next" aria-label="">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M10 6 L16 12 L10 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+      </button>
+      <button type="button" class="photo-lightbox__fullscreen" data-lightbox-fullscreen aria-label="" hidden>
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 9 V4 H9 M15 4 H20 V9 M20 15 V20 H15 M9 20 H4 V15" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="photo-lightbox__fullscreen-label"></span>
+      </button>
+      <span class="photo-lightbox__counter" aria-hidden="true"></span>
+    </div>
+  `;
+  document.body.appendChild(lightbox);
+
+  const closeEls = lightbox.querySelectorAll('[data-lightbox-close]');
+  const prev = lightbox.querySelector('.photo-lightbox__nav--prev');
+  const next = lightbox.querySelector('.photo-lightbox__nav--next');
+  const closeBtn = lightbox.querySelector('.photo-lightbox__close');
+  closeBtn.setAttribute('aria-label', t('home.close'));
+  prev.setAttribute('aria-label', t('home.detail.prevPhoto'));
+  next.setAttribute('aria-label', t('home.detail.nextPhoto'));
+  const fsLabel = lightbox.querySelector('.photo-lightbox__fullscreen-label');
+  if (fsLabel) fsLabel.textContent = t('home.detail.fullscreen');
+  lightbox.querySelector('[data-lightbox-fullscreen]')?.setAttribute('aria-label', t('home.detail.fullscreen'));
+
+  closeEls.forEach((el) => el.addEventListener('click', closePhotoLightbox));
+  prev.addEventListener('click', () => stepPhotoLightbox(-1));
+  next.addEventListener('click', () => stepPhotoLightbox(1));
+  lightbox.querySelector('[data-lightbox-fullscreen]')
+    ?.addEventListener('click', () => {
+      requestVideoFullscreen(lightbox.querySelector('.photo-lightbox__video'));
+    });
+  lightbox.addEventListener('click', (e) => {
+    if (e.target === lightbox.querySelector('.photo-lightbox__stage')) closePhotoLightbox();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (!photoLightboxEl || photoLightboxEl.hidden) return;
+    if (e.key === 'Escape') closePhotoLightbox();
+    if (e.key === 'ArrowLeft') stepPhotoLightbox(-1);
+    if (e.key === 'ArrowRight') stepPhotoLightbox(1);
+  });
+
+  photoLightboxEl = lightbox;
+  return lightbox;
+}
+
+function renderPhotoLightbox() {
+  const lightbox = ensurePhotoLightbox();
+  const img = lightbox.querySelector('.photo-lightbox__img');
+  let video = lightbox.querySelector('.photo-lightbox__video');
+  if (!video) {
+    video = document.createElement('video');
+    video.className = 'photo-lightbox__video';
+    img.insertAdjacentElement('afterend', video);
+  }
+  const counter = lightbox.querySelector('.photo-lightbox__counter');
+  const prev = lightbox.querySelector('.photo-lightbox__nav--prev');
+  const next = lightbox.querySelector('.photo-lightbox__nav--next');
+  const fullscreen = lightbox.querySelector('[data-lightbox-fullscreen]');
+  const stage = lightbox.querySelector('.photo-lightbox__stage');
+  const url = photoLightboxUrls[photoLightboxIndex] || '';
+
+  if (isVideoMediaUrl(url)) {
+    img.classList.remove('is-active');
+    img.removeAttribute('src');
+    video.classList.add('is-active');
+    setLightboxVideoSource(video, url);
+    if (fullscreen) fullscreen.hidden = false;
+  } else {
+    video.classList.remove('is-active');
+    video.pause();
+    video.removeAttribute('src');
+    img.classList.add('is-active');
+    img.src = url;
+    img.alt = photoLightboxIndex === 0 ? photoLightboxAlt : '';
+    if (fullscreen) fullscreen.hidden = true;
+  }
+  stage.setAttribute('aria-label', t('home.detail.photoLightbox'));
+  if (fullscreen) fullscreen.setAttribute('aria-label', t('home.detail.fullscreen'));
+
+  const multi = photoLightboxUrls.length > 1;
+  prev.hidden = !multi;
+  next.hidden = !multi;
+  counter.hidden = !multi;
+  if (multi) {
+    counter.textContent = `${photoLightboxIndex + 1} / ${photoLightboxUrls.length}`;
+    prev.disabled = photoLightboxIndex === 0;
+    next.disabled = photoLightboxIndex === photoLightboxUrls.length - 1;
+  }
+}
+
+function openPhotoLightbox(urls, index = 0, alt = '') {
+  if (!urls.length) return;
+  photoLightboxUrls = urls;
+  photoLightboxIndex = Math.max(0, Math.min(urls.length - 1, index));
+  photoLightboxAlt = alt;
+  const lightbox = ensurePhotoLightbox();
+  renderPhotoLightbox();
+  photoLightboxScrollLock = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  lightbox.hidden = false;
+  lightbox.classList.add('is-open');
+  lightbox.querySelector('.photo-lightbox__close')?.focus();
+}
+
+function closePhotoLightbox() {
+  if (!photoLightboxEl || photoLightboxEl.hidden) return;
+  photoLightboxEl.querySelector('.photo-lightbox__video')?.pause();
+  photoLightboxEl.hidden = true;
+  photoLightboxEl.classList.remove('is-open');
+  document.body.style.overflow = photoLightboxScrollLock;
+  photoLightboxScrollLock = '';
+}
+
+function stepPhotoLightbox(delta) {
+  if (photoLightboxUrls.length <= 1) return;
+  photoLightboxIndex = Math.max(0, Math.min(photoLightboxUrls.length - 1, photoLightboxIndex + delta));
+  renderPhotoLightbox();
+}
+
+function initPhotoMosaic(mosaic) {
+  if (mosaic.dataset.mosaicReady || mosaic.classList.contains('photo-mosaic--empty')) return;
+  mosaic.dataset.mosaicReady = '1';
+
+  let urls = [];
+  try {
+    urls = JSON.parse(mosaic.dataset.allUrls || '[]');
+  } catch {
+    urls = [];
+  }
+  if (!urls.length) return;
+
+  const alt = mosaic.dataset.imageAlt || '';
+  const track = mosaic.querySelector('.photo-mosaic__track');
+  const counter = mosaic.querySelector('.photo-mosaic__counter');
+  const cells = [...mosaic.querySelectorAll('.photo-mosaic__cell')];
+
+  const updateCounter = () => {
+    if (!counter || !track || cells.length <= 1) return;
+    const anchorX = track.getBoundingClientRect().left + track.clientWidth * 0.28;
+    let index = 0;
+    let best = Infinity;
+    cells.forEach((cell, i) => {
+      const rect = cell.getBoundingClientRect();
+      const center = rect.left + rect.width / 2;
+      const dist = Math.abs(center - anchorX);
+      if (dist < best) {
+        best = dist;
+        index = i;
+      }
+    });
+    counter.textContent = `${index + 1} / ${cells.length}`;
+  };
+
+  track?.addEventListener('scroll', () => {
+    window.requestAnimationFrame(updateCounter);
+  }, { passive: true });
+
+  cells.forEach((cell, index) => {
+    applyPhotoSlideOrientation(cell, cell.querySelector('.photo-mosaic__img, .photo-mosaic__video'));
+    bindGalleryTap(cell, (e) => {
+      e.stopPropagation();
+      if (mapSheetPeekOpen() && mosaic.closest('.map-sheet__peek-row')) {
+        expandMapSheet();
+        return;
+      }
+      openPhotoLightbox(urls, index, alt);
+    }, { scrollRoot: track });
+  });
+
+  updateCounter();
 }
 
 function mountDetailContent(container, card) {
+  destroyDetailMaps(container);
   const item = getItemForCard(card);
   container.replaceChildren(...buildDetailNodes(item));
-  container.querySelectorAll('.photo-gallery').forEach(initPhotoGallery);
+  container.querySelectorAll('.photo-mosaic').forEach(initPhotoMosaic);
+  initDetailMapCanvases(container);
 }
 
 function buildDetailSection(item, { loop = '' } = {}) {
@@ -658,6 +1066,7 @@ function createPeekColButton(step) {
 function mountMapSheetDetail(card) {
   detailScrollRoot = null;
   detailLoopHeight = 0;
+  destroyDetailMaps(mapSheetBody);
   mapSheetBody.replaceChildren();
   mapSheetBody.style.paddingBottom = '';
   mapSheetBody.scrollTop = 0;
@@ -665,7 +1074,22 @@ function mountMapSheetDetail(card) {
   const item = getItemForCard(card);
   const section = buildDetailSection(item);
   mapSheetBody.appendChild(section);
-  section.querySelectorAll('.photo-gallery').forEach(initPhotoGallery);
+  section.querySelectorAll('.photo-mosaic').forEach(initPhotoMosaic);
+  initDetailMapCanvases(section);
+}
+
+function mountSplitDetail(card) {
+  detailScrollRoot = null;
+  detailLoopHeight = 0;
+  destroyDetailMaps(feedDetailBody);
+  feedDetailBody.replaceChildren();
+  feedDetailBody.style.paddingBottom = '';
+  feedDetailBody.scrollTop = 0;
+  if (!card) return;
+  const section = buildDetailSection(getItemForCard(card));
+  feedDetailBody.appendChild(section);
+  section.querySelectorAll('.photo-mosaic').forEach(initPhotoMosaic);
+  initDetailMapCanvases(section);
 }
 
 function mountMapSheetPeek(card, { direction = 0 } = {}) {
@@ -690,15 +1114,43 @@ function mountMapSheetPeek(card, { direction = 0 } = {}) {
   if (multi) row.appendChild(createPeekColButton(1));
 
   mapSheetBody.appendChild(row);
-  row.querySelectorAll('.photo-gallery').forEach(initPhotoGallery);
+  row.querySelectorAll('.photo-mosaic').forEach(initPhotoMosaic);
+  syncMapSheetPeekLayout(row);
 
   if (direction) {
     window.setTimeout(() => { delete mapSheetBody.dataset.peekDirection; }, 260);
   }
 }
 
+const PEEK_FLAT_RATIO = 1.8;
+const PEEK_CAP_EARLY = 0.68;
+
+function syncMapSheetPeekLayout(row = mapSheetBody?.querySelector('.map-sheet__peek-row')) {
+  if (!row || !mapSheetPeekOpen()) return;
+  const apply = () => {
+    const isTabletPeek = TABLET_SPLIT_MQ.matches && !DESKTOP_SPLIT_MQ.matches;
+    if (!isTabletPeek) {
+      row.classList.remove('map-sheet__peek-row--split');
+      return;
+    }
+    const w = row.getBoundingClientRect().width || window.innerWidth;
+    if (!w) return;
+    const rootFont = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const maxPhotoH = Math.min(window.innerHeight * 0.32, rootFont * 13);
+    const naturalStripH = w * (10 / 16);
+    const displayH = Math.min(naturalStripH, maxPhotoH);
+    const stripTooFlat = (w / displayH) >= PEEK_FLAT_RATIO
+      || naturalStripH >= maxPhotoH * PEEK_CAP_EARLY;
+    row.classList.toggle('map-sheet__peek-row--split', stripTooFlat);
+  };
+  apply();
+  window.requestAnimationFrame(apply);
+  window.requestAnimationFrame(() => window.requestAnimationFrame(apply));
+}
+
 function mountContinuousDetail(container, { scrollTo } = {}) {
   detailScrollRoot = container;
+  destroyDetailMaps(container);
   container.replaceChildren();
   container.style.paddingBottom = '';
   const visible = getVisibleCards();
@@ -706,7 +1158,8 @@ function mountContinuousDetail(container, { scrollTo } = {}) {
   if (!isPhoneLayout()) {
     visible.forEach((card) => container.appendChild(buildDetailSection(getItemForCard(card), { loop: 'after' })));
   }
-  container.querySelectorAll('.photo-gallery').forEach(initPhotoGallery);
+  container.querySelectorAll('.photo-mosaic').forEach(initPhotoMosaic);
+  initDetailMapCanvases(container);
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       detailLoopHeight = measureDetailLoopHeight(container);
@@ -728,7 +1181,7 @@ function normalizeDetailScrollLoop() {
 function scrollDetailToCard(card, { behavior = 'smooth' } = {}) {
   const section = findPrimaryDetailSection(card.dataset.id);
   if (!section || !detailScrollRoot) return;
-  const anchor = section.querySelector('.photo-gallery') || section;
+  const anchor = section.querySelector('.photo-mosaic') || section;
   detailAdvanceLock = true;
   const rootRect = detailScrollRoot.getBoundingClientRect();
   const anchorRect = anchor.getBoundingClientRect();
@@ -745,14 +1198,14 @@ function scrollDetailToCard(card, { behavior = 'smooth' } = {}) {
 function findActiveDetailSection() {
   if (!detailScrollRoot) return null;
   const containerRect = detailScrollRoot.getBoundingClientRect();
-  const anchor = containerRect.top + 20;
+  const anchor = containerRect.top + containerRect.height * DETAIL_SCROLL_ANCHOR_RATIO;
   const sections = [...detailScrollRoot.querySelectorAll('.feed-detail__section')];
   let active = null;
 
   for (const section of sections) {
-    const gallery = section.querySelector('.photo-gallery');
-    if (!gallery) continue;
-    if (gallery.getBoundingClientRect().top <= anchor + 1) active = section;
+    const mosaic = section.querySelector('.photo-mosaic');
+    if (!mosaic) continue;
+    if (mosaic.getBoundingClientRect().top <= anchor + 1) active = section;
     else if (active) break;
   }
 
@@ -761,7 +1214,7 @@ function findActiveDetailSection() {
 
 function isDetailStreamActive() {
   if (feedStage.classList.contains('is-detail-open')) return true;
-  return isPhoneLayout()
+  return usesSheetDetail()
     && mapSheet.classList.contains('is-open')
     && mapSheet.classList.contains('is-expanded');
 }
@@ -777,8 +1230,8 @@ function updateDetailScrollSpy() {
 
 function debouncedCenterMapOnCard(card) {
   window.clearTimeout(mapPanTimer);
-  const animate = !(isPhoneLayout() && mapSheet.classList.contains('is-open'));
-  mapPanTimer = window.setTimeout(() => centerMapOnCard(card, { animate }), 220);
+  const animate = !(usesSheetDetail() && mapSheet.classList.contains('is-open'));
+  mapPanTimer = window.setTimeout(() => centerMapOnCard(card, { animate }), MAP_PIN_PAN_DELAY_MS);
 }
 
 function syncFocusedFromDetailScroll(card) {
@@ -801,15 +1254,94 @@ function onDetailPaneScroll() {
   if (!detailScrollRaf) detailScrollRaf = requestAnimationFrame(updateDetailScrollSpy);
 }
 
-function buildCardSeenText(iso) {
+function buildCardReportText(iso) {
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
-  const diffMs = Date.now() - date.getTime();
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 1) return t('home.card.seenJustNow');
-  const time = formatRelativeTime(iso);
-  return time ? t('home.card.someoneSeen', { time }) : null;
+  const minutes = Math.floor((Date.now() - date.getTime()) / 60000);
+  const time = minutes < 1
+    ? t('home.relative.justNow')
+    : (formatRelativeTime(iso) || t('home.relative.justNow'));
+  return t('home.card.lastReport', { time });
+}
+
+function formatDetailLocationLabel(location) {
+  const trimmed = location.trim();
+  if (!trimmed) return '';
+  if (/^📍\s*/u.test(trimmed)) return trimmed;
+  return `📍 ${trimmed}`;
+}
+
+function buildStarterRow(item) {
+  const name = item.creatorName || item.observerName;
+  if (!name) return null;
+
+  const row = document.createElement('p');
+  row.className = 'detail__starter';
+  row.append(document.createTextNode(t('home.detail.startedByPrefix')));
+  row.appendChild(buildMemberAvatar({
+    userId: item.userId,
+    name,
+    avatarUrl: item.creatorAvatarUrl,
+    category: item.category,
+  }, { className: 'detail__member-avatar detail__member-avatar--sm' }));
+  if (item.userId) {
+    row.appendChild(buildMemberName({
+      userId: item.userId,
+      name,
+      className: 'detail__starter-name detail__member-link',
+    }));
+  } else {
+    const plain = document.createElement('strong');
+    plain.className = 'detail__starter-name';
+    plain.textContent = name;
+    row.appendChild(plain);
+  }
+  row.append(document.createTextNode(t('home.detail.startedBySuffix')));
+  return row;
+}
+
+function appendDetailMeta(head, item) {
+  const starter = buildStarterRow(item);
+  if (starter) head.appendChild(starter);
+
+  if (item.location) {
+    const location = document.createElement('p');
+    location.className = 'detail__subtitle detail__subtitle--location';
+    location.textContent = formatDetailLocationLabel(item.location);
+    head.appendChild(location);
+  }
+
+  const latest = item.recentSightings?.[0];
+  const seenAt = latest?.seenAt || item.lastSeenAt;
+  if (seenAt) {
+    const when = formatRelativeTime(seenAt) || t('home.relative.justNow');
+    const report = document.createElement('p');
+    report.className = 'detail__last-report';
+    report.textContent = t('home.card.lastReport', { time: when });
+    head.appendChild(report);
+  }
+}
+
+function buildCardSeenText(iso) {
+  return buildCardReportText(iso);
+}
+
+function appendCardLocation(parent, locationText) {
+  const location = document.createElement('p');
+  location.className = 'card__location';
+
+  const pin = document.createElement('span');
+  pin.className = 'card__location-pin';
+  pin.setAttribute('aria-hidden', 'true');
+  pin.textContent = '📍';
+
+  const text = document.createElement('span');
+  text.className = 'card__location-text';
+  text.textContent = locationText;
+
+  location.append(pin, text);
+  parent.appendChild(location);
 }
 
 function renderCard(item) {
@@ -822,9 +1354,13 @@ function renderCard(item) {
   if (item.lng != null) card.dataset.lng = String(item.lng);
   if (item.location) card.dataset.location = item.location;
   if (item.notes) card.dataset.notes = item.notes;
+  if (item.findingHint) card.dataset.findingHint = item.findingHint;
   card.dataset.sightingCount = String(item.sightingCount ?? 0);
   card.dataset.observerCount = String(item.observerCount ?? 0);
   if (item.lastSeenAt) card.dataset.lastSeenAt = item.lastSeenAt;
+  if (item.userId) card.dataset.userId = item.userId;
+  if (item.creatorName) card.dataset.creatorName = item.creatorName;
+  if (item.creatorAvatarUrl) card.dataset.creatorAvatarUrl = item.creatorAvatarUrl;
 
   const imageUrls = resolveImageUrls(item);
   if (imageUrls.length) card.dataset.imageUrls = JSON.stringify(imageUrls);
@@ -832,61 +1368,47 @@ function renderCard(item) {
   const photo = document.createElement('div');
   photo.className = 'card__photo';
   if (imageUrls[0]) {
-    const img = document.createElement('img');
-    img.src = imageUrls[0];
-    img.alt = item.imageAlt || '';
-    img.loading = 'lazy';
-    photo.appendChild(img);
+    const first = imageUrls[0];
+    if (isVideoMediaUrl(first)) {
+      const video = document.createElement('video');
+      video.className = 'card__photo-video';
+      video.src = first;
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = 'metadata';
+      photo.appendChild(video);
+      tuneCardPhoto(video);
+    } else {
+      const img = document.createElement('img');
+      img.src = first;
+      img.alt = item.imageAlt || '';
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      photo.appendChild(img);
+      tuneCardPhoto(img);
+    }
   }
 
   const body = document.createElement('div');
   body.className = 'card__body';
 
-  const category = document.createElement('p');
-  category.className = 'card__category';
-  category.textContent = categoryLabel(item.category);
-
   const title = document.createElement('h3');
   title.className = 'card__title';
   title.textContent = item.title;
+  body.appendChild(title);
 
-  body.append(category, title);
+  if (item.location) appendCardLocation(body, item.location);
 
-  if (item.location) {
-    const location = document.createElement('p');
-    location.className = 'card__location';
-    location.textContent = item.location;
-    body.appendChild(location);
-  }
-
-  const desc = document.createElement('p');
-  desc.className = 'card__desc';
-  desc.textContent = item.description;
-  body.appendChild(desc);
-
-  const activity = document.createElement('div');
-  activity.className = 'card__activity';
   const seenText = buildCardSeenText(item.lastSeenAt);
   if (seenText) {
-    const recent = document.createElement('p');
-    recent.className = 'card__activity-recent';
-    recent.textContent = seenText;
-    activity.appendChild(recent);
+    const foot = document.createElement('p');
+    foot.className = 'card__foot';
+    foot.textContent = seenText;
+    body.appendChild(foot);
   }
-  const updates = item.sightingCount ?? 0;
-  const observers = item.observerCount ?? 0;
-  if (updates > 0 || observers > 0) {
-    const stats = document.createElement('p');
-    stats.className = 'card__activity-stats';
-    stats.textContent = t('home.card.observerStats', {
-      observers,
-      updates,
-    });
-    activity.appendChild(stats);
-  }
-  if (activity.childElementCount) body.appendChild(activity);
 
   card.append(photo, body);
+
   return card;
 }
 
@@ -920,12 +1442,30 @@ function addMapMarkers() {
   applyFilters();
 }
 
+function bindPinchWheelZoom(map) {
+  let wheelAcc = 0;
+  const wheelThreshold = 45;
+  map.getContainer().addEventListener('wheel', (event) => {
+    if (!event.ctrlKey) return;
+    event.preventDefault();
+    wheelAcc += event.deltaY;
+    if (Math.abs(wheelAcc) < wheelThreshold) return;
+    const step = wheelAcc > 0 ? -1 : 1;
+    wheelAcc = 0;
+    map.setZoom(map.getZoom() + step);
+  }, { passive: false });
+}
+
 function initMap() {
   if (leafletMap) {
     addMapMarkers();
     return;
   }
-  leafletMap = L.map('mapCanvas').setView(ZUOYING_CENTER, 15);
+  leafletMap = L.map('mapCanvas', {
+    scrollWheelZoom: false,
+    touchZoom: true,
+  }).setView(ZUOYING_CENTER, 15);
+  bindPinchWheelZoom(leafletMap);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -943,32 +1483,449 @@ function openPhenomenonOnMap(item) {
   else openSplitDetail(card);
 }
 
-function buildDetailActions(item) {
-  const actions = document.createElement('div');
-  actions.className = 'detail__actions';
+function googleMapsDirectionsUrl(item) {
+  const lat = Number(item.lat);
+  const lng = Number(item.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  }
+  const place = item.location?.trim();
+  if (place) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place)}`;
+  }
+  return null;
+}
 
-  if (item.lat != null && item.lng != null) {
-    const mapBtn = document.createElement('button');
-    mapBtn.type = 'button';
-    mapBtn.className = 'detail__action detail__action--secondary';
-    mapBtn.textContent = t('home.detail.viewLocation');
-    mapBtn.addEventListener('click', () => openPhenomenonOnMap(item));
-    actions.appendChild(mapBtn);
+const detailMiniMapRegistry = new WeakMap();
+let detailMapOverlayEl = null;
+let detailMapOverlayMap = null;
+let detailMapOverlayScrollLock = '';
+
+function destroyDetailMaps(root) {
+  root?.querySelectorAll('.detail__map-canvas').forEach((canvas) => {
+    const map = detailMiniMapRegistry.get(canvas);
+    if (map) {
+      map.remove();
+      detailMiniMapRegistry.delete(canvas);
+    }
+  });
+}
+
+function initDetailMiniMap(canvas, lat, lng) {
+  if (!canvas || typeof L === 'undefined') return null;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (detailMiniMapRegistry.has(canvas)) return detailMiniMapRegistry.get(canvas);
+
+  const map = L.map(canvas, {
+    zoomControl: false,
+    dragging: false,
+    scrollWheelZoom: false,
+    touchZoom: false,
+    doubleClickZoom: false,
+    boxZoom: false,
+    keyboard: false,
+    attributionControl: false,
+  });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+  L.marker([lat, lng]).addTo(map);
+  map.setView([lat, lng], 15, { animate: false });
+  detailMiniMapRegistry.set(canvas, map);
+  requestAnimationFrame(() => map.invalidateSize({ animate: false }));
+  return map;
+}
+
+function initDetailMapCanvases(root) {
+  root?.querySelectorAll('.detail__map-canvas').forEach((canvas) => {
+    const lat = Number(canvas.dataset.lat);
+    const lng = Number(canvas.dataset.lng);
+    initDetailMiniMap(canvas, lat, lng);
+  });
+}
+
+function closeDetailMapOverlay() {
+  if (!detailMapOverlayEl || detailMapOverlayEl.hidden) return;
+  detailMapOverlayEl.hidden = true;
+  document.body.style.overflow = detailMapOverlayScrollLock;
+  detailMapOverlayScrollLock = '';
+  if (detailMapOverlayMap) {
+    detailMapOverlayMap.remove();
+    detailMapOverlayMap = null;
+  }
+  detailMapOverlayEl.querySelector('.detail-map-overlay__canvas')?.replaceChildren();
+}
+
+function ensureDetailMapOverlay() {
+  if (detailMapOverlayEl) return detailMapOverlayEl;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'detail-map-overlay';
+  overlay.hidden = true;
+
+  const top = document.createElement('div');
+  top.className = 'detail-map-overlay__top';
+
+  const navSlot = document.createElement('div');
+  navSlot.className = 'detail-map-overlay__nav-slot';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'detail-map-overlay__close';
+  closeBtn.setAttribute('aria-label', t('home.detail.back'));
+  closeBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M14 6 L8 12 L14 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg><span>${t('home.detail.back')}</span>`;
+  closeBtn.addEventListener('click', closeDetailMapOverlay);
+
+  top.append(closeBtn, navSlot);
+
+  const canvasWrap = document.createElement('div');
+  canvasWrap.className = 'detail-map-overlay__canvas-wrap';
+  const canvas = document.createElement('div');
+  canvas.className = 'detail-map-overlay__canvas';
+  canvasWrap.appendChild(canvas);
+
+  overlay.append(top, canvasWrap);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeDetailMapOverlay();
+  });
+  document.body.appendChild(overlay);
+  detailMapOverlayEl = overlay;
+  return overlay;
+}
+
+function openDetailMapOverlay(item) {
+  const lat = Number(item.lat);
+  const lng = Number(item.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+  const overlay = ensureDetailMapOverlay();
+  const canvas = overlay.querySelector('.detail-map-overlay__canvas');
+  const navSlot = overlay.querySelector('.detail-map-overlay__nav-slot');
+  navSlot.replaceChildren();
+
+  const mapsUrl = googleMapsDirectionsUrl(item);
+  if (mapsUrl) {
+    const navBtn = document.createElement('a');
+    navBtn.className = 'detail__action detail-map-overlay__nav';
+    navBtn.href = mapsUrl;
+    navBtn.target = '_blank';
+    navBtn.rel = 'noopener noreferrer';
+    navBtn.innerHTML = `${detailActionIcon('navigate')}<span>${t('home.detail.navigate')}</span>`;
+    navSlot.appendChild(navBtn);
   }
 
-  const wentBtn = document.createElement('a');
-  wentBtn.className = 'detail__action detail__action--primary';
-  wentBtn.href = `/submit?phenomenon=${encodeURIComponent(item.id)}`;
-  wentBtn.textContent = t('home.detail.iAlsoWent');
-  actions.appendChild(wentBtn);
+  overlay.hidden = false;
+  detailMapOverlayScrollLock = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  overlay.querySelector('.detail-map-overlay__close')?.focus();
+
+  if (detailMapOverlayMap) {
+    detailMapOverlayMap.remove();
+    detailMapOverlayMap = null;
+  }
+
+  requestAnimationFrame(() => {
+    detailMapOverlayMap = L.map(canvas, {
+      zoomControl: true,
+      scrollWheelZoom: true,
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap',
+      maxZoom: 19,
+    }).addTo(detailMapOverlayMap);
+    L.marker([lat, lng]).addTo(detailMapOverlayMap);
+    detailMapOverlayMap.setView([lat, lng], 16, { animate: false });
+    requestAnimationFrame(() => detailMapOverlayMap?.invalidateSize({ animate: false }));
+  });
+}
+
+
+const TRACKED_STORAGE_KEY = 'fieldnotes.trackedPhenomena';
+const TRACK_UPDATES_SEEN_KEY = 'fieldnotes.trackUpdatesSeen';
+
+function readTrackedIds() {
+  try {
+    const raw = localStorage.getItem(TRACKED_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function isPhenomenonTracked(id) {
+  return readTrackedIds().includes(id);
+}
+
+function canEditPhenomenon(item) {
+  const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  return item.userId != null && String(item.userId) === String(user.id);
+}
+
+function canEditSighting(sighting) {
+  const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  return sighting.userId != null && String(sighting.userId) === String(user.id);
+}
+
+function remountOpenDetailForAuth() {
+  if (!focusedCard) return;
+  if (feedStage.classList.contains('is-detail-open')) {
+    mountSplitDetail(focusedCard);
+    return;
+  }
+  if (cardModal?.classList.contains('is-open')) {
+    mountDetailContent(cardModalBody, focusedCard);
+    return;
+  }
+  if (mapSheet?.classList.contains('is-open')) {
+    if (mapSheet.classList.contains('is-expanded')) mountMapSheetDetail(focusedCard);
+    else mountMapSheetPeek(focusedCard);
+  }
+}
+
+function getRenderRichText() {
+  return typeof globalThis.renderRichText === 'function' ? globalThis.renderRichText : null;
+}
+
+function appendRichText(parent, text, className) {
+  const el = document.createElement('div');
+  if (className) el.className = className;
+  el.classList.add('rich-text');
+  const render = getRenderRichText();
+  if (render && text) {
+    el.appendChild(render(text));
+  } else if (text) {
+    String(text).split('\n').forEach((line, index) => {
+      if (index > 0) el.appendChild(document.createElement('br'));
+      el.appendChild(document.createTextNode(line));
+    });
+  }
+  parent.appendChild(el);
+  return el;
+}
+
+async function syncTrackedFromServer() {
+  const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  if (!user || typeof api !== 'function') return;
+  try {
+    const { data } = await api('/api/me/track-ids');
+    if (Array.isArray(data)) {
+      localStorage.setItem(TRACKED_STORAGE_KEY, JSON.stringify(data));
+      document.querySelectorAll('.detail__action--track[data-id]').forEach((btn) => {
+        if (btn.dataset.id) syncTrackControls(btn.dataset.id);
+      });
+    }
+  } catch {
+    // Keep local cache if offline.
+  }
+}
+
+function renderTrackButton(btn, id) {
+  const tracked = isPhenomenonTracked(id);
+  btn.classList.toggle('is-active', tracked);
+  const label = tracked ? t('home.detail.tracking') : t('home.detail.track');
+  btn.innerHTML = `${detailActionIcon('heart', { filled: tracked })}<span>${label}</span>`;
+  btn.setAttribute('aria-label', label);
+  btn.setAttribute('aria-pressed', tracked ? 'true' : 'false');
+}
+
+function syncTrackControls(id) {
+  document.querySelectorAll(`.detail__action--track[data-id="${id}"]`).forEach((btn) => {
+    renderTrackButton(btn, id);
+  });
+}
+
+function setPhenomenonTracked(id, tracked) {
+  const ids = readTrackedIds();
+  const next = tracked ? [...new Set([...ids, id])] : ids.filter((entry) => entry !== id);
+  localStorage.setItem(TRACKED_STORAGE_KEY, JSON.stringify(next));
+  const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  if (user && typeof api === 'function') {
+    const path = tracked ? `/api/me/tracks/${id}` : `/api/me/tracks/${id}`;
+    void api(path, { method: tracked ? 'POST' : 'DELETE' }).catch(() => {});
+  }
+  if (tracked) {
+    const item = phenomenonCache.get(id);
+    if (item?.updatedAt) markTrackUpdateSeen(id, item.updatedAt);
+  }
+  syncTrackControls(id);
+}
+
+function readTrackUpdatesSeen() {
+  try {
+    const raw = localStorage.getItem(TRACK_UPDATES_SEEN_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function markTrackUpdateSeen(id, updatedAt) {
+  const seen = readTrackUpdatesSeen();
+  seen[id] = updatedAt;
+  localStorage.setItem(TRACK_UPDATES_SEEN_KEY, JSON.stringify(seen));
+}
+
+function showTrackUpdateBanner(items) {
+  let banner = document.getElementById('feedUpdateBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'feedUpdateBanner';
+    banner.className = 'feed-update-banner';
+    banner.setAttribute('role', 'status');
+    feedStage?.prepend(banner);
+  }
+  const label = items.length === 1
+    ? t('home.updates.single', { title: items[0].title })
+    : t('home.updates.multi', { count: items.length });
+  banner.replaceChildren();
+  const text = document.createElement('p');
+  text.className = 'feed-update-banner__text';
+  text.textContent = label;
+  banner.appendChild(text);
+  if (items.length === 1) {
+    const link = document.createElement('button');
+    link.type = 'button';
+    link.className = 'feed-update-banner__link';
+    link.textContent = t('home.updates.view');
+    link.addEventListener('click', () => {
+      const card = cards.find((c) => c.dataset.id === items[0].id);
+      if (card) openCardDetail(card);
+      banner.remove();
+    });
+    banner.appendChild(link);
+  }
+}
+
+function checkTrackedUpdates(items) {
+  const tracked = readTrackedIds();
+  if (!tracked.length) return;
+  const seen = readTrackUpdatesSeen();
+  const updates = items.filter((item) => {
+    if (!tracked.includes(item.id) || !item.updatedAt) return false;
+    const lastSeen = seen[item.id];
+    if (!lastSeen) {
+      markTrackUpdateSeen(item.id, item.updatedAt);
+      return false;
+    }
+    return new Date(item.updatedAt) > new Date(lastSeen);
+  });
+  if (updates.length) showTrackUpdateBanner(updates);
+}
+
+function bindDetailEditLink(editLink) {
+  editLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    window.location.assign(editLink.href);
+  });
+}
+
+function detailActionIcon(type, { filled = false } = {}) {
+  if (type === 'heart') {
+    const fill = filled ? 'currentColor' : 'none';
+    const stroke = filled ? 'none' : 'currentColor';
+    return `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 20.5 C12 20.5 4.5 15.2 4.5 9.6 C4.5 7.2 6.4 5.5 8.7 5.5 C10.1 5.5 11.3 6.2 12 7.3 C12.7 6.2 13.9 5.5 15.3 5.5 C17.6 5.5 19.5 7.2 19.5 9.6 C19.5 15.2 12 20.5 12 20.5 Z" fill="${fill}" stroke="${stroke}" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+  }
+  if (type === 'navigate') {
+    return '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 12 L20 4 L14 20 L12 13 L4 12 Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" fill="none"/></svg>';
+  }
+  if (type === 'report') {
+    return '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 7 V17 M7 12 H17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+  }
+  if (type === 'edit') {
+    return '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 20 H14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" fill="none"/></svg>';
+  }
+  return '';
+}
+
+function buildSightingReportLink(item) {
+  const reportLink = document.createElement('a');
+  reportLink.className = 'detail__action detail__action--primary';
+  reportLink.href = `/sighting?phenomenon=${encodeURIComponent(item.id)}`;
+  reportLink.innerHTML = `${detailActionIcon('report')}<span>${t('home.detail.iAlsoWent')}</span>`;
+  reportLink.addEventListener('click', (e) => e.stopPropagation());
+  return reportLink;
+}
+
+function buildDetailMapActions(item, { includeTrack = true } = {}) {
+  const actions = document.createElement('div');
+  actions.className = 'detail__map-actions';
+
+  const mapsUrl = googleMapsDirectionsUrl(item);
+  if (mapsUrl) {
+    const navBtn = document.createElement('a');
+    navBtn.className = 'detail__action detail__action--nav';
+    navBtn.href = mapsUrl;
+    navBtn.target = '_blank';
+    navBtn.rel = 'noopener noreferrer';
+    navBtn.innerHTML = `${detailActionIcon('navigate')}<span>${t('home.detail.navigateShort')}</span>`;
+    navBtn.addEventListener('click', (e) => e.stopPropagation());
+    actions.appendChild(navBtn);
+  }
+
+  const reportLink = buildSightingReportLink(item);
+  actions.appendChild(reportLink);
+
+  if (includeTrack) {
+    const trackBtn = document.createElement('button');
+    trackBtn.type = 'button';
+    trackBtn.className = 'detail__action detail__action--track';
+    trackBtn.dataset.id = item.id;
+    renderTrackButton(trackBtn, item.id);
+    trackBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setPhenomenonTracked(item.id, !isPhenomenonTracked(item.id));
+    });
+    actions.appendChild(trackBtn);
+  }
 
   return actions;
+}
+
+function buildDetailMapBlock(item) {
+  const lat = Number(item.lat);
+  const lng = Number(item.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    const actions = buildDetailMapActions(item);
+    actions.className = 'detail__actions detail__actions--no-map';
+    return actions;
+  }
+
+  const block = document.createElement('section');
+  block.className = 'detail__map-block';
+
+  const previewBtn = document.createElement('button');
+  previewBtn.type = 'button';
+  previewBtn.className = 'detail__map-preview';
+  previewBtn.setAttribute('aria-label', t('home.detail.openMap'));
+
+  const canvas = document.createElement('div');
+  canvas.className = 'detail__map-canvas';
+  canvas.dataset.lat = String(lat);
+  canvas.dataset.lng = String(lng);
+  previewBtn.appendChild(canvas);
+
+  const expand = document.createElement('span');
+  expand.className = 'detail__map-expand';
+  expand.textContent = t('home.detail.openMap');
+  previewBtn.appendChild(expand);
+
+  previewBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openDetailMapOverlay(item);
+  });
+
+  block.append(previewBtn, buildDetailMapActions(item));
+  return block;
 }
 
 function buildObserverGroup(item) {
   const observers = item.observers?.length
     ? item.observers
-    : (item.observerName ? [{ name: item.observerName }] : []);
+    : (item.observerName ? [{ userId: item.userId, name: item.observerName, avatarUrl: null }] : []);
   if (!observers.length) return null;
 
   const row = document.createElement('div');
@@ -976,11 +1933,12 @@ function buildObserverGroup(item) {
   const avatars = document.createElement('div');
   avatars.className = 'detail__observer-avatars';
   observers.slice(0, 4).forEach((observer) => {
-    const avatar = document.createElement('span');
-    avatar.className = 'avatar';
-    avatar.dataset.cat = item.category;
-    avatar.textContent = observerInitial(observer.name);
-    avatars.appendChild(avatar);
+    avatars.appendChild(buildMemberAvatar({
+      userId: observer.userId,
+      name: observer.name,
+      avatarUrl: observer.avatarUrl,
+      category: item.category,
+    }, { className: 'detail__member-avatar detail__member-avatar--sm' }));
   });
   if (observers.length > 4) {
     const more = document.createElement('span');
@@ -990,56 +1948,101 @@ function buildObserverGroup(item) {
   }
   const label = document.createElement('p');
   label.className = 'detail__observer-label';
-  label.textContent = t('home.detail.observersTogether', { count: observers.length });
+  label.textContent = observers.length === 1
+    ? t('home.detail.observersOne', { count: observers.length })
+    : t('home.detail.observersMany', { count: observers.length });
   row.append(avatars, label);
   return row;
 }
 
 function buildSightingsTimeline(item) {
   const sightings = item.recentSightings ?? [];
-  if (!sightings.length) return null;
 
   const wrap = document.createElement('section');
   wrap.className = 'detail__sightings';
 
   const heading = document.createElement('h4');
-  heading.className = 'detail__section-title';
+  heading.className = 'detail__section-title detail__section-title--sightings';
   heading.textContent = t('home.detail.recentSightings');
   wrap.appendChild(heading);
+
+  if (!sightings.length) {
+    const empty = document.createElement('p');
+    empty.className = 'detail__sightings-empty';
+    empty.textContent = t('home.detail.recentSightingsEmpty');
+    wrap.appendChild(empty);
+  }
 
   sightings.forEach((sighting, index) => {
     const entry = document.createElement('article');
     entry.className = 'detail__sighting';
 
-    const meta = document.createElement('p');
-    meta.className = 'detail__sighting-meta';
-    const name = sighting.observerName || t('home.detail.anonymousObserver');
-    meta.textContent = `${formatSightingDate(sighting.seenAt)} · ${name}`;
-    entry.appendChild(meta);
+    const head = document.createElement('header');
+    head.className = 'detail__sighting-head';
+
+    const author = document.createElement('div');
+    author.className = 'detail__sighting-author';
+    author.append(
+      buildMemberAvatar({
+        userId: sighting.userId,
+        name: sighting.observerName,
+        avatarUrl: sighting.observerAvatarUrl,
+        category: item.category,
+      }),
+      buildMemberName({ userId: sighting.userId, name: sighting.observerName }),
+    );
+
+    const date = document.createElement('time');
+    date.className = 'detail__sighting-date';
+    date.dateTime = sighting.seenAt;
+    const relative = formatRelativeTime(sighting.seenAt);
+    const dateLabel = formatSightingDate(sighting.seenAt);
+    date.textContent = relative && dateLabel
+      ? `${dateLabel} · ${relative}`
+      : (dateLabel || relative || '');
+
+    head.append(author, date);
+    entry.appendChild(head);
 
     if (sighting.note) {
-      const note = document.createElement('p');
-      note.className = 'detail__sighting-note';
-      note.textContent = sighting.note;
-      entry.appendChild(note);
+      appendRichText(entry, sighting.note, 'detail__sighting-note');
     }
 
-    if (sighting.condition) {
-      const chip = document.createElement('span');
-      chip.className = 'detail__sighting-condition';
-      chip.textContent = conditionLabel(sighting.condition);
-      entry.appendChild(chip);
+    if (canEditSighting(sighting)) {
+      const edit = document.createElement('a');
+      edit.className = 'detail__sighting-edit';
+      edit.href = `/sighting?edit=${encodeURIComponent(sighting.id)}`;
+      edit.textContent = t('home.detail.editSighting');
+      entry.appendChild(edit);
     }
 
     if (sighting.images?.length) {
       const photos = document.createElement('div');
       photos.className = 'detail__sighting-photos';
-      sighting.images.forEach((image) => {
-        const img = document.createElement('img');
-        img.src = image.imageUrl;
-        img.alt = image.imageAlt || '';
-        img.loading = 'lazy';
-        photos.appendChild(img);
+      const urls = sighting.images.map((image) => image.imageUrl);
+      sighting.images.forEach((image, imgIndex) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        const isVideo = isVideoMediaUrl(image.imageUrl);
+        btn.className = `detail__sighting-photo-btn${isVideo ? ' is-video' : ''}`;
+        btn.setAttribute('aria-label', isVideo
+          ? t('submit.photo.openVideo')
+          : t('home.detail.openPhoto', { index: imgIndex + 1, total: urls.length }));
+        appendMediaPreview(btn, image.imageUrl, {
+          alt: image.imageAlt || '',
+          className: 'detail__sighting-media',
+        });
+        if (isVideo) {
+          const fsHint = document.createElement('span');
+          fsHint.className = 'detail__sighting-fullscreen-hint';
+          fsHint.textContent = t('home.detail.fullscreen');
+          btn.appendChild(fsHint);
+        }
+        bindGalleryTap(btn, (e) => {
+          e.stopPropagation();
+          openPhotoLightbox(urls, imgIndex, image.imageAlt || '');
+        }, { scrollRoot: photos.length > 1 ? photos : null });
+        photos.appendChild(btn);
       });
       entry.appendChild(photos);
     }
@@ -1052,13 +2055,57 @@ function buildSightingsTimeline(item) {
     }
   });
 
-  const footer = document.createElement('a');
-  footer.className = 'detail__sightings-footer';
-  footer.href = `/submit?phenomenon=${encodeURIComponent(item.id)}`;
-  footer.textContent = `＋ ${t('home.detail.iAlsoWent')}`;
-  wrap.appendChild(footer);
+  const reportBtn = buildSightingReportLink(item);
+  reportBtn.classList.add('detail__sightings-report');
+  wrap.appendChild(reportBtn);
 
   return wrap;
+}
+
+function buildNotesContent(notes) {
+  const container = document.createDocumentFragment();
+  notes.split(/\n\n+/).filter(Boolean).forEach((block, index) => {
+    const trimmed = block.trim();
+    const lines = trimmed.split('\n').map((line) => line.trim()).filter(Boolean);
+    if (!lines.length) return;
+
+    if (/^🔎/.test(lines[0])) {
+      const heading = document.createElement('h5');
+      heading.className = 'detail__about-heading';
+      heading.textContent = lines[0].replace(/^🔎\s*/, '');
+      container.appendChild(heading);
+      if (lines.length > 1) {
+        const para = document.createElement('div');
+        para.className = 'detail__about-para';
+        const render = getRenderRichText();
+        if (render) para.appendChild(render(lines.slice(1).join('\n')));
+        container.appendChild(para);
+      }
+      return;
+    }
+
+    if (/^⚠️/.test(lines[0])) {
+      const heading = document.createElement('h5');
+      heading.className = 'detail__about-heading detail__about-heading--warn';
+      heading.textContent = lines[0].replace(/^⚠️\s*/, '');
+      container.appendChild(heading);
+      if (lines.length > 1) {
+        const para = document.createElement('div');
+        para.className = 'detail__about-para';
+        const render = getRenderRichText();
+        if (render) para.appendChild(render(lines.slice(1).join('\n')));
+        container.appendChild(para);
+      }
+      return;
+    }
+
+    const para = document.createElement('div');
+    para.className = index === 0 ? 'detail__about-lead' : 'detail__about-para';
+    const render = getRenderRichText();
+    if (render) para.appendChild(render(trimmed));
+    container.appendChild(para);
+  });
+  return container;
 }
 
 function buildAboutSection(item) {
@@ -1068,9 +2115,9 @@ function buildAboutSection(item) {
   const heading = document.createElement('h4');
   heading.className = 'detail__section-title';
   heading.textContent = t('home.detail.aboutObservation');
-  const body = document.createElement('p');
+  const body = document.createElement('div');
   body.className = 'detail__about-body';
-  body.textContent = item.notes;
+  body.append(buildNotesContent(item.notes));
   about.append(heading, body);
   return about;
 }
@@ -1078,64 +2125,69 @@ function buildAboutSection(item) {
 // Builds detail nodes shared by the map sheet, card modal, and split detail.
 function buildDetailNodes(item) {
   const imageUrls = resolveImageUrls(item);
-  const photoWrap = buildPhotoGallery(imageUrls, item.imageAlt || '');
+  const photoWrap = buildPhotoMosaic(imageUrls, item.imageAlt || '', { phenomenonId: item.id });
 
   const body = document.createElement('div');
   body.className = 'card__body detail__hero';
 
-  if (item.location) {
-    const meta = document.createElement('p');
-    meta.className = 'detail__category-location';
-    meta.textContent = t('home.detail.categoryLocation', {
-      category: categoryLabel(item.category),
-      location: item.location,
-    });
-    body.appendChild(meta);
-  } else {
-    const meta = document.createElement('p');
-    meta.className = 'detail__category-location';
-    meta.textContent = categoryLabel(item.category);
-    body.appendChild(meta);
-  }
+  const head = document.createElement('div');
+  head.className = 'detail__head';
 
+  const titleRow = document.createElement('div');
+  titleRow.className = 'detail__title-row';
   const title = document.createElement('h3');
   title.className = 'card__title';
   title.textContent = item.title;
+  titleRow.appendChild(title);
 
-  const desc = document.createElement('p');
-  desc.className = 'card__desc';
-  desc.textContent = item.description;
-  body.append(title, desc);
+  if (canEditPhenomenon(item)) {
+    const editLink = document.createElement('a');
+    editLink.className = 'detail__edit-btn';
+    editLink.href = `/submit?edit=${encodeURIComponent(item.id)}`;
+    editLink.setAttribute('aria-label', t('home.detail.editObservation'));
+    editLink.innerHTML = detailActionIcon('edit');
+    bindDetailEditLink(editLink);
+    titleRow.appendChild(editLink);
+  }
+  head.appendChild(titleRow);
 
-  const seenRelative = formatRelativeTime(item.lastSeenAt);
-  if (item.lastSeenAt) {
-    const status = document.createElement('p');
-    status.className = 'detail__status-line';
-    status.textContent = t('home.detail.stillSeen', { time: seenRelative || t('home.relative.justNow') });
-    body.appendChild(status);
-
-    const latest = item.recentSightings?.[0];
-    if (latest?.condition) {
-      const detail = document.createElement('p');
-      detail.className = 'detail__status-detail';
-      detail.textContent = t('home.detail.latestNote', {
-        time: formatRelativeTime(latest.seenAt) || t('home.relative.justNow'),
-        detail: conditionLabel(latest.condition),
-      });
-      body.appendChild(detail);
-    }
+  if (item.description) {
+    appendRichText(head, item.description, 'detail__summary');
   }
 
-  const observerGroup = buildObserverGroup(item);
-  if (observerGroup) body.appendChild(observerGroup);
+  appendDetailMeta(head, item);
 
-  body.appendChild(buildDetailActions(item));
+  body.appendChild(head);
+
+  if (item.updatedAt) markTrackUpdateSeen(item.id, item.updatedAt);
+
+  const mapBlock = buildDetailMapBlock(item);
+  mapBlock.classList.add('detail__block', 'detail__block--map');
+  body.appendChild(mapBlock);
+
+  const extras = document.createElement('div');
+  extras.className = 'detail__extras';
+
+  if (item.findingHint) {
+    const finding = document.createElement('section');
+    finding.className = 'detail__finding';
+    const heading = document.createElement('h4');
+    heading.className = 'detail__section-title detail__section-title--finding';
+    heading.textContent = t('submit.finding.label');
+    const body = document.createElement('p');
+    body.className = 'detail__finding-body';
+    body.textContent = item.findingHint;
+    finding.append(heading, body);
+    extras.appendChild(finding);
+  }
+
+  if (extras.childElementCount) body.appendChild(extras);
 
   const nodes = [photoWrap, body];
-  const timeline = buildSightingsTimeline(item);
-  if (timeline) nodes.push(timeline);
   const about = buildAboutSection(item);
+  const timeline = buildSightingsTimeline(item);
   if (about) nodes.push(about);
+  if (timeline) nodes.push(timeline);
 
   return nodes;
 }
@@ -1172,7 +2224,7 @@ function navigateMapSheetPin(step) {
     mountMapSheetPeek(nextCard, { direction: step });
   }
   updateMapSheetPeekNav();
-  scheduleCenterMapOnCard(nextCard, { animate: true });
+  scheduleCenterMapOnCard(nextCard, { animate: true, waitForPeek: true });
   scrollRailToFocusedCard();
 }
 
@@ -1180,12 +2232,14 @@ function findCenterRailCard() {
   if (!mapRail || mapRail.hidden) return null;
   const railRect = mapRail.getBoundingClientRect();
   const railCenter = railRect.top + railRect.height / 2;
+  const switchBand = Math.max(28, railRect.height * MAP_RAIL_CENTER_BAND);
   let bestItem = null;
   let bestDist = Infinity;
   mapRailList?.querySelectorAll('.map-rail__item').forEach((item) => {
     const rect = item.getBoundingClientRect();
     if (rect.bottom < railRect.top || rect.top > railRect.bottom) return;
     const dist = Math.abs(rect.top + rect.height / 2 - railCenter);
+    if (dist > switchBand) return;
     if (dist < bestDist) {
       bestDist = dist;
       bestItem = item;
@@ -1213,7 +2267,7 @@ function onMapRailScrollDebounced() {
       setActiveMapPin(entry.marker);
       debouncedCenterMapOnCard(card);
     }
-  }, 140);
+  }, MAP_RAIL_SCROLL_DEBOUNCE_MS);
 }
 
 function setHighlightedPin(card) {
@@ -1265,11 +2319,12 @@ function findMarkerEntry(card) {
 }
 
 function renderMapRailItem(card) {
-  const item = document.createElement('button');
-  item.type = 'button';
-  item.className = 'map-rail__item';
-  item.dataset.id = card.dataset.id;
-  if (card.dataset.status) item.dataset.status = card.dataset.status;
+  const item = getItemForCard(card);
+  const itemEl = document.createElement('button');
+  itemEl.type = 'button';
+  itemEl.className = 'map-rail__item';
+  itemEl.dataset.id = card.dataset.id;
+  if (card.dataset.status) itemEl.dataset.status = card.dataset.status;
 
   const imgSrc = card.querySelector('.card__photo img')?.src;
   if (imgSrc) {
@@ -1278,34 +2333,50 @@ function renderMapRailItem(card) {
     thumb.src = imgSrc;
     thumb.alt = '';
     thumb.loading = 'lazy';
-    item.appendChild(thumb);
+    itemEl.appendChild(thumb);
   }
 
   const body = document.createElement('div');
   body.className = 'map-rail__body';
 
-  const pill = card.querySelector('.pill');
-  if (pill) body.appendChild(pill.cloneNode(true));
-
   const title = document.createElement('span');
   title.className = 'map-rail__title';
-  title.textContent = card.querySelector('.card__title')?.textContent || '';
+  title.textContent = item.title;
   body.appendChild(title);
 
-  const observer = card.querySelector('.card__observer');
-  if (observer) body.appendChild(observer.cloneNode(true));
+  if (item.location) {
+    const location = document.createElement('p');
+    location.className = 'map-rail__location';
+    const pin = document.createElement('span');
+    pin.className = 'map-rail__location-pin';
+    pin.setAttribute('aria-hidden', 'true');
+    pin.textContent = '📍';
+    const text = document.createElement('span');
+    text.className = 'map-rail__location-text';
+    text.textContent = item.location;
+    location.append(pin, text);
+    body.appendChild(location);
+  }
 
-  item.appendChild(body);
+  const seenText = buildCardSeenText(item.lastSeenAt);
+  if (seenText) {
+    const recent = document.createElement('p');
+    recent.className = 'map-rail__activity-recent';
+    recent.textContent = seenText;
+    body.appendChild(recent);
+  }
 
-  item.addEventListener('mouseenter', () => setHighlightedPin(card));
-  item.addEventListener('mouseleave', () => clearHighlightedPin());
-  item.addEventListener('click', () => {
+  itemEl.appendChild(body);
+
+  itemEl.addEventListener('mouseenter', () => setHighlightedPin(card));
+  itemEl.addEventListener('mouseleave', () => clearHighlightedPin());
+  itemEl.addEventListener('click', () => {
     const entry = findMarkerEntry(card);
     if (entry) openMapSheet(card, entry.marker);
     else if (prefersSplitDetail()) openSplitDetail(card);
   });
 
-  return item;
+  return itemEl;
 }
 
 function syncMapRail() {
@@ -1331,7 +2402,7 @@ function settleMapLayout({ pan = false, animate = false } = {}) {
       requestAnimationFrame(() => {
         if (!leafletMap || mapView.classList.contains('is-hidden')) return;
         leafletMap.invalidateSize({ animate: false });
-        if (pan && focusedCard) scheduleCenterMapOnCard(focusedCard, { animate, waitForSheet: isPhoneLayout() && mapSheet.classList.contains('is-open') });
+        if (pan && focusedCard) scheduleCenterMapOnCard(focusedCard, { animate, waitForSheet: usesSheetDetail() && mapSheet.classList.contains('is-open') });
       });
     });
   }, 40);
@@ -1348,6 +2419,11 @@ function updateMapRailVisibility({ pan = false, animate = false } = {}) {
 }
 
 const MAP_PIN_VISIBLE_RATIO = 0.48;
+const DETAIL_SCROLL_ANCHOR_RATIO = 0.42;
+const MAP_RAIL_CENTER_BAND = 0.14;
+const MAP_PIN_PAN_DELAY_MS = 320;
+const MAP_RAIL_SCROLL_DEBOUNCE_MS = 260;
+const MAP_PEEK_PAN_DELAY_MS = 300;
 
 function getMapPinScreenBand() {
   if (!leafletMap || prefersSplitDetail()) return null;
@@ -1411,7 +2487,7 @@ function centerMapOnCard(card, { animate = true, resize = true } = {}) {
   if (!leafletMap || !card?.dataset.lat || !card?.dataset.lng) return;
   const latlng = L.latLng(parseFloat(card.dataset.lat), parseFloat(card.dataset.lng));
   const zoom = leafletMap.getZoom();
-  const sheetOpen = isPhoneLayout() && mapSheet.classList.contains('is-open');
+  const sheetOpen = usesSheetDetail() && mapSheet.classList.contains('is-open');
   const run = () => {
     if (!shouldDeferMapLayoutSync()) leafletMap.invalidateSize({ animate: false });
     if (sheetOpen) {
@@ -1435,14 +2511,15 @@ function centerMapOnCard(card, { animate = true, resize = true } = {}) {
   else run();
 }
 
-function scheduleCenterMapOnCard(card, { animate = false, waitForSheet = false } = {}) {
+function scheduleCenterMapOnCard(card, { animate = false, waitForSheet = false, waitForPeek = false } = {}) {
   window.clearTimeout(mapCenterTimer);
   const run = () => centerMapOnCard(card, { animate, resize: false });
-  if (waitForSheet && mapSheet.classList.contains('is-open') && isPhoneLayout()) {
+  if (waitForSheet && mapSheet.classList.contains('is-open') && usesSheetDetail()) {
     afterMapSheetLayout(run);
     return;
   }
-  mapCenterTimer = window.setTimeout(run, waitForSheet ? 280 : 0);
+  const delay = waitForPeek ? MAP_PEEK_PAN_DELAY_MS : (waitForSheet ? 280 : 0);
+  mapCenterTimer = window.setTimeout(run, delay);
 }
 
 function afterMapSheetLayout(callback) {
@@ -1477,6 +2554,7 @@ function expandMapSheet() {
     updateMapSheetPeekNav();
     settleMapLayout({ pan: Boolean(focusedCard), animate: false });
     syncPhoneSheetBodyLock();
+    syncMapSheetChrome();
   })();
 }
 
@@ -1507,14 +2585,35 @@ function panToFocusedCard() {
   const entry = findMarkerEntry(focusedCard);
   if (!entry) return;
   setActiveMapPin(entry.marker);
-  const animate = !(isPhoneLayout() && mapSheet.classList.contains('is-open'));
+  const animate = !(usesSheetDetail() && mapSheet.classList.contains('is-open'));
   centerMapOnCard(focusedCard, { animate });
 }
 
 function syncPhoneSheetBodyLock() {
-  if (!isPhoneLayout()) return;
+  if (!usesSheetDetail()) return;
   const lock = mapSheet.classList.contains('is-open') && mapSheet.classList.contains('is-expanded');
   document.body.classList.toggle('is-detail-open', lock);
+}
+
+function syncMapSheetChrome() {
+  if (!usesSheetDetail()) return;
+  const open = mapSheet.classList.contains('is-open');
+  const expanded = mapSheet.classList.contains('is-expanded');
+  const inMap = !mapView.classList.contains('is-hidden');
+
+  if (mapSheetHeader) mapSheetHeader.hidden = !open || !expanded;
+  if (mapSheetHandle) mapSheetHandle.hidden = !open || expanded;
+  if (mapSheetClose) mapSheetClose.hidden = !open || expanded;
+
+  if (mapSheetBack) {
+    mapSheetBack.setAttribute(
+      'aria-label',
+      t(inMap ? 'home.detail.backToMap' : 'home.detail.backToList'),
+    );
+  }
+  if (mapSheetBackLabel) {
+    mapSheetBackLabel.textContent = t('home.detail.back');
+  }
 }
 
 async function openPhoneDetailSheet(card, { mode = 'expanded', pan = false, marker = null } = {}) {
@@ -1542,10 +2641,11 @@ async function openPhoneDetailSheet(card, { mode = 'expanded', pan = false, mark
     settleMapLayout({ pan: false, animate: false });
   }
   syncPhoneSheetBodyLock();
+  syncMapSheetChrome();
 }
 
 function openMapSheet(card, marker, { pan = true } = {}) {
-  if (isPhoneLayout()) {
+  if (usesSheetDetail()) {
     void openPhoneDetailSheet(card, { mode: 'peek', pan, marker });
     return;
   }
@@ -1569,6 +2669,7 @@ function hideMapSheet() {
   clearMapPinActive();
   updateMapSheetPeekNav();
   syncPhoneSheetBodyLock();
+  syncMapSheetChrome();
   if (!mapView.classList.contains('is-hidden')) settleMapLayout({ pan: false, animate: false });
 }
 
@@ -1578,8 +2679,9 @@ function closeMapSheet() {
 }
 
 mapSheetClose.addEventListener('click', closeMapSheet);
+mapSheetBack?.addEventListener('click', closeMapSheet);
 mapSheetHandle?.addEventListener('click', () => {
-  if (!isPhoneLayout() || !mapSheet.classList.contains('is-open')) return;
+  if (!usesSheetDetail() || !mapSheet.classList.contains('is-open')) return;
   if (mapSheet.classList.contains('is-expanded')) closeMapSheet();
   else expandMapSheet();
 });
@@ -1589,13 +2691,13 @@ let mapSheetTouchStartY = 0;
 let mapSheetTouchOnGallery = false;
 let mapSheetTouchAxis = '';
 function mapSheetPeekOpen() {
-  return isPhoneLayout() && mapSheet.classList.contains('is-open') && !mapSheet.classList.contains('is-expanded');
+  return usesSheetDetail() && mapSheet.classList.contains('is-open') && !mapSheet.classList.contains('is-expanded');
 }
 
 function updateMapSheetPeekNav() {
   if (!mapSheetPeekNav) return;
   const pinCards = getMapPinCards();
-  const show = isPhoneLayout() && mapSheet.classList.contains('is-open') && pinCards.length > 1;
+  const show = usesSheetDetail() && mapSheet.classList.contains('is-open') && pinCards.length > 1;
   mapSheetPeekNav.hidden = !show;
   mapSheetPeekNav.setAttribute('aria-hidden', show ? 'false' : 'true');
   mapSheet?.classList.toggle('is-peek-multi', show);
@@ -1644,14 +2746,14 @@ function onMapSheetSwipeEnd(startX, startY, e) {
 }
 function bindMapSheetSwipe(el, { trackAxis = false } = {}) {
   el?.addEventListener('touchstart', (e) => {
-    if (!isPhoneLayout() || !mapSheet.classList.contains('is-open')) return;
+    if (!usesSheetDetail() || !mapSheet.classList.contains('is-open')) return;
     mapSheetTouchStartX = e.touches[0].clientX;
     mapSheetTouchStartY = e.touches[0].clientY;
-    mapSheetTouchOnGallery = Boolean(e.target.closest('.photo-gallery__track'));
+    mapSheetTouchOnGallery = Boolean(e.target.closest('.photo-mosaic'));
     mapSheetTouchAxis = '';
   }, { passive: true });
   el?.addEventListener('touchmove', (e) => {
-    if (!isPhoneLayout() || !mapSheet.classList.contains('is-open') || mapSheetTouchOnGallery) return;
+    if (!usesSheetDetail() || !mapSheet.classList.contains('is-open') || mapSheetTouchOnGallery) return;
     const dx = e.touches[0].clientX - mapSheetTouchStartX;
     const dy = e.touches[0].clientY - mapSheetTouchStartY;
     if (!mapSheetTouchAxis && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
@@ -1660,7 +2762,7 @@ function bindMapSheetSwipe(el, { trackAxis = false } = {}) {
     if (trackAxis && mapSheetTouchAxis === 'x') e.preventDefault();
   }, { passive: false });
   el?.addEventListener('touchend', (e) => {
-    if (!isPhoneLayout() || !mapSheet.classList.contains('is-open')) return;
+    if (!usesSheetDetail() || !mapSheet.classList.contains('is-open')) return;
     onMapSheetSwipeEnd(mapSheetTouchStartX, mapSheetTouchStartY, e);
   }, { passive: true });
 }
@@ -1672,7 +2774,7 @@ let mapSheetTapStartX = 0;
 let mapSheetTapStartY = 0;
 function tryExpandMapSheetFromTap(e) {
   if (!mapSheetPeekOpen()) return;
-  if (e.target.closest('a, button, .photo-gallery__track')) return;
+  if (e.target.closest('a, button, .detail__map-preview, .detail__edit-btn, .detail__map-actions')) return;
   expandMapSheet();
 }
 mapSheetBody?.addEventListener('click', (e) => {
@@ -1750,13 +2852,29 @@ viewToggleBtns.forEach((btn) => btn.addEventListener('click', () => {
   if (isMap) {
     hideCardModal();
     hideSplitDetail();
+    closeMapSheet();
     enterMapView();
   } else {
     hideMapSheet();
     clearMapPinActive();
     updateMapRailVisibility();
+    if (focusedCard && !usesSheetDetail()) openSplitDetail(focusedCard);
+    else updateDetailRailBtn();
   }
 }));
+
+function updateDetailRailBtn() {
+  if (!feedDetailRailBtn) return;
+  feedDetailRailBtn.hidden = true;
+}
+
+function closeMapDetailToRail() {
+  if (isPhoneLayout() || mapView.classList.contains('is-hidden')) return;
+  hideSplitDetail();
+  scrollRailToFocusedCard();
+  updateDetailRailBtn();
+  if (leafletMap) settleMapLayout({ pan: false, animate: false });
+}
 
 function hideSplitDetail() {
   setFeedDetailMenuOpen(false);
@@ -1768,32 +2886,26 @@ function hideSplitDetail() {
   feedDetailPane.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('is-detail-open');
   updateMapRailVisibility();
+  updateDetailRailBtn();
 }
 
 function openSplitDetail(card) {
-  if (isPhoneLayout()) {
+  if (usesSheetDetail()) {
     void openPhoneDetailSheet(card, { mode: 'expanded' });
     return;
   }
   hideCardModal();
   hideMapSheet();
-  const wasOpen = feedStage.classList.contains('is-detail-open');
   setFocusedCard(card);
   updateDetailHeaderTitle(card);
   feedDetailPane.setAttribute('aria-hidden', 'false');
   feedStage.classList.add('is-detail-open');
-  if (!isPhoneLayout()) document.body.classList.remove('is-detail-open');
+  if (!usesSheetDetail()) document.body.classList.remove('is-detail-open');
   updateMapRailVisibility();
+  updateDetailRailBtn();
   void (async () => {
-    const visible = getVisibleCards();
-    await Promise.all(visible.map((c) => ensurePhenomenonDetail(c.dataset.id)));
-    const hasStream = feedDetailBody.querySelector('.feed-detail__section');
-    if (!wasOpen || !hasStream) {
-      mountContinuousDetail(feedDetailBody, { scrollTo: card });
-    } else {
-      detailScrollRoot = feedDetailBody;
-      scrollDetailToCard(card);
-    }
+    await ensurePhenomenonDetail(card.dataset.id);
+    mountSplitDetail(card);
     renderFeedDetailMenu();
     setFeedDetailMenuOpen(false);
     if (!mapView.classList.contains('is-hidden')) {
@@ -1804,12 +2916,12 @@ function openSplitDetail(card) {
 }
 
 function closeSplitDetail() {
-  if (isPhoneLayout() && mapSheet.classList.contains('is-open')) {
+  if (usesSheetDetail() && mapSheet.classList.contains('is-open')) {
     closeMapSheet();
     return;
   }
   if (!focusedCard && !feedStage.classList.contains('is-detail-open')) return;
-  const returnToMap = isPhoneLayout() && !mapView.classList.contains('is-hidden');
+  const returnToMap = usesSheetDetail() && !mapView.classList.contains('is-hidden');
   hideSplitDetail();
   if (!returnToMap) clearMapPinActive();
   setFocusedCard(null);
@@ -1834,7 +2946,7 @@ function resetHomeView() {
 }
 
 function openCardDetail(card) {
-  if (isPhoneLayout()) {
+  if (usesSheetDetail()) {
     const inMap = !mapView.classList.contains('is-hidden');
     const entry = inMap ? findMarkerEntry(card) : null;
     if (entry) {
@@ -1867,7 +2979,7 @@ function closeCardModal() {
   hideCardModal();
   setFocusedCard(null);
 }
-feedDetailClose.addEventListener('click', closeSplitDetail);
+feedDetailRailBtn?.addEventListener('click', closeMapDetailToRail);
 feedDetailHeaderClose?.addEventListener('click', closeSplitDetail);
 feedDetailMenuBtn?.addEventListener('click', (e) => {
   e.stopPropagation();
@@ -1895,6 +3007,10 @@ cardModalClose.addEventListener('click', closeCardModal);
 cardModalBackdrop.addEventListener('click', closeCardModal);
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    if (detailMapOverlayEl && !detailMapOverlayEl.hidden) {
+      closeDetailMapOverlay();
+      return;
+    }
     if (feedDetailMenuPanel && !feedDetailMenuPanel.hidden) {
       setFeedDetailMenuOpen(false);
       return;
@@ -1917,12 +3033,13 @@ const sitehead = document.querySelector('.sitehead');
 const onScroll = () => {
   const floatingVisible = window.scrollY > sitehead.offsetHeight - 48;
   const toolbarPanelOpen = isFeedToolbarPanelOpen();
+  const useFloatingNav = floatingVisible && isPhoneLayout();
   floatingbar.classList.toggle('is-visible', floatingVisible);
   if (!toolbarPanelOpen) {
-    feedControls?.classList.toggle('is-floating-nav', floatingVisible);
+    feedControls?.classList.toggle('is-floating-nav', useFloatingNav);
   }
-  if (!toolbarPanelOpen && floatingVisible !== onScroll.lastFloatingVisible) {
-    onScroll.lastFloatingVisible = floatingVisible;
+  if (!toolbarPanelOpen && useFloatingNav !== onScroll.lastFloatingVisible) {
+    onScroll.lastFloatingVisible = useFloatingNav;
     if (!mapView.classList.contains('is-hidden') && leafletMap) {
       settleMapLayout({ pan: false, animate: false });
     }
@@ -1940,6 +3057,7 @@ window.addEventListener('scroll', onScroll, { passive: true });
 window.addEventListener('resize', () => {
   if (detailScrollRoot) detailLoopHeight = measureDetailLoopHeight();
   syncMapLayoutOnly();
+  syncMapSheetPeekLayout();
 }, { passive: true });
 window.visualViewport?.addEventListener('resize', () => {
   if (shouldDeferMapLayoutSync()) return;
@@ -1979,6 +3097,15 @@ async function loadPhenomena() {
       return;
     }
     cachePhenomena(items);
+    checkTrackedUpdates(items);
+    items.sort((a, b) => {
+      const aCreated = new Date(a.createdAt || 0).getTime();
+      const bCreated = new Date(b.createdAt || 0).getTime();
+      if (bCreated !== aCreated) return bCreated - aCreated;
+      const aActive = new Date(a.lastSeenAt || a.lastNoticedAt || 0).getTime();
+      const bActive = new Date(b.lastSeenAt || b.lastNoticedAt || 0).getTime();
+      return bActive - aActive;
+    });
     const nodes = items.map(renderCard);
     gridFeed.replaceChildren(...nodes);
     cards = nodes;
@@ -1997,5 +3124,14 @@ loadWeather();
 await i18nReady;
 formatToday();
 syncFloatingLangOptions();
+document.addEventListener('fn:user-updated', () => {
+  remountOpenDetailForAuth();
+});
 await loadPhenomena();
-if (feedStage.classList.contains('is-map-view')) enterMapView();
+void syncTrackedFromServer();
+const deepLinkId = new URLSearchParams(location.search).get('phenomenon');
+if (deepLinkId) {
+  const card = cards.find((c) => c.dataset.id === deepLinkId);
+  if (card) openCardDetail(card);
+}
+updateDetailRailBtn();

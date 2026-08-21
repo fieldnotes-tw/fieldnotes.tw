@@ -1,0 +1,23 @@
+<header class="auth-page-head">
+  <a href="/" class="brand-mark" aria-label="<%= it.t('brand.name') %>"><span>最</span><span>近</span><span>左</span><span>營</span></a>
+  <div class="auth-nav" data-auth-nav></div>
+</header>
+
+<main class="auth-main auth-main--submit auth-main--profile">
+  <div class="submit-form member-page" id="memberPage">
+    <header class="submit-form__intro profile-intro member-intro">
+      <div class="member-intro__avatar" id="memberAvatar"></div>
+      <div class="member-intro__meta">
+        <h1 class="submit-form__title member-intro__name" id="memberName"></h1>
+        <p class="member-intro__bio" id="memberBio" hidden></p>
+      </div>
+    </header>
+
+    <section class="submit-form__section member-reports" id="memberReports" hidden>
+      <h2 class="submit-form__section-title" id="memberReportsTitle"><%= it.t('member.recentReports') %></h2>
+      <ul class="member-report-list" id="memberReportList"></ul>
+    </section>
+
+    <p class="submit-form__error" id="memberError" hidden></p>
+  </div>
+</main>

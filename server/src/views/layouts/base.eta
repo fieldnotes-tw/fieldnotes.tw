@@ -22,6 +22,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <% } %>
 <script src="/js/i18n.js"></script>
+<script src="/js/rich-text.js"></script>
 <script src="/js/auth.js"></script>
 <% for (const src of it.scripts) { %>
 <script src="<%= src %>"></script>

@@ -144,6 +144,9 @@ authRoutes.get('/confirm', async (c) => {
       id: users.id,
       email: users.email,
       role: users.role,
+      displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
+      bio: users.bio,
     });
 
   const publicUser = toPublicUser(updated);

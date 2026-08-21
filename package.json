@@ -9,6 +9,7 @@
     "prebuild": "npm run static:sync",
     "build": "npm run assets:build",
     "dev": "npm run static:sync && npm run seed:media-local && npm run dev:server",
+    "dev:mobile": "npm run static:sync && npm run seed:media-local && sh scripts/dev-mobile.sh",
     "dev:server": "npm --prefix server run dev",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
@@ -17,9 +18,15 @@
     "compose:logs": "docker compose logs -f api",
     "db:push": "npm --prefix server run db:push",
     "db:seed": "npm --prefix server run db:seed",
-    "db:reseed": "SEED_DEMO=1 SEED_RESET=1 npm --prefix server run db:seed"
+    "db:reseed": "SEED_DEMO=1 SEED_RESET=1 npm --prefix server run db:seed",
+    "db:promote-admin": "npm --prefix server run db:promote-admin",
+    "db:clear-sightings": "npm --prefix server run db:clear-sightings",
+    "db:transcode-videos": "npm --prefix server run db:transcode-videos"
   },
   "devDependencies": {
-    "vite": "^7.0.6"
+    "vite": "^5.4.21"
+  },
+  "engines": {
+    "node": ">=18.18.0"
   }
 }

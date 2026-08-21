@@ -160,7 +160,11 @@ function bindLangSwitchDoc() {
   if (langSwitchDocBound) return;
   langSwitchDocBound = true;
   document.addEventListener('click', (e) => {
-    if (e.target.closest('.lang-switch') || e.target.closest('.lang-switch__panel--sitehead')) return;
+    if (
+      e.target.closest('.lang-switch')
+      || e.target.closest('.lang-switch__panel--sitehead')
+      || e.target.closest('.lang-switch__panel--authhead')
+    ) return;
     closeAllLangPanels();
   });
   document.addEventListener('keydown', (e) => {
@@ -172,6 +176,7 @@ function renderLangSwitcher(container) {
   bindLangSwitchDoc();
 
   const siteheadWeather = container.closest('.sitehead__weather');
+  const authHead = container.closest('.auth-page-head');
   const wrap = document.createElement('div');
   wrap.className = 'lang-switch' + (siteheadWeather ? ' lang-switch--sitehead' : '');
 
@@ -185,7 +190,9 @@ function renderLangSwitcher(container) {
   btn.innerHTML = `<svg class="lang-switch__icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15.3 15.3 0 0 1 4 9 15.3 15.3 0 0 1-4 9 15.3 15.3 0 0 1-4-9 15.3 15.3 0 0 1 4-9z"/></svg>`;
 
   const panel = document.createElement('div');
-  panel.className = 'lang-switch__panel' + (siteheadWeather ? ' lang-switch__panel--sitehead' : '');
+  panel.className = 'lang-switch__panel'
+    + (siteheadWeather ? ' lang-switch__panel--sitehead' : '')
+    + (authHead ? ' lang-switch__panel--authhead' : '');
   panel.id = panelId;
   panel.hidden = true;
   panel.setAttribute('role', 'menu');
@@ -214,6 +221,7 @@ function renderLangSwitcher(container) {
   wrap.append(btn);
   container.appendChild(wrap);
   if (siteheadWeather) siteheadWeather.appendChild(panel);
+  else if (authHead) authHead.appendChild(panel);
   else wrap.append(panel);
 }
 

@@ -1,6 +1,7 @@
 const ZUOYING_CENTER = [22.688, 120.297];
 const NOMINATIM = 'https://nominatim.openstreetmap.org';
 const ZUOYING_VIEWBOX = '120.24,22.62,120.35,22.74'; // west,south,east,north
+const DESCRIPTION_MAX = 120;
 
 let map = null;
 let pin = null;
@@ -46,13 +47,34 @@ function setLocationLabel(label) {
   if (label) $('f_location').value = label;
 }
 
+const submitPinIcon = () => L.divIcon({
+  html: '<span class="map-pin map-pin--submit" aria-hidden="true"></span>',
+  className: 'map-pin-wrapper',
+  iconSize: [26, 34],
+  iconAnchor: [13, 34],
+});
+
+function syncMapPinState() {
+  const wrap = document.querySelector('.submit-form__map-wrap');
+  const hint = $('submitMapHint');
+  if (!wrap) return;
+  const hasPin = Boolean($('f_lat').value && $('f_lng').value);
+  wrap.classList.toggle('submit-form__map-wrap--unpinned', !hasPin);
+  if (hint) {
+    hint.textContent = t(hasPin ? 'submit.where.mapHintPlaced' : 'submit.where.mapHintEmpty');
+  }
+}
+
 function setPin(lat, lng, label) {
   $('f_lat').value = lat;
   $('f_lng').value = lng;
   if (label) setLocationLabel(label);
-  if (!map) return;
+  if (!map) {
+    syncMapPinState();
+    return;
+  }
   if (pin) pin.remove();
-  pin = L.marker([lat, lng], { draggable: true }).addTo(map);
+  pin = L.marker([lat, lng], { draggable: true, icon: submitPinIcon() }).addTo(map);
   pin.on('dragend', async () => {
     const { lat: pLat, lng: pLng } = pin.getLatLng();
     $('f_lat').value = pLat;
@@ -67,6 +89,7 @@ function setPin(lat, lng, label) {
     }
   });
   map.setView([lat, lng], Math.max(map.getZoom(), 16));
+  syncMapPinState();
 }
 
 function initMap() {
@@ -93,6 +116,7 @@ function initMap() {
     map.invalidateSize();
     setTimeout(() => map?.invalidateSize(), 200);
   });
+  syncMapPinState();
 }
 
 function renderSearchResults(items) {
@@ -154,15 +178,21 @@ function initSearch() {
 }
 
 function defaultSeenDate() {
-  const input = $('f_seenDate');
-  if (input.value) return;
-  const today = new Date();
-  input.value = today.toISOString().slice(0, 10);
+  setDefaultSeenDateTime($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'));
 }
 
-function showSuccess() {
+function showSuccess(phenomenonId) {
   $('submitForm').hidden = true;
   $('submitSuccess').hidden = false;
+  const viewLink = $('submitSuccessView');
+  if (viewLink) {
+    if (phenomenonId) {
+      viewLink.href = `/?phenomenon=${encodeURIComponent(phenomenonId)}`;
+      viewLink.hidden = false;
+    } else {
+      viewLink.hidden = true;
+    }
+  }
 }
 
 function syncStatusOther() {
@@ -226,6 +256,14 @@ function removePhoto(id) {
   renderPhotoList();
 }
 
+function syncSubmitState() {
+  const btn = $('submitBtn');
+  if (!btn || $('submitForm')?.hidden) return;
+  const uploading = photos.some((p) => p.uploading);
+  btn.disabled = uploading;
+  btn.setAttribute('aria-busy', uploading ? 'true' : 'false');
+}
+
 function renderPhotoList() {
   const list = $('photoList');
   list.replaceChildren();
@@ -233,6 +271,7 @@ function renderPhotoList() {
   photos.forEach((photo, index) => {
     const li = document.createElement('li');
     li.className = 'submit-form__photo-item';
+    if (photo.uploading) li.classList.add('is-uploading');
     li.dataset.id = photo.id;
 
     const handle = document.createElement('span');
@@ -257,12 +296,8 @@ function renderPhotoList() {
       frame.appendChild(cover);
     }
 
-    const img = document.createElement('img');
-    img.className = 'submit-form__photo-img';
-    img.src = photoSrc(photo);
-    img.alt = '';
-    img.draggable = false;
-    frame.appendChild(img);
+    appendUploadPreview(frame, photo);
+    bindUploadPreviewLightbox(frame, photo, photos, index);
 
     const remove = document.createElement('button');
     remove.type = 'button';
@@ -348,41 +383,28 @@ function renderPhotoList() {
 
   list.hidden = photos.length === 0;
   $('photoDragHint').hidden = photos.length < 2;
+  syncSubmitState();
 }
 
 async function uploadImageFile(file) {
-  const { data } = await api('/api/submissions/uploads', {
-    method: 'POST',
-    body: JSON.stringify({ contentType: file.type || 'image/jpeg' }),
-  });
-
-  const put = await fetch(data.uploadUrl, {
-    method: 'PUT',
-    credentials: 'include',
-    headers: { 'content-type': data.contentType },
-    body: file,
-  });
-  if (!put.ok) {
-    throw new Error(t('submit.error.uploadFailed'));
-  }
-
-  return data.publicPath;
+  return uploadMediaFile(file);
 }
 
 async function addPhotoFile(file) {
   const photo = {
-    id: crypto.randomUUID(),
+    id: randomId(),
     url: '',
     localUrl: URL.createObjectURL(file),
     uploading: true,
+    isVideo: isVideoUploadFile(file),
   };
   photos.push(photo);
   renderPhotoList();
 
   try {
     photo.url = await uploadImageFile(file);
-    revokePhotoPreview(photo);
     photo.uploading = false;
+    if (!photo.isVideo) revokePhotoPreview(photo);
     renderPhotoList();
   } catch (err) {
     removePhoto(photo.id);
@@ -391,7 +413,7 @@ async function addPhotoFile(file) {
 }
 
 async function handleImagePick(fileList) {
-  const files = Array.from(fileList || []).filter((file) => file.type.startsWith('image/'));
+  const files = Array.from(fileList || []).filter(isUploadMediaFile);
   if (!files.length) return;
 
   setImageStatus(t('submit.photo.uploading'));
@@ -415,10 +437,29 @@ function initPhotoUpload() {
   renderPhotoList();
 }
 
+function syncRichPreviews() {
+  $('f_extra')?.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function setSubmitFormTitle(key) {
+  const title = $('submitPageTitle');
+  if (title) title.textContent = t(key);
+}
+
+function setSubmitPrimaryLabel(key) {
+  const btn = $('submitBtn');
+  if (btn) btn.textContent = t(key);
+}
+
 function resetForm() {
+  editId = '';
   $('submitForm').reset();
   $('submitForm').hidden = false;
   $('submitSuccess').hidden = true;
+  const viewLink = $('submitSuccessView');
+  if (viewLink) viewLink.hidden = true;
+  setSubmitFormTitle('submit.title');
+  setSubmitPrimaryLabel('submit.send');
   setError('');
   syncStatusOther();
   clearPhotos();
@@ -429,10 +470,34 @@ function resetForm() {
   $('f_lat').value = '';
   $('f_lng').value = '';
   defaultSeenDate();
+  syncRichPreviews();
   map?.setView(ZUOYING_CENTER, 14);
+  syncMapPinState();
+}
+
+function initDescriptionCounter() {
+  const field = $('f_description');
+  const counter = $('descriptionCounter');
+  if (!field || !counter) return;
+  const sync = () => {
+    const count = field.value.length;
+    counter.textContent = t('submit.description.counter', { count, max: DESCRIPTION_MAX });
+    counter.classList.toggle('is-over', count > DESCRIPTION_MAX);
+  };
+  field.addEventListener('input', sync);
+  sync();
 }
 
 function validateForm() {
+  if (!$('f_title').value.trim()) {
+    return t('submit.error.noTitle');
+  }
+  if (!$('f_description').value.trim()) {
+    return t('submit.error.noDescription');
+  }
+  if (!combineSeenDateTime($('f_seenDate').value, $('f_seenHour').value, $('f_seenMinute').value)) {
+    return t('submit.error.noSeenDate');
+  }
   if (!$('f_lat').value || !$('f_lng').value) {
     return t('submit.error.noLocation');
   }
@@ -445,6 +510,12 @@ function validateForm() {
   }
   if (photos.some((p) => p.uploading)) {
     return t('submit.error.uploadInProgress');
+  }
+  if (photos.some((p) => !p.url)) {
+    return t('submit.error.uploadFailed');
+  }
+  if ($('f_description').value.trim().length > DESCRIPTION_MAX) {
+    return t('submit.error.descriptionTooLong');
   }
   return '';
 }
@@ -468,47 +539,130 @@ async function handleSubmit(e) {
     title: $('f_title').value.trim(),
     description: $('f_description').value.trim(),
     extra: $('f_extra').value.trim(),
+    findingHint: $('f_finding').value.trim(),
     status: status === 'other' ? 'other' : status,
     statusLabel: status === 'other' ? $('f_statusOther').value.trim() : undefined,
     location: $('f_location').value.trim(),
     lat: Number($('f_lat').value),
     lng: Number($('f_lng').value),
-    seenAt: $('f_seenDate').value,
+    seenAt: seenDateTimeIso($('f_seenDate'), $('f_seenHour'), $('f_seenMinute')),
     imageUrls: photos.map((p) => p.url).filter(Boolean),
   };
 
   try {
-    // Review queue API coming soon — for now acknowledge locally.
-    await new Promise((r) => setTimeout(r, 400));
-    console.info('[submit] draft payload', payload);
-    showSuccess();
+    let phenomenonId = editId || '';
+    if (editId) {
+      await api(`/api/submissions/phenomena/${editId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          title: payload.title,
+          description: payload.description,
+          notes: payload.extra || undefined,
+          findingHint: payload.findingHint || undefined,
+          status: payload.status === 'other' ? 'active' : payload.status,
+          location: payload.location,
+          lat: payload.lat,
+          lng: payload.lng,
+          imageUrls: payload.imageUrls,
+          lastNoticedAt: payload.seenAt,
+        }),
+      });
+    } else {
+      const result = await api('/api/submissions', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...payload,
+          extra: payload.extra || undefined,
+          findingHint: payload.findingHint || undefined,
+          status: payload.status === 'other' ? 'active' : payload.status,
+        }),
+      });
+      phenomenonId = result?.data?.id || '';
+    }
+    showSuccess(phenomenonId);
   } catch (submitErr) {
     setError(submitErr.message || t('submit.error.failed'));
-  } finally {
-    btn.disabled = false;
+    syncSubmitState();
   }
+}
+
+let editId = '';
+
+async function loadEditPhenomenon(id) {
+  const { data } = await api(`/api/submissions/phenomena/${id}`);
+  editId = id;
+  $('f_title').value = data.title;
+  $('f_description').value = data.description;
+  $('f_extra').value = data.notes || '';
+  $('f_finding').value = data.findingHint || '';
+  $('f_location').value = data.location || '';
+  if (data.lat != null && data.lng != null) setPin(data.lat, data.lng);
+  if (data.status) {
+    const radio = document.querySelector(`input[name="status"][value="${data.status}"]`);
+    if (radio) radio.checked = true;
+  }
+  if (data.lastNoticedAt) {
+    setSeenDateTimeInputs($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'), data.lastNoticedAt);
+  }
+  syncStatusOther();
+  clearPhotos();
+  const urls = Array.isArray(data.imageUrls) && data.imageUrls.length
+    ? data.imageUrls
+    : data.imageUrl
+      ? [data.imageUrl]
+      : [];
+  for (const url of urls) {
+    photos.push({ id: randomId(), url, localUrl: '', uploading: false });
+  }
+  renderPhotoList();
+  setSubmitFormTitle('submit.editTitle');
+  setSubmitPrimaryLabel('submit.save');
+  syncRichPreviews();
 }
 
 async function boot() {
   await i18nReady;
 
+  try {
+    await refreshCurrentUser();
+  } catch {
+    // Keep cached session if /me is unreachable.
+  }
+
   if (!getCurrentUser()) {
-    location.href = '/login';
+    const next = encodeURIComponent(`${location.pathname}${location.search}`);
+    location.href = `/login?next=${next}`;
     return;
   }
 
   if (typeof L === 'undefined') {
     setError(t('submit.error.mapLoad'));
-    return;
+  } else {
+    initMap();
   }
-
-  initMap();
   initSearch();
   initStatusOther();
   initPhotoUpload();
   defaultSeenDate();
+  mountRichField($('f_extra'), $('extraPreview'));
+  initDescriptionCounter();
   $('submitForm').addEventListener('submit', handleSubmit);
   $('submitAgain').addEventListener('click', resetForm);
+
+  const params = new URLSearchParams(location.search);
+  const editParam = params.get('edit');
+  if (editParam) {
+    try {
+      await loadEditPhenomenon(editParam);
+    } catch (err) {
+      if (err.status === 403) {
+        setError(t('submit.error.forbidden'));
+        history.replaceState(null, '', '/submit');
+        return;
+      }
+      setError(err.message || t('submit.error.failed'));
+    }
+  }
 }
 
 boot();

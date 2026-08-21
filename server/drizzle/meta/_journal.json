@@ -36,6 +36,20 @@
       "when": 1786446000000,
       "tag": "0004_sightings",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786447000000,
+      "tag": "0005_user_profile_ownership",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786448000000,
+      "tag": "0006_phenomenon_images_finding",
+      "breakpoints": true
     }
   ]
 }

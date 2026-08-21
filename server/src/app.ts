@@ -4,13 +4,17 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { publicRoot } from './lib/assets.js';
+import { servePhenomenonMedia } from './lib/serve-media.js';
 import { localeOf, t } from './lib/i18n.js';
 import { withLocale, type LocaleEnv } from './middleware/locale.js';
 import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from './routes/auth.js';
 import { health } from './routes/health.js';
+import { meRoutes } from './routes/me.js';
 import { pageRoutes } from './routes/pages.js';
+import { sightingRoutes } from './routes/sightings.js';
 import { submissionRoutes } from './routes/submissions.js';
+import { memberRoutes } from './routes/members.js';
 import { phenomenaRoutes } from './routes/phenomena.js';
 
 export function createApp() {
@@ -56,15 +60,19 @@ export function createApp() {
   app.use('/fonts/*', longCache);
   app.use('/fonts/*', serveStatic({ root: staticRoot }));
   app.use('/locales/*', serveStatic({ root: staticRoot }));
+  app.get('/media/phenomena/:filename', servePhenomenonMedia);
   // Local/dev seed + upload photos (staging/prod serve /media/* from S3 via CloudFront).
   app.use('/media/*', serveStatic({ root: staticRoot }));
   app.use('/images/*', serveStatic({ root: staticRoot }));
 
   app.route('/api/health', health);
   app.route('/api/auth', authRoutes);
+  app.route('/api/me', meRoutes);
   app.route('/api/admin', adminRoutes);
   app.route('/api/submissions', submissionRoutes);
+  app.route('/api/sightings', sightingRoutes);
   app.route('/api/phenomena', phenomenaRoutes);
+  app.route('/api/members', memberRoutes);
   app.route('/', pageRoutes);
 
   app.notFound((c) => {

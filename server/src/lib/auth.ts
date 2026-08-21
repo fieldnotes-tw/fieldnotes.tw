@@ -15,12 +15,18 @@ export type SessionUser = {
   id: string;
   email: string;
   role: UserRole;
+  displayName: string | null;
+  avatarUrl: string | null;
+  bio: string | null;
 };
 
 type JwtPayload = {
   sub: string;
   email: string;
   role: UserRole;
+  displayName: string | null;
+  avatarUrl: string | null;
+  bio: string | null;
   exp: number;
 };
 
@@ -36,11 +42,14 @@ export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-export function toPublicUser(user: Pick<User, 'id' | 'email' | 'role'>): SessionUser {
+export function toPublicUser(user: Pick<User, 'id' | 'email' | 'role' | 'displayName' | 'avatarUrl' | 'bio'>): SessionUser {
   return {
     id: user.id,
     email: user.email,
     role: user.role,
+    displayName: user.displayName ?? null,
+    avatarUrl: user.avatarUrl ?? null,
+    bio: user.bio ?? null,
   };
 }
 
@@ -72,6 +81,9 @@ export async function createSessionToken(user: SessionUser) {
       sub: user.id,
       email: user.email,
       role: user.role,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+      bio: user.bio,
       exp: now + 60 * 60 * 24 * 14,
     } satisfies JwtPayload,
     jwtSecret(),
@@ -106,6 +118,9 @@ export async function readSessionUser(c: Context): Promise<SessionUser | null> {
         id: users.id,
         email: users.email,
         role: users.role,
+        displayName: users.displayName,
+        avatarUrl: users.avatarUrl,
+        bio: users.bio,
         emailVerifiedAt: users.emailVerifiedAt,
       })
       .from(users)

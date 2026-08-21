@@ -55,7 +55,7 @@
 
 <section class="section" id="phenomena">
   <div class="feed-shell" id="feedShell">
-    <div class="feed-stage is-map-view" id="feedStage">
+    <div class="feed-stage" id="feedStage">
       <aside class="feed-layout__detail" id="feedDetailPane" aria-hidden="true">
         <header class="feed-detail__header" id="feedDetailHeader">
           <div class="feed-detail__header-row">
@@ -71,8 +71,13 @@
             <div class="feed-detail__menu-list" id="feedDetailMenuList" role="listbox" aria-label="<%= it.t('home.detail.itemMenu') %>"></div>
           </div>
         </header>
-        <button type="button" class="feed-detail__close" id="feedDetailClose" aria-label="<%= it.t('home.close') %>">
-          <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <button type="button" class="feed-detail__rail-btn" id="feedDetailRailBtn" aria-label="<%= it.t('home.detail.backToRail') %>" hidden>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M8 6h12M8 12h12M8 18h12"/>
+            <circle cx="4" cy="6" r="1" fill="currentColor" stroke="none"/>
+            <circle cx="4" cy="12" r="1" fill="currentColor" stroke="none"/>
+            <circle cx="4" cy="18" r="1" fill="currentColor" stroke="none"/>
+          </svg>
         </button>
         <div class="feed-detail__body" id="feedDetailBody"></div>
       </aside>
@@ -91,12 +96,12 @@
                   </svg>
                 </button>
                 <div class="view-toggle" role="group" aria-label="<%= it.t('home.viewToggle') %>">
-                  <button type="button" class="view-toggle__btn" data-view="list">
-                    <svg class="view-toggle__icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
+                  <button type="button" class="view-toggle__btn is-active" data-view="list">
+                    <svg class="view-toggle__icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
                     <span><%= it.t('home.view.cards') %></span>
                   </button>
-                  <button type="button" class="view-toggle__btn is-active" data-view="map">
-                    <svg class="view-toggle__icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>
+                  <button type="button" class="view-toggle__btn" data-view="map">
+                    <svg class="view-toggle__icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>
                     <span><%= it.t('home.view.map') %></span>
                   </button>
                 </div>
@@ -116,18 +121,18 @@
                 <circle cx="16" cy="19" r="2"/>
               </svg>
             </button>
-          </div>
-          <div class="feed-toolbar__filter-panel" id="feedFilterPanel" hidden>
-            <div class="feed-toolbar__filter-menu" role="group" aria-label="<%= it.t('nav.categories') %>">
-              <label class="cat-toggle check-item" data-cat="plant"><span class="check-item__box"></span><span><%= it.t('category.plant') %></span></label>
-              <label class="cat-toggle check-item" data-cat="animal"><span class="check-item__box"></span><span><%= it.t('category.animal') %></span></label>
-              <label class="cat-toggle check-item" data-cat="sky"><span class="check-item__box"></span><span><%= it.t('category.sky') %></span></label>
-              <label class="cat-toggle check-item" data-cat="taste"><span class="check-item__box"></span><span><%= it.t('category.taste') %></span></label>
-              <label class="cat-toggle check-item" data-cat="workshop"><span class="check-item__box"></span><span><%= it.t('category.workshop') %></span></label>
+            <div class="feed-toolbar__filter-panel" id="feedFilterPanel" hidden>
+              <div class="feed-toolbar__filter-menu" role="group" aria-label="<%= it.t('nav.categories') %>">
+                <label class="cat-toggle check-item" data-cat="plant"><span class="check-item__box"></span><span><%= it.t('category.plant') %></span></label>
+                <label class="cat-toggle check-item" data-cat="animal"><span class="check-item__box"></span><span><%= it.t('category.animal') %></span></label>
+                <label class="cat-toggle check-item" data-cat="sky"><span class="check-item__box"></span><span><%= it.t('category.sky') %></span></label>
+                <label class="cat-toggle check-item" data-cat="taste"><span class="check-item__box"></span><span><%= it.t('category.taste') %></span></label>
+                <label class="cat-toggle check-item" data-cat="workshop"><span class="check-item__box"></span><span><%= it.t('category.workshop') %></span></label>
+              </div>
             </div>
           </div>
         </div>
-        <div class="feed-layout-host is-hidden" id="feedLayoutHost">
+        <div class="feed-layout-host" id="feedLayoutHost">
           <div class="feed-layout" id="feedLayout">
             <div class="feed-layout__list">
               <div class="grid-feed" id="gridFeed" aria-live="polite"></div>
@@ -135,18 +140,24 @@
           </div>
         </div>
 
-        <div class="map-view" id="mapView">
+        <div class="map-view is-hidden" id="mapView">
           <div class="map-frame" id="mapFrame">
             <div class="map-view__canvas" id="mapCanvas"></div>
           </div>
         </div>
       </div>
       <div class="map-sheet" id="mapSheet">
+        <header class="map-sheet__header" id="mapSheetHeader" hidden>
+          <button type="button" class="map-sheet__back" id="mapSheetBack" aria-label="<%= it.t('home.detail.backToList') %>">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M14 6 L8 12 L14 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+            <span id="mapSheetBackLabel"><%= it.t('home.detail.back') %></span>
+          </button>
+        </header>
         <button type="button" class="map-sheet__handle" id="mapSheetHandle" aria-label="<%= it.t('home.expandPanel') %>">
           <span class="map-sheet__handle-bar" aria-hidden="true"></span>
         </button>
         <button type="button" class="map-sheet__close" id="mapSheetClose" aria-label="<%= it.t('home.close') %>">
-          <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
         </button>
         <div class="map-sheet__body" id="mapSheetBody"></div>
         <div class="map-sheet__peek-footer" id="mapSheetPeekNav" hidden aria-hidden="true">
@@ -162,13 +173,12 @@
   <div class="card-modal__backdrop" id="cardModalBackdrop"></div>
   <div class="card-modal__panel" id="cardModalPanel">
     <button type="button" class="card-modal__close" id="cardModalClose" aria-label="<%= it.t('home.close') %>">
-      <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
     </button>
     <div class="card-modal__body" id="cardModalBody"></div>
   </div>
 </div>
 
-<%~ include('partials/contributors', it) %>
 
 <footer id="about">
   <div class="about__block">

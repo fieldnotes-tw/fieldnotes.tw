@@ -1,0 +1,56 @@
+<header class="auth-page-head">
+  <a href="/" class="brand-mark" aria-label="<%= it.t('brand.name') %>"><span>最</span><span>近</span><span>左</span><span>營</span></a>
+  <div class="auth-nav" data-auth-nav></div>
+</header>
+
+<main class="auth-main auth-main--submit">
+  <form class="submit-form sighting-form" id="sightingForm" novalidate>
+    <header class="submit-form__intro">
+      <h1 class="submit-form__title" id="sightingTitle"><%= it.t('sighting.form.title') %></h1>
+      <p class="submit-form__context" id="sightingContext" hidden></p>
+    </header>
+
+    <section class="submit-form__section" aria-labelledby="sightingPhoto">
+      <h2 class="submit-form__section-title" id="sightingPhoto"><%= it.t('sighting.form.photo') %></h2>
+      <div class="submit-form__photo">
+        <ul class="submit-form__photo-list" id="photoList" aria-live="polite"></ul>
+        <label class="submit-form__photo-upload">
+          <input type="file" id="f_image" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" multiple hidden>
+          <span class="submit-form__photo-btn"><%= it.t('submit.photo.upload') %></span>
+        </label>
+        <p class="submit-form__photo-status" id="imageStatus" hidden></p>
+      </div>
+    </section>
+
+    <section class="submit-form__section" aria-labelledby="sightingWhen">
+      <h2 class="submit-form__section-title" id="sightingWhen"><%= it.t('sighting.form.when') %></h2>
+      <label class="submit-form__option">
+        <input type="checkbox" id="f_commentOnly">
+        <span><%= it.t('sighting.form.commentOnly') %></span>
+      </label>
+      <div class="submit-form__when-fields" id="sightingWhenFields">
+        <%~ include('partials/datetime-fields', it) %>
+      </div>
+    </section>
+
+    <section class="submit-form__section" aria-labelledby="sightingNote">
+      <h2 class="submit-form__section-title" id="sightingNote"><%= it.t('sighting.form.note') %></h2>
+      <label class="submit-form__field">
+        <span class="visually-hidden"><%= it.t('sighting.form.note') %></span>
+        <textarea id="f_note" rows="4" maxlength="2000"></textarea>
+      </label>
+    </section>
+
+    <p class="submit-form__error" id="sightingError" hidden></p>
+    <div class="submit-form__actions">
+      <button type="submit" class="submit-form__submit" id="sightingBtn"><%= it.t('sighting.form.send') %></button>
+      <button type="button" class="submit-form__delete" id="sightingDeleteBtn" hidden><%= it.t('sighting.form.delete') %></button>
+    </div>
+  </form>
+
+  <div class="submit-form__success" id="sightingSuccess" hidden>
+    <h1 class="submit-form__title"><%= it.t('sighting.form.successTitle') %></h1>
+    <p class="submit-form__lede"><%= it.t('sighting.form.successBody') %></p>
+    <a href="/" class="submit-form__success-link" id="sightingSuccessLink"><%= it.t('sighting.form.back') %></a>
+  </div>
+</main>
