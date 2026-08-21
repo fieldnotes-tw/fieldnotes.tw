@@ -101,18 +101,18 @@ This creates the hosted zone, ACM cert (pending validation), ACM DNS records, DM
 
 Do **not** replace `ns57/58.domaincontrol.com` yet.
 
-At GoDaddy DNS, add four **NS** records, host `staging`, values = the four `name_servers` from the job summary. Also add the ACM validation CNAMEs for `fieldnotes.tw` and `www.fieldnotes.tw` (those names are still served by GoDaddy).
+At GoDaddy DNS, add four **NS** records, host `staging`, values = the four `name_servers` from the job summary. Do **not** add ACM validation CNAMEs at GoDaddy — the UI rejects leading-underscore CNAME names. The cert is `staging.fieldnotes.tw` only until apex nameservers move here.
 
-Full-domain NS cutover is later: replace GoDaddy nameservers with the same four Route 53 nameservers only after the zone already has the GitHub Pages apex/`www` records (default `legacy_github_pages = true`).
+Full-domain NS cutover is later: replace GoDaddy nameservers with the same four Route 53 nameservers only after the zone already has the GitHub Pages apex/`www` records (default `legacy_github_pages = true`). Then expand `acm_domain_name` / `certificate_sans` to cover apex and `www`.
 
 ### 3. Wait for ACM
 
-After the GoDaddy records have propagated, re-run **Deploy DNS** with `wait_for_acm_validation` enabled. Job summary ACM status should be `ISSUED`.
+After staging NS has propagated, re-run **Deploy DNS** with `wait_for_acm_validation` enabled. Job summary ACM status should be `ISSUED`.
 
 ### 4. Attach custom domains to CloudFront
 
 1. Staging: set GitHub Environment variable `USE_CUSTOM_DOMAIN=true` (or local `TF_VAR_use_custom_domain=true`) and redeploy / `terraform apply`. This adds `staging.fieldnotes.tw` aliases + Route 53 records and updates `app_base_url` / CORS.
-2. Production: set `USE_CUSTOM_DOMAIN=true` first so CloudFront picks up `fieldnotes.tw` + `www` and the cert (DNS can still point at GitHub Pages).
+2. Production: only after the ACM cert includes `fieldnotes.tw` and `www` (after apex NS cutover). Then set `USE_CUSTOM_DOMAIN=true` so CloudFront picks up those aliases and the cert.
 3. Cut apex/`www` to CloudFront:
    - In `infra/dns` set `legacy_github_pages = false` and apply (removes GH Pages records).
    - Set production `CREATE_DNS_RECORDS=true` and apply (creates A/AAAA aliases to CloudFront).

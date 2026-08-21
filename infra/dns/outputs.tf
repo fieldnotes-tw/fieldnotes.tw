@@ -12,7 +12,7 @@ output "name_servers" {
 }
 
 output "acm_certificate_arn" {
-  description = "Shared us-east-1 cert for CloudFront. Issued only after NS delegation (or wait_for_acm_validation=true)."
+  description = "us-east-1 cert for CloudFront (currently staging.fieldnotes.tw only until apex NS cutover)."
   value       = aws_acm_certificate.site.arn
 }
 
