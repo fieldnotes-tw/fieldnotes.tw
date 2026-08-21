@@ -31,7 +31,7 @@ variable "ses_dkim_tokens" {
 variable "legacy_github_pages" {
   type        = bool
   description = "Keep apex/www pointing at GitHub Pages until CloudFront cutover. Set false before production creates Route 53 aliases."
-  default     = true
+  default     = false
 }
 
 variable "github_pages_ipv4" {

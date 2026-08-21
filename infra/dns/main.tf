@@ -51,6 +51,17 @@ resource "aws_route53_record" "dmarc" {
   records = ["v=DMARC1; p=quarantine; adkim=r; aspf=r; rua=${var.dmarc_rua}"]
 }
 
+resource "aws_route53_record" "caa" {
+  zone_id = aws_route53_zone.this.zone_id
+  name    = var.domain_name
+  type    = "CAA"
+  ttl     = 300
+  records = [
+    "0 issue \"amazon.com\"",
+    "0 issuewild \"amazon.com\"",
+  ]
+}
+
 resource "aws_route53_record" "ses_dkim" {
   for_each = toset(var.ses_dkim_tokens)
 
@@ -78,9 +89,9 @@ resource "aws_route53_record" "www_github_pages" {
 
   zone_id = aws_route53_zone.this.zone_id
   name    = "www.${var.domain_name}"
-  type    = "CNAME"
+  type    = "A"
   ttl     = 300
-  records = [var.github_pages_cname]
+  records = var.github_pages_ipv4
 }
 
 # Full CloudFront cert (apex + www + staging). Kept separate from the staging-only
