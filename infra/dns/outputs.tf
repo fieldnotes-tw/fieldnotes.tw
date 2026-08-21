@@ -12,12 +12,12 @@ output "name_servers" {
 }
 
 output "acm_certificate_arn" {
-  description = "Cert attached to CloudFront. Staging-only until cdn cert is ISSUED and stacks are switched."
-  value       = aws_acm_certificate.site.arn
+  description = "us-east-1 CloudFront certificate covering apex, www, and staging"
+  value       = aws_acm_certificate.cdn.arn
 }
 
 output "acm_certificate_status" {
-  value = aws_acm_certificate.site.status
+  value = aws_acm_certificate.cdn.status
 }
 
 output "cdn_acm_certificate_arn" {
