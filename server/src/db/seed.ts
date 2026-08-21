@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { eq, or, sql } from 'drizzle-orm';
 import { db } from './index.js';
 import { phenomena, sightingImages, sightings, users } from './schema.js';
 import { hashPassword } from '../lib/auth.js';
@@ -6,18 +6,59 @@ import { hashPassword } from '../lib/auth.js';
 const seedData = [
   {
     status: 'active' as const,
+    category: 'plant' as const,
+    title: '來找羅漢松的「小羅漢」，會慢慢變紅哦',
+    description: '雌株的種子正慢慢成熟，可以找找看可愛的「小羅漢」。',
+    location: '凹子底公園旁 · 迷路小章魚左前方',
+    notes: `你可曾留意過豪宅門前總少不了什麼植栽？俗諺說：「家有羅漢松，一世不會窮。」是的，就是終年長青的羅漢松。
+
+目前已過了羅漢松的盛花期，雄株的毬花多半已經枯萎掉落，而雌株的種子正慢慢成熟中。這時候可以特別找找看它可愛的「小羅漢」。
+
+🔎 為什麼叫羅漢松？
+仔細看看它的種子，圓圓的種子長在膨大的紅色種托上，看起來就像一個頂著圓形光頭、披著紅色袈裟的羅漢佛像，十分可愛，因此有了「羅漢松」這個名字。
+
+🔎 紅色的是果實嗎？
+圓圓的頭可不是果實喔！羅漢松屬於裸子植物，還沒演化出果皮將種子包裹住。種子下方的種托成熟時會慢慢變成紅色，就像羅漢披著紅色袈裟的身體。
+
+🔎 羅漢松也有公母
+羅漢松是雌雄異株，也就是有公樹、母樹之別。雄株的毬花 3～5 朵叢生在葉腋，看起來有點像小毛毛蟲，成熟時會釋放出花粉。現在盛花期已過，雄株的毬花多半已經枯萎掉落；雌株的種子則正慢慢成熟。
+
+🔎 下次也觀察看看
+我曾經特別檢視過豪宅門前種植的羅漢松，發現大多是雄株。你知道為什麼嗎？下次經過羅漢松時，也可以試著找找看：眼前這棵究竟是公樹，還是母樹？`,
+    lat: 22.6601,
+    lng: 120.2992,
+    imageUrl: '/media/phenomena/podocarpus.jpg',
+    imageAlt: '凹子底公園旁、迷路小章魚左前方的羅漢松',
+    observerName: '陳恩',
+    metaLabel: '最近一次注意到 · 2 小時前',
+    lastNoticedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+    createdAt: new Date(),
+  },
+  {
+    status: 'active' as const,
     category: 'animal' as const,
     title: '紅冠水雞生寶寶了',
     description: '蓮池潭龍虎塔旁，紅冠水雞生小寶寶了。',
     location: '蓮池潭龍虎塔旁',
-    notes: '親鳥護幼中，請保持距離，不要驚擾。',
+    findingHint: '從龍虎塔步道往水塘方向走，留意蘆葦叢邊緣與睡蓮葉之間。',
+    notes: `蓮池潭龍虎塔旁的水塘裡，最近常看到紅冠水雞帶著幼鳥覓食。
+
+🔎 怎麼認？
+頭頂有鮮紅的冠，嘴尖黃色，身體烏黑；幼鳥顏色較淡、還沒有紅冠。
+
+🔎 在哪裡看？
+龍虎塔東側水岸、步道旁蘆葦叢附近最容易看到。清晨和傍晚活動較頻繁。
+
+⚠️ 請保持距離
+親鳥正在護幼，請勿靠近或使用閃光燈，以免驚擾。`,
     lat: 22.6907,
     lng: 120.2951,
     imageUrl: '/media/phenomena/moorhen-chick.jpg',
     imageAlt: '紅冠水雞成鳥帶著幼鳥在水面覓食',
-    observerName: '阿明',
-    metaLabel: '最近一次注意到 · 1 天前',
-    lastNoticedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    observerName: 'Chao',
+    metaLabel: '最近一次注意到 · 5 小時前',
+    lastNoticedAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
+    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
   },
   {
     status: 'active' as const,
@@ -32,21 +73,7 @@ const seedData = [
     imageAlt: '棋盤腳的花與果實，長長的花絲垂在葉叢間',
     observerName: '小華',
     metaLabel: '開花時間 · 18:00–19:00',
-  },
-  {
-    status: 'active' as const,
-    category: 'plant' as const,
-    title: '蓮霧、龍眼結果了',
-    description: '見城之道旁的蓮霧樹跟龍眼樹在結果。',
-    location: '見城之道（東門段）',
-    notes: '為住家與店家庭院果樹，請只賞不採。',
-    lat: 22.6828,
-    lng: 120.2995,
-    imageUrl: '/media/phenomena/longan.jpg',
-    imageAlt: '龍眼樹枝頭結實累累',
-    observerName: '阿珠',
-    metaLabel: '最近一次注意到 · 3 天前',
-    lastNoticedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
   },
   {
     status: 'active' as const,
@@ -61,35 +88,7 @@ const seedData = [
     imageAlt: '三顆黑色菱角平放在白色桌面上',
     observerName: '陳老闆',
     metaLabel: '上市時間 · 這幾天',
-  },
-  {
-    status: 'active' as const,
-    category: 'taste' as const,
-    title: '芒果糯米飯開賣',
-    description: '大城老船麵的芒果糯米飯開賣了。',
-    location: '大城老船麵（大路）',
-    notes: '每日限量，售完即止。',
-    lat: 22.6865,
-    lng: 120.3045,
-    imageUrl: '/media/phenomena/mango-sticky-rice.jpg',
-    imageAlt: '芒果切片鋪在椰奶糯米飯上',
-    observerName: '阿吉',
-    metaLabel: '販售時間 · 每日限量',
-  },
-  {
-    status: 'active' as const,
-    category: 'plant' as const,
-    title: '九重葛盛開',
-    description: '果貿社區幾條巷子的九重葛開得正盛，牆面幾乎染成一片桃紅。',
-    location: '果貿社區',
-    notes: '花期估計還可持續兩週左右。',
-    lat: 22.6968,
-    lng: 120.2975,
-    imageUrl: '/media/phenomena/bougainvillea.jpg',
-    imageAlt: '盛開的桃紅色九重葛花叢',
-    observerName: '里長伯',
-    metaLabel: '最近一次注意到 · 5 小時前',
-    lastNoticedAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
+    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
   },
 ];
 
@@ -157,60 +156,84 @@ const sightingSeedByTitle: Record<string, {
     imageAlt?: string;
   }[];
 }> = {
-  '棋盤腳進入花季': {
-    sightings: [
-      {
-        observerName: 'Chao',
-        seenAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-        condition: 'abundant',
-        note: '現在花量很多，六點半左右開始開。',
-        imageUrl: '/media/phenomena/qipan-jiao.jpg',
-        imageAlt: '棋盤腳的花與果實',
-      },
-      {
-        observerName: '陳恩',
-        seenAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
-        condition: 'abundant',
-        note: '靠水邊的幾棵已經開始了，大概六點左右陸續綻放。',
-        imageUrl: '/media/phenomena/qipan-jiao.jpg',
-      },
-      {
-        observerName: '美妃',
-        seenAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
-        note: '看到今年第一批花苞出現了。',
-        imageUrl: '/media/phenomena/qipan-jiao.jpg',
-      },
-    ],
-  },
   '紅冠水雞生寶寶了': {
     sightings: [
       {
-        observerName: '阿明',
-        seenAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-        condition: 'abundant',
-        note: '幼鳥還跟在成鳥旁邊，請保持距離。',
-        imageUrl: '/media/phenomena/moorhen-chick.jpg',
-      },
-      {
-        observerName: '金蓮',
-        seenAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-        note: '龍虎塔旁水雞家族活動中。',
-        imageUrl: '/media/phenomena/moorhen-chick.jpg',
-      },
-    ],
-  },
-  '九重葛盛開': {
-    sightings: [
-      {
-        observerName: '里長伯',
+        observerName: 'Chao',
         seenAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
         condition: 'abundant',
-        note: '果貿社區幾條巷子都開得很滿。',
-        imageUrl: '/media/phenomena/bougainvillea.jpg',
+        note: '大概六點，龍虎塔東邊水岸，三隻小的跟成鳥在找吃的，會鑽蘆葦。聽說是亞成鳥幫忙帶？有人看過嗎',
+        imageUrl: '/media/phenomena/moorhen-chick.jpg',
       },
     ],
   },
 };
+
+async function resolveChaoUserId() {
+  const email = process.env.DEMO_MEMBER_EMAIL?.trim().toLowerCase();
+  if (email) {
+    const [row] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+    if (row) return row.id;
+  }
+  const [byName] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(sql`lower(${users.displayName}) = 'chao'`)
+    .limit(1);
+  return byName?.id ?? null;
+}
+
+async function linkChaoMemberContent() {
+  const userId = await resolveChaoUserId();
+  if (!userId) {
+    console.log('No Chao member account found; demo sightings stay name-only. Set DEMO_MEMBER_EMAIL to link.');
+    return;
+  }
+  await db
+    .update(sightings)
+    .set({ userId, observerName: null })
+    .where(or(
+      eq(sightings.observerName, 'Chao'),
+      sql`lower(${sightings.observerName}) = 'chao'`,
+    ));
+  await db
+    .update(phenomena)
+    .set({ userId, observerName: null })
+    .where(or(
+      eq(phenomena.observerName, 'Chao'),
+      sql`lower(${phenomena.observerName}) = 'chao'`,
+    ));
+  console.log('Linked Chao demo content to member account.');
+}
+
+async function promoteDemoMemberToAdmin() {
+  const email = process.env.DEMO_MEMBER_EMAIL?.trim().toLowerCase();
+  let target = null;
+
+  if (email) {
+    [target] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+  }
+
+  if (!target) {
+    [target] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(sql`lower(${users.displayName}) = 'chao'`)
+      .limit(1);
+  }
+
+  if (!target || target.role === 'admin') return;
+
+  await db
+    .update(users)
+    .set({ role: 'admin', updatedAt: new Date() })
+    .where(eq(users.id, target.id));
+  console.log('Promoted demo member to admin.');
+}
 
 async function seedSightings() {
   const existing = await db.select({ id: sightings.id }).from(sightings).limit(1);
@@ -223,16 +246,20 @@ async function seedSightings() {
     .select({ id: phenomena.id, title: phenomena.title })
     .from(phenomena);
 
+  const chaoUserId = await resolveChaoUserId();
+
   for (const row of rows) {
     const bundle = sightingSeedByTitle[row.title];
     if (!bundle) continue;
 
     for (const entry of bundle.sightings) {
+      const isChao = entry.observerName.toLowerCase() === 'chao';
       const [inserted] = await db
         .insert(sightings)
         .values({
           phenomenonId: row.id,
-          observerName: entry.observerName,
+          userId: isChao && chaoUserId ? chaoUserId : null,
+          observerName: isChao && chaoUserId ? null : entry.observerName,
           seenAt: entry.seenAt,
           condition: entry.condition,
           note: entry.note,
@@ -256,7 +283,11 @@ async function seedSightings() {
 async function seed() {
   await seedAdmin();
   await seedPhenomena();
-  if (process.env.SEED_DEMO === '1') await seedSightings();
+  if (process.env.SEED_DEMO === '1') {
+    await seedSightings();
+    await linkChaoMemberContent();
+    await promoteDemoMemberToAdmin();
+  }
   process.exit(0);
 }
 

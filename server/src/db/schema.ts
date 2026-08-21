@@ -3,6 +3,7 @@ import {
   integer,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -62,9 +63,11 @@ export const phenomena = pgTable('phenomena', {
   lng: doublePrecision('lng'),
   imageUrl: text('image_url'),
   imageAlt: text('image_alt'),
+  findingHint: text('finding_hint'),
   observerName: text('observer_name'),
   metaLabel: text('meta_label'),
   lastNoticedAt: timestamp('last_noticed_at', { withTimezone: true }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -80,6 +83,8 @@ export const users = pgTable(
     email: text('email').notNull(),
     passwordHash: text('password_hash').notNull(),
     displayName: text('display_name'),
+    avatarUrl: text('avatar_url'),
+    bio: text('bio'),
     role: userRoleEnum('role').notNull().default('user'),
     emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
     emailConfirmTokenHash: text('email_confirm_token_hash'),
@@ -111,6 +116,32 @@ export const sightings = pgTable('sightings', {
     .defaultNow(),
 });
 
+export const phenomenonTracks = pgTable(
+  'phenomenon_tracks',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    phenomenonId: uuid('phenomenon_id')
+      .notNull()
+      .references(() => phenomena.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.phenomenonId] })],
+);
+
+export const phenomenonImages = pgTable('phenomenon_images', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  phenomenonId: uuid('phenomenon_id')
+    .notNull()
+    .references(() => phenomena.id, { onDelete: 'cascade' }),
+  imageUrl: text('image_url').notNull(),
+  imageAlt: text('image_alt'),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
 export const sightingImages = pgTable('sighting_images', {
   id: uuid('id').defaultRandom().primaryKey(),
   sightingId: uuid('sighting_id')
@@ -129,4 +160,5 @@ export type UserRole = (typeof USER_ROLES)[number];
 export type Sighting = typeof sightings.$inferSelect;
 export type NewSighting = typeof sightings.$inferInsert;
 export type SightingImage = typeof sightingImages.$inferSelect;
+export type PhenomenonImage = typeof phenomenonImages.$inferSelect;
 export type SightingCondition = (typeof SIGHTING_CONDITIONS)[number];

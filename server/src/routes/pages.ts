@@ -53,7 +53,28 @@ pageRoutes.get('/submit', (c) =>
   renderPage(c, 'submit', {
     titleKey: 'submit.pageTitle',
     leaflet: true,
-    scripts: ['/js/pages/submit.js'],
+    scripts: ['/js/datetime-local.js', '/js/media.js', '/js/pages/submit.js'],
+  }),
+);
+
+pageRoutes.get('/sighting', (c) =>
+  renderPage(c, 'sighting', {
+    titleKey: 'sighting.form.pageTitle',
+    scripts: ['/js/datetime-local.js', '/js/media.js', '/js/pages/sighting.js'],
+  }),
+);
+
+pageRoutes.get('/profile', (c) =>
+  renderPage(c, 'profile', {
+    titleKey: 'profile.pageTitle',
+    scripts: ['/js/pages/profile.js'],
+  }),
+);
+
+pageRoutes.get('/members/:id', (c) =>
+  renderPage(c, 'member', {
+    titleKey: 'member.pageTitle',
+    scripts: ['/js/pages/member.js'],
   }),
 );
 

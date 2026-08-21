@@ -1,0 +1,59 @@
+<header class="auth-page-head">
+  <a href="/" class="brand-mark" aria-label="<%= it.t('brand.name') %>"><span>最</span><span>近</span><span>左</span><span>營</span></a>
+  <div class="auth-nav" data-auth-nav></div>
+</header>
+
+<main class="auth-main auth-main--submit auth-main--profile">
+  <div class="submit-form profile-page" id="profilePage">
+    <header class="submit-form__intro profile-intro">
+      <h1 class="submit-form__title"><%= it.t('profile.title') %></h1>
+      <button type="button" class="profile-logout profile-logout--head" id="profileLogoutBtn"><%= it.t('nav.logout') %></button>
+    </header>
+
+    <form class="profile-form" id="profileForm" novalidate>
+      <section class="submit-form__section" aria-labelledby="profileAbout">
+        <h2 class="submit-form__section-title" id="profileAbout"><%= it.t('profile.about') %></h2>
+
+        <div class="profile-form__avatar">
+          <div class="profile-form__avatar-frame" id="profileAvatarPreview">
+            <span class="avatar avatar--lg" id="profileAvatarFallback"></span>
+            <img class="profile-form__avatar-img" id="profileAvatarImg" alt="" hidden>
+          </div>
+          <label class="profile-form__avatar-upload">
+            <input type="file" id="f_avatar" accept="image/jpeg,image/png,image/webp" hidden>
+            <span class="submit-form__photo-btn"><%= it.t('profile.uploadAvatar') %></span>
+          </label>
+        </div>
+
+        <label class="submit-form__field">
+          <span class="profile-form__label"><%= it.t('profile.displayName') %></span>
+          <input type="text" id="f_displayName" maxlength="80">
+        </label>
+
+        <label class="submit-form__field">
+          <span class="profile-form__label"><%= it.t('profile.bio') %></span>
+          <textarea id="f_bio" rows="3" maxlength="500"></textarea>
+        </label>
+
+        <p class="submit-form__error" id="profileError" hidden></p>
+        <p class="profile-form__feedback profile-form__feedback--success" id="profileSuccess" hidden></p>
+        <button type="submit" class="submit-form__submit" id="profileSaveBtn"><%= it.t('profile.save') %></button>
+      </section>
+    </form>
+
+    <section class="submit-form__section profile-lists" aria-labelledby="profileLists">
+      <h2 class="submit-form__section-title" id="profileLists"><%= it.t('profile.lists') %></h2>
+
+      <div class="profile-tabs" role="tablist" aria-label="<%= it.t('profile.lists') %>">
+        <button type="button" class="profile-tabs__btn is-active" data-tab="mine" role="tab" aria-selected="true"><%= it.t('profile.myObservations') %></button>
+        <button type="button" class="profile-tabs__btn" data-tab="tracks" role="tab" aria-selected="false"><%= it.t('profile.tracked') %></button>
+        <button type="button" class="profile-tabs__btn" data-tab="sightings" role="tab" aria-selected="false"><%= it.t('profile.mySightings') %></button>
+      </div>
+
+      <div class="profile-panel" id="profilePanelMine" role="tabpanel"></div>
+      <div class="profile-panel" id="profilePanelTracks" role="tabpanel" hidden></div>
+      <div class="profile-panel" id="profilePanelSightings" role="tabpanel" hidden></div>
+    </section>
+
+  </div>
+</main>

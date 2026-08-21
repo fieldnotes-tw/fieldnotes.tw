@@ -16,12 +16,16 @@ function emailLocalPart(email) {
 function shapeUser(apiUser) {
   if (!apiUser?.email) return null;
   const local = emailLocalPart(apiUser.email);
+  const display = apiUser.displayName || local;
   return {
     id: apiUser.id,
     email: apiUser.email,
     role: apiUser.role,
+    displayName: apiUser.displayName || null,
+    avatarUrl: apiUser.avatarUrl || null,
+    bio: apiUser.bio || null,
     colorVar: colorForEmail(apiUser.email),
-    initial: Array.from(local.trim())[0]?.toUpperCase() || '?',
+    initial: Array.from(display.trim())[0]?.toUpperCase() || '?',
   };
 }
 
@@ -48,6 +52,17 @@ function setCurrentUser(apiUser) {
 
 function logoutCurrentUser() {
   localStorage.removeItem(CURRENT_USER_KEY);
+}
+
+function randomId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => {
+    const r = (Math.random() * 16) | 0;
+    const v = ch === 'x' ? r : ((r & 0x3) | 0x8);
+    return v.toString(16);
+  });
 }
 
 async function api(path, options = {}) {
@@ -86,7 +101,9 @@ async function api(path, options = {}) {
 
 async function refreshCurrentUser() {
   const { data } = await api('/api/auth/me');
-  return setCurrentUser(data);
+  const user = setCurrentUser(data);
+  document.dispatchEvent(new CustomEvent('fn:user-updated', { detail: user }));
+  return user;
 }
 
 async function login(email, password) {
@@ -134,9 +151,9 @@ function renderAuthNav(container) {
   }
 
   const submitLink = document.createElement('a');
-  submitLink.className = 'auth-nav__btn';
+  submitLink.className = 'auth-nav__btn' + (user ? '' : ' auth-nav__btn--primary');
   submitLink.textContent = t('nav.submit');
-  submitLink.href = user ? '/submit' : '/login';
+  submitLink.href = user ? '/submit' : `/login?next=${encodeURIComponent('/submit')}`;
   container.appendChild(submitLink);
 
   if (user) {
@@ -151,44 +168,28 @@ function renderAuthNav(container) {
     const wrap = document.createElement('div');
     wrap.className = 'auth-nav__user';
 
-    const avatarBtn = document.createElement('button');
-    avatarBtn.type = 'button';
-    avatarBtn.className = 'avatar avatar--sm auth-nav__avatar';
-    avatarBtn.style.background = `var(${user.colorVar})`;
-    avatarBtn.textContent = user.initial;
-    avatarBtn.setAttribute('aria-label', t('nav.accountMenu', { email: user.email }));
+    const profileLink = document.createElement('a');
+    profileLink.className = 'avatar avatar--sm auth-nav__avatar';
+    profileLink.href = '/profile';
+    profileLink.setAttribute('aria-label', t('nav.profile'));
+    if (user.avatarUrl) {
+      const img = document.createElement('img');
+      img.src = user.avatarUrl;
+      img.alt = '';
+      img.className = 'auth-nav__avatar-img';
+      profileLink.appendChild(img);
+    } else {
+      profileLink.style.background = `var(${user.colorVar})`;
+      profileLink.textContent = user.initial;
+    }
 
-    const dropdown = document.createElement('div');
-    dropdown.className = 'auth-nav__dropdown';
-    const nameEl = document.createElement('span');
-    nameEl.className = 'auth-nav__dropdown-name';
-    nameEl.textContent = user.role === 'admin'
-      ? t('nav.adminBadge', { email: user.email })
-      : user.email;
-    const logoutBtn = document.createElement('button');
-    logoutBtn.type = 'button';
-    logoutBtn.className = 'auth-nav__logout';
-    logoutBtn.textContent = t('nav.logout');
-    dropdown.append(nameEl, logoutBtn);
-
-    wrap.append(avatarBtn, dropdown);
+    wrap.append(profileLink);
     container.appendChild(wrap);
-
-    avatarBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      wrap.classList.toggle('is-open');
-    });
-    logoutBtn.addEventListener('click', async () => {
-      await logout();
-      location.href = '/';
-    });
-    document.addEventListener('click', () => wrap.classList.remove('is-open'));
   } else {
     const loginLink = document.createElement('a');
-    loginLink.className = 'auth-nav__btn auth-nav__btn--primary';
+    loginLink.className = 'auth-nav__btn';
     loginLink.textContent = t('nav.login');
     loginLink.href = '/login';
-
     container.appendChild(loginLink);
   }
 }

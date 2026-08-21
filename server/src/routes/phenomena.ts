@@ -2,6 +2,7 @@ import { eq, inArray, type SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { phenomena } from '../db/schema.js';
 import {
+  attachImageUrls,
   getPhenomenonDetail,
   listPhenomenaWithStats,
 } from '../lib/phenomena-query.js';
@@ -44,7 +45,8 @@ phenomenaRoutes.get('/', async (c) => {
   }
 
   const rows = await listPhenomenaWithStats(filters);
-  return c.json({ data: rows });
+  const data = await attachImageUrls(rows);
+  return c.json({ data });
 });
 
 phenomenaRoutes.get('/:id', async (c) => {
