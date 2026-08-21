@@ -7,7 +7,7 @@
 
 <div class="floatingbar" id="floatingbar">
   <div class="floatingbar__row">
-    <a href="#top" class="brand-mark" aria-label="<%= it.t('brand.name') %>"><span>最</span><span>近</span><span>左</span><span>營</span></a>
+    <a href="#top" class="brand-mark" aria-label="<%= it.t('brand.name') %>"><span>最</span><span>近</span><span>高</span><span>雄</span></a>
     <div class="floatingbar__actions">
       <button type="button" class="floatingbar__lang-btn" id="floatingLangBtn" aria-label="<%= it.t('nav.lang.label') %>" aria-expanded="false" aria-controls="floatingLangPanel">
         <svg class="floatingbar__lang-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -37,7 +37,7 @@
   </div>
   <div class="sitehead__brandrow">
     <div class="sitehead__identity">
-      <h1 class="brand-mark"><span>最</span><span>近</span><span>左</span><span>營</span></h1>
+      <h1 class="brand-mark"><span>最</span><span>近</span><span>高</span><span>雄</span></h1>
       <div class="sitehead__taglines">
         <span><%= it.t('home.tagline1') %></span>
         <span><%= it.t('home.tagline2') %></span>

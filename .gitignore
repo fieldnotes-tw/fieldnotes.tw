@@ -3,6 +3,7 @@
 .pw/
 node_modules/
 dist/
+vite.config.js.timestamp-*.mjs
 .env
 server/.env
 

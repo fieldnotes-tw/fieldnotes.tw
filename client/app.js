@@ -63,7 +63,7 @@ function usesSheetDetail() {
   return !DESKTOP_SPLIT_MQ.matches;
 }
 
-// Zuoying (左營), Kaohsiung — placeholder until a Google Maps API key replaces this OSM view.
+// Kaohsiung (高雄) — placeholder until a Google Maps API key replaces this OSM view.
 const ZUOYING_CENTER = [22.688, 120.297];
 let leafletMap = null;
 const markerRefs = [];
