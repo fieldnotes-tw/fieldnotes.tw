@@ -59,6 +59,15 @@ export const createSightingSchema = z.object({
   seenAt: z.coerce.date().optional(),
   note: z.string().trim().min(1).max(2000),
   imageUrls: z.array(z.string().trim().max(1000)).max(8).optional(),
+  spotId: z.string().uuid().optional(),
+  otherSpot: z.object({
+    name: z.string().trim().min(1).max(200),
+    locationDetail: z.string().trim().max(300).optional(),
+    lat: z.number().min(-90).max(90).optional(),
+    lng: z.number().min(-180).max(180).optional(),
+  }).optional(),
+}).refine((value) => !(value.spotId && value.otherSpot), {
+  message: 'errors.invalidRequest',
 });
 
 export const updateSightingSchema = z.object({

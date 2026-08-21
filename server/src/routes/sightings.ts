@@ -115,6 +115,7 @@ sightingRoutes.get('/:id', requireAuth, async (c) => {
     .select({
       id: sightings.id,
       phenomenonId: sightings.phenomenonId,
+      spotId: sightings.spotId,
       userId: sightings.userId,
       seenAt: sightings.seenAt,
       note: sightings.note,
@@ -147,6 +148,7 @@ sightingRoutes.get('/:id', requireAuth, async (c) => {
     data: {
       id: row.id,
       phenomenonId: row.phenomenonId,
+      spotId: row.spotId,
       phenomenonTitle: row.phenomenonTitle,
       seenAt: row.seenAt,
       note: row.note,

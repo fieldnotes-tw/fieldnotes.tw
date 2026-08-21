@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { phenomena } from '../db/schema.js';
 import {
   attachImageUrls,
+  attachLocationSummaries,
   getPhenomenonDetail,
   listPhenomenaWithStats,
 } from '../lib/phenomena-query.js';
@@ -45,7 +46,8 @@ phenomenaRoutes.get('/', async (c) => {
   }
 
   const rows = await listPhenomenaWithStats(filters);
-  const data = await attachImageUrls(rows);
+  const withSummaries = await attachLocationSummaries(rows);
+  const data = await attachImageUrls(withSummaries);
   return c.json({ data });
 });
 

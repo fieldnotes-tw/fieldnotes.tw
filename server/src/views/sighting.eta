@@ -10,6 +10,13 @@
       <p class="submit-form__context" id="sightingContext" hidden></p>
     </header>
 
+    <section class="submit-form__section submit-form__section--compact" id="sightingCommentOnlySection" aria-labelledby="sightingCommentOnly">
+      <label class="submit-form__option submit-form__option--solo" id="sightingCommentOnly">
+        <input type="checkbox" id="f_commentOnly">
+        <span><%= it.t('sighting.form.commentOnly') %></span>
+      </label>
+    </section>
+
     <section class="submit-form__section" aria-labelledby="sightingPhoto">
       <h2 class="submit-form__section-title" id="sightingPhoto"><%= it.t('sighting.form.photo') %></h2>
       <div class="submit-form__photo">
@@ -22,12 +29,34 @@
       </div>
     </section>
 
-    <section class="submit-form__section" aria-labelledby="sightingWhen">
+    <section class="submit-form__section" id="sightingSpotSection" aria-labelledby="sightingSpot" hidden>
+      <h2 class="submit-form__section-title" id="sightingSpot"><%= it.t('sighting.form.where') %></h2>
+      <div class="sighting-form__spot-list" id="spotChoices" role="radiogroup" aria-labelledby="sightingSpot"></div>
+      <div class="sighting-form__other-spot" id="otherSpotField" hidden>
+        <div class="submit-form__search sighting-form__other-spot-search">
+          <input
+            type="search"
+            id="f_otherSpotLocation"
+            class="submit-form__search-input"
+            maxlength="300"
+            autocomplete="off"
+            placeholder="<%= it.t('submit.where.placeholder') %>"
+            aria-controls="otherSpotSearchResults"
+            aria-expanded="false"
+          >
+          <ul class="submit-form__search-results" id="otherSpotSearchResults" hidden role="listbox"></ul>
+        </div>
+        <p class="submit-form__hint submit-form__map-hint" id="otherSpotMapHint" aria-live="polite"><%= it.t('submit.where.mapHintEmpty') %></p>
+        <div class="submit-form__map-wrap submit-form__map-wrap--unpinned" id="otherSpotMapWrap">
+          <div class="submit-form__map" id="otherSpotMap" role="application" aria-label="<%= it.t('submit.where.mapLabel') %>"></div>
+        </div>
+        <input type="hidden" id="f_otherSpotLat">
+        <input type="hidden" id="f_otherSpotLng">
+      </div>
+    </section>
+
+    <section class="submit-form__section" id="sightingWhenSection" aria-labelledby="sightingWhen">
       <h2 class="submit-form__section-title" id="sightingWhen"><%= it.t('sighting.form.when') %></h2>
-      <label class="submit-form__option">
-        <input type="checkbox" id="f_commentOnly">
-        <span><%= it.t('sighting.form.commentOnly') %></span>
-      </label>
       <div class="submit-form__when-fields" id="sightingWhenFields">
         <%~ include('partials/datetime-fields', it) %>
       </div>

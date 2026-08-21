@@ -60,7 +60,8 @@ pageRoutes.get('/submit', (c) =>
 pageRoutes.get('/sighting', (c) =>
   renderPage(c, 'sighting', {
     titleKey: 'sighting.form.pageTitle',
-    scripts: ['/js/datetime-local.js', '/js/media.js', '/js/pages/sighting.js'],
+    leaflet: true,
+    scripts: ['/js/datetime-local.js', '/js/media.js', '/js/submit-map.js', '/js/pages/sighting.js'],
   }),
 );
 

@@ -5,6 +5,7 @@ import { db } from '../db/index.js';
 import { USER_ROLES, phenomena, users } from '../db/schema.js';
 import { hashPassword, normalizeEmail } from '../lib/auth.js';
 import { localeOf, t } from '../lib/i18n.js';
+import { createPrimarySpotForPhenomenon } from '../lib/spots.js';
 import {
   createUploadUrl,
   isAllowedContentType,
@@ -287,6 +288,13 @@ adminRoutes.post('/phenomena', validated('json', createPhenomenonSchema), async 
       updatedAt: now,
     })
     .returning();
+
+  await createPrimarySpotForPhenomenon(row.id, {
+    location: row.location,
+    lat: row.lat,
+    lng: row.lng,
+    findingHint: row.findingHint,
+  });
 
   return c.json({ data: row }, 201);
 });

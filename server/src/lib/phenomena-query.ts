@@ -2,15 +2,25 @@ import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from '../db/index.js';
 import {
+  attachLocationSummaries,
+  buildLocationSummary,
+  formatSpotLabel,
+  listSpotsWithStats,
+  type SpotWithStats,
+} from './spots.js';
+import {
   phenomena,
   phenomenonImages,
   sightingImages,
   sightings,
+  spots,
   users,
   type Phenomenon,
 } from '../db/schema.js';
 
 const creator = alias(users, 'creator');
+
+export type { SpotWithStats };
 
 export type PhenomenonListItem = Phenomenon & {
   sightingCount: number;
@@ -19,11 +29,16 @@ export type PhenomenonListItem = Phenomenon & {
   creatorName: string | null;
   creatorAvatarUrl: string | null;
   imageUrls?: string[];
+  locationSummary?: string;
+  spotCount?: number;
 };
 
 export type SightingWithImages = {
   id: string;
   phenomenonId: string;
+  spotId: string;
+  spotName: string | null;
+  spotLabel: string | null;
   userId: string | null;
   observerName: string | null;
   observerAvatarUrl: string | null;
@@ -35,6 +50,9 @@ export type SightingWithImages = {
 
 export type PhenomenonDetail = PhenomenonListItem & {
   imageUrls: string[];
+  locationSummary: string;
+  spotCount: number;
+  spots: SpotWithStats[];
   recentSightings: SightingWithImages[];
   observers: { userId: string | null; name: string; avatarUrl: string | null }[];
 };
@@ -133,6 +151,8 @@ export async function listPhenomenaWithStats(filters: SQL[] = []) {
   return rows.map(mapListRow);
 }
 
+export { attachLocationSummaries };
+
 function mergeUniqueImageUrls(primary: string[], extra: string[]) {
   const merged = [...primary];
   const seen = new Set(primary);
@@ -215,6 +235,10 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
     .select({
       id: sightings.id,
       phenomenonId: sightings.phenomenonId,
+      spotId: sightings.spotId,
+      spotName: spots.name,
+      spotLocationDetail: spots.locationDetail,
+      spotKind: spots.kind,
       userId: sightings.userId,
       observerName: sql<string | null>`coalesce(${users.displayName}, ${sightings.observerName})`,
       observerAvatarUrl: users.avatarUrl,
@@ -224,6 +248,7 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
     })
     .from(sightings)
     .leftJoin(users, eq(users.id, sightings.userId))
+    .leftJoin(spots, eq(spots.id, sightings.spotId))
     .where(eq(sightings.phenomenonId, id))
     .orderBy(desc(sightings.seenAt))
     .limit(12);
@@ -252,6 +277,15 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
   const recentSightings: SightingWithImages[] = sightingRows.map((sighting) => ({
     id: sighting.id,
     phenomenonId: sighting.phenomenonId,
+    spotId: sighting.spotId,
+    spotName: sighting.spotName,
+    spotLabel: sighting.spotName
+      ? formatSpotLabel({
+        name: sighting.spotName,
+        locationDetail: sighting.spotLocationDetail,
+        kind: sighting.spotKind,
+      })
+      : null,
     userId: sighting.userId,
     observerName: sighting.observerName,
     observerAvatarUrl: sighting.observerAvatarUrl ?? null,
@@ -308,9 +342,14 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
       : [];
 
   const sightingImageUrls = imageRows.map((row) => row.imageUrl);
+  const spotList = await listSpotsWithStats(id);
+  const locationSummary = buildLocationSummary(spotList) || base.location || '';
 
   return {
     ...base,
+    locationSummary,
+    spotCount: spotList.length,
+    spots: spotList,
     imageUrls: mergeUniqueImageUrls(imageUrls, sightingImageUrls),
     recentSightings,
     observers,

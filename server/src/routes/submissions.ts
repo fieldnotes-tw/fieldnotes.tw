@@ -20,6 +20,7 @@ import {
 } from '../lib/validators.js';
 import { validated } from '../lib/validate.js';
 import { getPhenomenonDetail } from '../lib/phenomena-query.js';
+import { createPrimarySpotForPhenomenon, resolveSightingSpotId } from '../lib/spots.js';
 import { requireAuth, type AuthEnv } from '../middleware/auth.js';
 import { sightingImages, sightings } from '../db/schema.js';
 
@@ -98,6 +99,13 @@ submissionRoutes.post('/', validated('json', submissionSchema), async (c) => {
   if (body.imageUrls?.length) {
     await replacePhenomenonImages(row.id, body.imageUrls, body.title);
   }
+
+  await createPrimarySpotForPhenomenon(row.id, {
+    location: body.location,
+    lat: body.lat,
+    lng: body.lng,
+    findingHint: body.findingHint || null,
+  });
 
   const detail = await getPhenomenonDetail(row.id);
   return c.json({ data: detail }, 201);
@@ -211,11 +219,21 @@ submissionRoutes.post(
 
     const body = c.req.valid('json');
     const observerName = await observerNameForUser(user.id);
+    let spotId: string;
+    try {
+      spotId = await resolveSightingSpotId(phenomenonId.data, {
+        spotId: body.spotId,
+        otherSpot: body.otherSpot,
+      });
+    } catch {
+      return c.json({ error: t(locale, 'errors.invalidRequest') }, 400);
+    }
 
     const [sighting] = await db
       .insert(sightings)
       .values({
         phenomenonId: phenomenonId.data,
+        spotId,
         userId: user.id,
         observerName,
         seenAt: body.seenAt ?? new Date(),

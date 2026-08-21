@@ -195,12 +195,15 @@
       </div>
       <div>
         <p class="about__text"><strong><%= it.t('home.about.bodyTitle') %></strong><%= it.t('home.about.body') %></p>
-        <p class="about__cta"><%= it.t('home.about.ctaBefore') %><a href="https://forms.gle/Ln8WBNaK5s8fggTYA" class="about__cta-link" target="_blank" rel="noopener"><%= it.t('home.about.ctaLink') %></a><%= it.t('home.about.ctaAfter') %></p>
+        <p class="about__text"><%= it.t('home.about.body2') %></p>
+        <p class="about__text"><%= it.t('home.about.body3') %></p>
+        <div class="about__actions">
+          <a href="/register" class="about__btn about__btn--primary"><%= it.t('nav.register') %></a>
+        </div>
       </div>
     </div>
   </div>
   <div class="footer__row">
-    <span class="credit"><%= it.t('home.footer.credit') %></span>
     <span class="credit"><%= it.t('home.footer.prototype') %></span>
   </div>
 </footer>
