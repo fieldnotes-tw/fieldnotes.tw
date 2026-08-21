@@ -20,6 +20,17 @@ output "acm_certificate_status" {
   value = aws_acm_certificate.site.status
 }
 
+output "acm_validation_records" {
+  description = "Copy these CNAMEs into GoDaddy for names that are not yet delegated to this zone (apex and www until full NS cutover)."
+  value = {
+    for name, record in aws_route53_record.acm_validation : name => {
+      type  = record.type
+      name  = record.name
+      value = one(record.records)
+    }
+  }
+}
+
 output "legacy_github_pages" {
   value = var.legacy_github_pages
 }
