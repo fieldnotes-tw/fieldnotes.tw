@@ -9,7 +9,7 @@ resource "aws_route53_zone" "this" {
 resource "aws_acm_certificate" "site" {
   provider = aws.acm
 
-  domain_name               = var.domain_name
+  domain_name               = var.acm_domain_name
   subject_alternative_names = var.certificate_sans
   validation_method         = "DNS"
 

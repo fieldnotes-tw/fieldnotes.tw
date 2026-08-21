@@ -9,5 +9,12 @@ ses_dkim_tokens = [
 # Keep true until you are ready to point apex/www at CloudFront.
 legacy_github_pages = true
 
-# Set true only after GoDaddy nameservers point at this zone.
+# Cert covers staging.fieldnotes.tw only (GoDaddy cannot store ACM underscore CNAMEs).
+# After apex nameservers move to this zone, set:
+#   acm_domain_name   = "fieldnotes.tw"
+#   certificate_sans  = ["www.fieldnotes.tw", "staging.fieldnotes.tw"]
+acm_domain_name  = "staging.fieldnotes.tw"
+certificate_sans = []
+
+# Set true after staging NS (or full zone NS) can answer ACM validation records.
 wait_for_acm_validation = false

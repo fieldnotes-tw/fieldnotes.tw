@@ -4,13 +4,16 @@ variable "domain_name" {
   default     = "fieldnotes.tw"
 }
 
+variable "acm_domain_name" {
+  type        = string
+  description = "Primary name on the us-east-1 CloudFront certificate. Staging-only until apex NS moves to this zone (GoDaddy rejects ACM underscore CNAMEs)."
+  default     = "staging.fieldnotes.tw"
+}
+
 variable "certificate_sans" {
   type        = list(string)
-  description = "Additional names on the shared ACM certificate (besides the apex)"
-  default = [
-    "www.fieldnotes.tw",
-    "staging.fieldnotes.tw",
-  ]
+  description = "Additional names on the ACM certificate besides acm_domain_name. Empty until apex/www validate in this zone."
+  default     = []
 }
 
 variable "dmarc_rua" {
