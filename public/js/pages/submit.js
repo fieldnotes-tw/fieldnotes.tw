@@ -6,6 +6,7 @@ const DESCRIPTION_MAX = 120;
 let map = null;
 let pin = null;
 let searchTimer = null;
+let placedLabel = '';
 let photos = [];
 let dragPhotoId = null;
 
@@ -44,7 +45,20 @@ async function nominatim(path) {
 }
 
 function setLocationLabel(label) {
-  if (label) $('f_location').value = label;
+  if (label) {
+    $('f_location').value = label;
+    placedLabel = label;
+  }
+}
+
+function clearPinPosition() {
+  if (pin) {
+    pin.remove();
+    pin = null;
+  }
+  $('f_lat').value = '';
+  $('f_lng').value = '';
+  syncMapPinState();
 }
 
 const submitPinIcon = () => L.divIcon({
@@ -163,9 +177,46 @@ async function runSearch(q) {
   }
 }
 
+async function selectFirstSearchResult() {
+  const input = $('f_location');
+  const list = $('searchResults');
+  const firstBtn = list?.querySelector('.submit-form__search-item');
+  if (firstBtn && list && !list.hidden) {
+    firstBtn.click();
+    return;
+  }
+
+  clearTimeout(searchTimer);
+  const trimmed = input.value.trim();
+  if (trimmed.length < 2) return;
+
+  try {
+    const rows = await nominatim(
+      `/search?q=${encodeURIComponent(trimmed)}&format=json&limit=6&viewbox=${ZUOYING_VIEWBOX}&bounded=0&countrycodes=tw`,
+    );
+    const items = Array.isArray(rows) ? rows : [];
+    if (items.length) {
+      const lat = Number(items[0].lat);
+      const lng = Number(items[0].lon);
+      setLocationLabel(formatPlaceName(items[0]));
+      setPin(lat, lng);
+      renderSearchResults(items);
+      setSearchOpen(false);
+    } else {
+      renderSearchResults([]);
+    }
+  } catch {
+    renderSearchResults([]);
+  }
+}
+
 function initSearch() {
   const input = $('f_location');
   input.addEventListener('input', () => {
+    if (input.value.trim() !== placedLabel.trim()) {
+      placedLabel = '';
+      clearPinPosition();
+    }
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => runSearch(input.value), 350);
   });
@@ -468,6 +519,7 @@ function resetForm() {
     pin.remove();
     pin = null;
   }
+  placedLabel = '';
   $('f_lat').value = '';
   $('f_lng').value = '';
   defaultSeenDate();
@@ -649,6 +701,11 @@ async function boot() {
   defaultSeenDate();
   mountRichField($('f_extra'), $('extraPreview'));
   initDescriptionCounter();
+  $('submitForm').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.target.tagName === 'TEXTAREA') return;
+    e.preventDefault();
+    if (e.target.id === 'f_location') selectFirstSearchResult();
+  });
   $('submitForm').addEventListener('submit', handleSubmit);
   $('submitDeleteBtn')?.addEventListener('click', handleDelete);
   $('submitAgain').addEventListener('click', resetForm);

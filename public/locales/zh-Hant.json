@@ -165,6 +165,7 @@
   "auth.login.line": "用 LINE 登入",
   "auth.login.failed": "登入失敗",
   "auth.register.title": "建立帳號",
+  "auth.register.pendingTitle": "請確認 email",
   "auth.register.pageTitle": "建立帳號 · 最近高雄",
   "auth.register.submit": "建立帳號",
   "auth.register.confirmPassword": "確認密碼",

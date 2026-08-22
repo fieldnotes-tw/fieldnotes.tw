@@ -49,6 +49,7 @@
     let existingPins = [];
     let existingSpotCategory = 'plant';
     let searchTimer = null;
+    let placedLabel = '';
 
     const $ = (id) => document.getElementById(id);
 
@@ -100,7 +101,20 @@
     }
 
     function setLocationLabel(label) {
-      if (label && $(locationInputId)) $(locationInputId).value = label;
+      if (label && $(locationInputId)) {
+        $(locationInputId).value = label;
+        placedLabel = label;
+      }
+    }
+
+    function clearPinPosition() {
+      if (pin) {
+        pin.remove();
+        pin = null;
+      }
+      if ($(latInputId)) $(latInputId).value = '';
+      if ($(lngInputId)) $(lngInputId).value = '';
+      syncMapPinState();
     }
 
     function syncMapPinState() {
@@ -213,10 +227,46 @@
       }
     }
 
+    async function selectFirstSearchResult() {
+      const input = $(locationInputId);
+      const list = $(resultsElId);
+      if (!input) return;
+
+      const firstBtn = list?.querySelector('.submit-form__search-item');
+      if (firstBtn && list && !list.hidden) {
+        firstBtn.click();
+        return;
+      }
+
+      clearTimeout(searchTimer);
+      const trimmed = input.value.trim();
+      if (trimmed.length < 2) return;
+
+      try {
+        const rows = await nominatim(
+          `/search?q=${encodeURIComponent(trimmed)}&format=json&limit=6&viewbox=${ZUOYING_VIEWBOX}&bounded=0&countrycodes=tw`,
+        );
+        const items = Array.isArray(rows) ? rows : [];
+        if (items.length) {
+          setPin(Number(items[0].lat), Number(items[0].lon), formatPlaceName(items[0]));
+          renderSearchResults(items);
+          setSearchOpen(false);
+        } else {
+          renderSearchResults([]);
+        }
+      } catch {
+        renderSearchResults([]);
+      }
+    }
+
     function initSearch() {
       const input = $(locationInputId);
       if (!input) return;
       input.addEventListener('input', () => {
+        if (input.value.trim() !== placedLabel.trim()) {
+          placedLabel = '';
+          clearPinPosition();
+        }
         clearTimeout(searchTimer);
         searchTimer = setTimeout(() => runSearch(input.value), 350);
       });
@@ -242,6 +292,7 @@
           pin.remove();
           pin = null;
         }
+        placedLabel = '';
         if ($(latInputId)) $(latInputId).value = '';
         if ($(lngInputId)) $(lngInputId).value = '';
         if ($(locationInputId)) $(locationInputId).value = '';
@@ -265,6 +316,22 @@
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
         return { lat, lng };
       },
+      selectFirstSearchResult,
     };
+  };
+
+  window.preventSubmitFormEnterSubmit = function preventSubmitFormEnterSubmit(form, {
+    searchInputId,
+    onSearchEnter,
+  } = {}) {
+    if (!form) return;
+    form.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      if (e.target.tagName === 'TEXTAREA') return;
+      e.preventDefault();
+      if (searchInputId && e.target.id === searchInputId && typeof onSearchEnter === 'function') {
+        onSearchEnter();
+      }
+    });
   };
 })();
