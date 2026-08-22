@@ -12,6 +12,8 @@ const htmlRedirects: Record<string, string> = {
   '/login.html': '/login',
   '/register.html': '/register',
   '/confirm.html': '/confirm',
+  '/forgot-password.html': '/forgot-password',
+  '/reset-password.html': '/reset-password',
   '/admin.html': '/admin',
   '/submit.html': '/submit',
 };
@@ -48,6 +50,20 @@ pageRoutes.get('/confirm', (c) =>
   renderPage(c, 'confirm', {
     titleKey: 'auth.confirm.pageTitle',
     scripts: ['/js/pages/confirm.js'],
+  }),
+);
+
+pageRoutes.get('/forgot-password', (c) =>
+  renderPage(c, 'forgot', {
+    titleKey: 'auth.forgot.pageTitle',
+    scripts: ['/js/pages/forgot.js'],
+  }),
+);
+
+pageRoutes.get('/reset-password', (c) =>
+  renderPage(c, 'reset-password', {
+    titleKey: 'auth.reset.pageTitle',
+    scripts: ['/js/pages/reset-password.js'],
   }),
 );
 

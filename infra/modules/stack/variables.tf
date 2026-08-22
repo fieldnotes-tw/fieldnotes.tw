@@ -97,3 +97,16 @@ variable "force_destroy" {
   description = "Allow terraform destroy to delete non-empty versioned S3 buckets (staging teardown)"
   default     = false
 }
+
+variable "line_channel_id" {
+  type        = string
+  description = "LINE Login channel ID (empty disables LINE login)"
+  default     = ""
+}
+
+variable "line_channel_secret" {
+  type        = string
+  description = "LINE Login channel secret"
+  default     = ""
+  sensitive   = true
+}

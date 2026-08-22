@@ -52,7 +52,7 @@
   --type-body-sm:0.875rem;
   --type-caption:0.8125rem;
   --type-meta:0.75rem;
-  --grid-feed-seam:color-mix(in srgb, var(--ink) 4%, var(--ground));
+  --grid-feed-seam:var(--map-ground);
   color-scheme: light;
 }
 
@@ -1160,6 +1160,7 @@ html[lang="en"] .sitehead__menu-oval{
 @media (max-width:759px){
   :root{ --map-peek-photo-height:11rem; }
   .feed-shell{ padding-bottom:0; }
+  .feed-layout__list{ background:var(--grid-feed-seam); }
   .feed-stage:not(.is-map-view) .feed-controls{
     margin:0.35rem 0 0.75rem;
     padding:0 1rem;
@@ -1212,7 +1213,7 @@ html[lang="en"] .sitehead__menu-oval{
     padding:0.5rem 0.75rem;
   }
   .grid-feed{
-    gap:1px;
+    gap:2px;
     padding:0;
     background:var(--grid-feed-seam);
   }
@@ -2550,7 +2551,8 @@ body.is-photo-lightbox-open .map-sheet.is-open{
 }
 .grid-feed{
   display:grid;
-  grid-template-columns:repeat(2,1fr); gap:1px; background:var(--grid-feed-seam);
+  grid-template-columns:repeat(2,1fr); gap:2px;
+  background:var(--grid-feed-seam);
 }
 @media (min-width:700px){ .grid-feed{ grid-template-columns:repeat(3,1fr); } }
 
@@ -2558,7 +2560,7 @@ body.is-photo-lightbox-open .map-sheet.is-open{
   .grid-feed{
     grid-template-columns:repeat(4, minmax(0, 1fr));
     gap:0.5rem;
-    background:transparent;
+    background:var(--grid-feed-seam);
   }
   .feed-stage.is-detail-open .grid-feed{
     grid-template-columns:repeat(4, minmax(0, 1fr));
@@ -3265,6 +3267,7 @@ footer .credit{ font-size:var(--type-meta); color:var(--ink-faint); }
 .auth-form__field input:focus-visible{ outline:2px solid var(--ink); outline-offset:1px; }
 .auth-form__error{ font-size:0.8rem; color:var(--status-ending); font-weight:700; margin:-0.5rem 0 1rem; }
 .auth-form__success{ font-size:0.85rem; color:var(--ink); font-weight:700; margin:-0.5rem 0 1rem; line-height:1.45; }
+.auth-form__hint{ font-size:0.85rem; color:var(--ink-soft); font-weight:600; line-height:1.45; margin:-0.35rem 0 1.1rem; }
 .auth-form__secondary{
   width:100%; margin-bottom:0.85rem;
   min-height:var(--btn-h-secondary);
@@ -3292,6 +3295,7 @@ footer .credit{ font-size:var(--type-meta); color:var(--ink-faint); }
 .auth-form__line-btn:hover{ filter:brightness(1.05); }
 .auth-form__line-btn:disabled{ opacity:0.55; cursor:not-allowed; filter:none; }
 .auth-form__switch{ text-align:center; font-size:0.85rem; color:var(--ink-soft); margin-top:1.3rem; }
+.auth-form__switch--compact{ margin:-0.15rem 0 1rem; text-align:left; }
 .auth-form__switch a{ font-weight:700; color:var(--ink); text-decoration:underline; text-underline-offset:2px; }
 
 .admin-main{

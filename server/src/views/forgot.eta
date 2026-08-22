@@ -1,0 +1,19 @@
+<header class="auth-page-head">
+  <a href="/" class="brand-mark" aria-label="<%= it.t('brand.name') %>"><span>最</span><span>近</span><span>高</span><span>雄</span></a>
+  <div class="auth-nav" data-auth-nav></div>
+</header>
+
+<main class="auth-main">
+  <form class="auth-form" id="forgotForm" novalidate>
+    <h1 class="auth-form__title"><%= it.t('auth.forgot.title') %></h1>
+    <p class="auth-form__hint"><%= it.t('auth.forgot.hint') %></p>
+    <label class="auth-form__field">
+      <span><%= it.t('auth.field.email') %></span>
+      <input type="email" name="email" autocomplete="email" required maxlength="254">
+    </label>
+    <p class="auth-form__error" id="forgotError" hidden></p>
+    <p class="auth-form__success" id="forgotSuccess" hidden></p>
+    <button type="submit" class="auth-form__submit"><%= it.t('auth.forgot.submit') %></button>
+    <p class="auth-form__switch"><a href="/login"><%= it.t('auth.forgot.backToLogin') %></a></p>
+  </form>
+</main>
