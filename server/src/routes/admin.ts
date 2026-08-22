@@ -5,6 +5,7 @@ import { db } from '../db/index.js';
 import { USER_ROLES, phenomena, users } from '../db/schema.js';
 import { hashPassword, normalizeEmail } from '../lib/auth.js';
 import { localeOf, t } from '../lib/i18n.js';
+import { createPrimarySpotForPhenomenon } from '../lib/spots.js';
 import {
   createUploadUrl,
   isAllowedContentType,
@@ -237,8 +238,8 @@ adminRoutes.put('/uploads/local/:filename', async (c) => {
     if (!body.byteLength) {
       return c.json({ error: t(locale, 'errors.invalidRequest') }, 400);
     }
-    const publicPath = await saveLocalUpload(filename, body, contentType);
-    return c.json({ data: { publicPath } }, 201);
+    const upload = await saveLocalUpload(filename, body, contentType);
+    return c.json({ data: upload }, 201);
   } catch (err) {
     console.error('Local media upload failed', err);
     return c.json({ error: t(locale, 'errors.uploadUrlFailed') }, 500);
@@ -287,6 +288,13 @@ adminRoutes.post('/phenomena', validated('json', createPhenomenonSchema), async 
       updatedAt: now,
     })
     .returning();
+
+  await createPrimarySpotForPhenomenon(row.id, {
+    location: row.location,
+    lat: row.lat,
+    lng: row.lng,
+    findingHint: row.findingHint,
+  });
 
   return c.json({ data: row }, 201);
 });

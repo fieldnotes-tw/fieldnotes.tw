@@ -1,4 +1,4 @@
-const REPORT_FORM_URL = 'https://forms.gle/Ln8WBNaK5s8fggTYA';
+import { appendVideoThumbnail, resolvePlayableMediaUrl, videoPosterUrl } from './video-preview.js';
 
 const feedStage = document.getElementById('feedStage');
 const feedLayoutHost = document.getElementById('feedLayoutHost');
@@ -23,6 +23,8 @@ const mapSheetBack = document.getElementById('mapSheetBack');
 const mapSheetBackLabel = document.getElementById('mapSheetBackLabel');
 const mapSheetHandle = document.getElementById('mapSheetHandle');
 const mapSheetPeekNav = document.getElementById('mapSheetPeekNav');
+const mapSheetPeekPrev = document.getElementById('mapSheetPeekPrev');
+const mapSheetPeekNext = document.getElementById('mapSheetPeekNext');
 const mapSheetPinDots = document.getElementById('mapSheetPinDots');
 const mapSheetPinCounter = document.getElementById('mapSheetPinCounter');
 const cardModal = document.getElementById('cardModal');
@@ -99,11 +101,16 @@ function applyFilters() {
   }
 }
 
+function resolveLocationText(item) {
+  return item?.locationSummary || item?.location || '';
+}
+
 function cardMatchesKeyword(card, query) {
   const item = getItemForCard(card);
   const parts = [
     item.title,
     item.description,
+    resolveLocationText(item),
     item.location,
     item.notes,
     categoryLabel(item.category),
@@ -356,6 +363,36 @@ function syncFloatingLangOptions() {
     btn.classList.toggle('is-active', btn.dataset.locale === locale);
   });
 }
+
+function getAboutBirdBubbles() {
+  const bubbles = [];
+  for (let i = 0; i < 12; i++) {
+    const key = `home.about.birdBubble.${i}`;
+    const text = t(key);
+    if (text === key) break;
+    bubbles.push(text);
+  }
+  return bubbles;
+}
+
+function initAboutBird() {
+  const bubble = document.getElementById('aboutBirdBubble');
+  const btn = document.getElementById('aboutBirdBtn');
+  if (!bubble || !btn) return;
+
+  const bubbles = getAboutBirdBubbles();
+  if (bubbles.length < 2) return;
+
+  let index = 0;
+  btn.addEventListener('click', () => {
+    index = (index + 1) % bubbles.length;
+    bubble.classList.add('is-changing');
+    window.setTimeout(() => {
+      bubble.textContent = bubbles[index];
+      bubble.classList.remove('is-changing');
+    }, 120);
+  });
+}
 document.addEventListener('click', (e) => {
   if (e.target.closest('.feed-toolbar__search-panel') || e.target.closest('.feed-toolbar__search-btn')) return;
   if (e.target.closest('.feed-toolbar__filter-panel') || e.target.closest('.feed-toolbar__filter-btn')) return;
@@ -432,8 +469,14 @@ function isVideoMediaUrl(url) {
   return /\.(mp4|webm|mov)(\?|#|$)/i.test(String(url || ''));
 }
 
-function resolvePlayableMediaUrl(url) {
-  return String(url || '').replace(/\.mov(?=($|[?#]))/i, '.mp4');
+function nextVideoSourceFallback(originalUrl, currentSrc) {
+  const original = String(originalUrl || '');
+  const current = String(currentSrc || '');
+  if (/\.mov(?=($|[?#]))/i.test(original) && current !== original) return original;
+  if (/\.mov(?=($|[?#]))/i.test(original) && current === original) {
+    return original.replace(/\.mov(?=($|[?#]))/i, '.mp4');
+  }
+  return '';
 }
 
 function mediaUrlMatches(video, url) {
@@ -452,27 +495,17 @@ function playLightboxVideo(video) {
 }
 
 function appendMediaPreview(parent, url, { alt = '', loading = 'lazy', className = '' } = {}) {
-  const src = isVideoMediaUrl(url) ? resolvePlayableMediaUrl(url) : url;
   if (isVideoMediaUrl(url)) {
-    const video = document.createElement('video');
-    video.className = className || 'photo-mosaic__video';
-    video.src = src;
-    video.muted = true;
-    video.loop = true;
-    video.playsInline = true;
-    video.preload = loading === 'eager' ? 'auto' : 'metadata';
-    video.addEventListener('loadedmetadata', () => {
-      try {
-        if (video.duration > 0) {
-          video.currentTime = Math.min(0.05, video.duration * 0.01);
-        }
-      } catch {
-        /* noop */
-      }
-    }, { once: true });
-    if (alt) video.setAttribute('aria-label', alt);
-    parent.appendChild(video);
-    return video;
+    const inlinePlayback = className === 'detail__sighting-media';
+    const result = appendVideoThumbnail(parent, {
+      videoUrl: url,
+      posterUrl: videoPosterUrl(url),
+      className: className || 'photo-mosaic__video',
+      alt,
+      loading,
+      inlinePlayback,
+    });
+    return inlinePlayback ? result.media : result;
   }
   const img = document.createElement('img');
   img.className = className || 'photo-mosaic__img';
@@ -545,6 +578,7 @@ function cardToFallbackItem(card) {
     title: card.querySelector('.card__title')?.textContent || '',
     description: card.querySelector('.card__desc')?.textContent || '',
     location: card.dataset.location || '',
+    locationSummary: card.dataset.locationSummary || card.dataset.location || '',
     notes: card.dataset.notes || '',
     findingHint: card.dataset.findingHint || '',
     userId: card.dataset.userId || null,
@@ -561,16 +595,146 @@ function cardToFallbackItem(card) {
   };
 }
 
-async function ensurePhenomenonDetail(id) {
+function patchCardPreview(card, item) {
+  if (!card || !item) return;
+
+  card.dataset.sightingCount = String(item.sightingCount ?? 0);
+  card.dataset.observerCount = String(item.observerCount ?? 0);
+  if (item.lastSeenAt) card.dataset.lastSeenAt = item.lastSeenAt;
+  else delete card.dataset.lastSeenAt;
+
+  const locationText = resolveLocationText(item);
+  if (locationText) card.dataset.locationSummary = locationText;
+  else delete card.dataset.locationSummary;
+
+  const body = card.querySelector('.card__body');
+  if (body) {
+    const locWrap = body.querySelector('.card__location');
+    if (locationText) {
+      if (locWrap) {
+        locWrap.querySelector('.card__location-text').textContent = locationText;
+      } else {
+        const title = body.querySelector('.card__title');
+        const loc = document.createElement('p');
+        loc.className = 'card__location';
+        const pin = document.createElement('span');
+        pin.className = 'card__location-pin';
+        pin.setAttribute('aria-hidden', 'true');
+        pin.textContent = '📍';
+        const text = document.createElement('span');
+        text.className = 'card__location-text';
+        text.textContent = locationText;
+        loc.append(pin, text);
+        title?.insertAdjacentElement('afterend', loc);
+      }
+    } else if (locWrap) {
+      locWrap.remove();
+    }
+
+    const seenText = buildCardSeenText(item.lastSeenAt);
+    const footEl = body.querySelector('.card__foot');
+    if (seenText) {
+      if (footEl) footEl.textContent = seenText;
+      else {
+        const foot = document.createElement('p');
+        foot.className = 'card__foot';
+        foot.textContent = seenText;
+        body.appendChild(foot);
+      }
+    } else if (footEl) {
+      footEl.remove();
+    }
+  }
+
+  patchMapRailPreview(card, item);
+}
+
+function patchMapRailPreview(card, item) {
+  if (!mapRailList || !card || !item) return;
+  const itemEl = mapRailList.querySelector(
+    `.map-rail__item[data-id="${CSS.escape(card.dataset.id)}"]`,
+  );
+  if (!itemEl) return;
+
+  const locationText = resolveLocationText(item);
+  const railBody = itemEl.querySelector('.map-rail__body');
+  if (railBody) {
+    const locWrap = railBody.querySelector('.map-rail__location');
+    if (locationText) {
+      if (locWrap) {
+        locWrap.querySelector('.map-rail__location-text').textContent = locationText;
+      } else {
+        const location = document.createElement('p');
+        location.className = 'map-rail__location';
+        const pin = document.createElement('span');
+        pin.className = 'map-rail__location-pin';
+        pin.setAttribute('aria-hidden', 'true');
+        pin.textContent = '📍';
+        const text = document.createElement('span');
+        text.className = 'map-rail__location-text';
+        text.textContent = locationText;
+        location.append(pin, text);
+        railBody.appendChild(location);
+      }
+    } else if (locWrap) {
+      locWrap.remove();
+    }
+
+    const seenText = buildCardSeenText(item.lastSeenAt);
+    const recentEl = railBody.querySelector('.map-rail__activity-recent');
+    if (seenText) {
+      if (recentEl) recentEl.textContent = seenText;
+      else {
+        const recent = document.createElement('p');
+        recent.className = 'map-rail__activity-recent';
+        recent.textContent = seenText;
+        railBody.appendChild(recent);
+      }
+    } else if (recentEl) {
+      recentEl.remove();
+    }
+  }
+}
+
+const REFRESH_PHENOMENON_KEY = 'fieldnotes.refreshPhenomenon';
+let pendingDeepLinkSpotId = null;
+
+function captureDeepLinkSpotId() {
+  const params = new URLSearchParams(location.search);
+  const spotId = params.get('spot');
+  if (!spotId) return;
+  pendingDeepLinkSpotId = spotId;
+  params.delete('spot');
+  const qs = params.toString();
+  history.replaceState(null, '', `${location.pathname}${qs ? `?${qs}` : ''}${location.hash}`);
+}
+
+function consumePendingDeepLinkSpotId() {
+  const spotId = pendingDeepLinkSpotId;
+  pendingDeepLinkSpotId = null;
+  return spotId;
+}
+
+async function ensurePhenomenonDetail(id, { force = false } = {}) {
+  const pendingRefresh = sessionStorage.getItem(REFRESH_PHENOMENON_KEY);
+  if (pendingRefresh === id) {
+    sessionStorage.removeItem(REFRESH_PHENOMENON_KEY);
+    phenomenonCache.delete(id);
+    force = true;
+  }
   const cached = phenomenonCache.get(id);
-  if (cached?.recentSightings) return cached;
+  if (!force && cached?.recentSightings) return cached;
   try {
     const res = await fetch(`/api/phenomena/${id}`, {
       headers: { 'Accept-Language': getLocale() },
     });
     if (!res.ok) return cached ?? null;
     const payload = await res.json();
-    if (payload.data) phenomenonCache.set(id, payload.data);
+    if (payload.data) {
+      phenomenonCache.set(id, payload.data);
+      const card = cards.find((entry) => entry.dataset.id === id);
+      if (card) patchCardPreview(card, payload.data);
+    }
     return payload.data ?? cached ?? null;
   } catch {
     return cached ?? null;
@@ -608,6 +772,30 @@ function resolveImageUrls(item) {
     ];
   }
   return urls;
+}
+
+function resolveFormImages(item) {
+  const fromImages = Array.isArray(item.images) && item.images.length
+    ? item.images.map((image) => ({
+      url: image.url || image.imageUrl,
+      caption: image.caption || image.imageAlt || '',
+    }))
+    : [];
+  const urls = resolveImageUrls(item);
+  if (!fromImages.length) {
+    return urls.map((url, index) => ({
+      url,
+      caption: index === 0 ? (item.imageAlt || '') : '',
+    }));
+  }
+  const seen = new Set(fromImages.map((image) => image.url));
+  const merged = [...fromImages];
+  urls.forEach((url) => {
+    if (!url || seen.has(url)) return;
+    merged.push({ url, caption: '' });
+    seen.add(url);
+  });
+  return merged;
 }
 
 function getCardImageUrls(card) {
@@ -689,7 +877,17 @@ function applyPhotoSlideOrientation(cell, mediaEl) {
   else mediaEl.addEventListener('load', apply, { once: true });
 }
 
-function buildPhotoMosaic(urls, alt = '', { phenomenonId = '' } = {}) {
+function buildPhotoMosaic(urlsOrImages, alt = '', { phenomenonId = '' } = {}) {
+  let urls;
+  let captions;
+  if (urlsOrImages.length && typeof urlsOrImages[0] === 'object') {
+    urls = urlsOrImages.map((image) => image.url);
+    captions = urlsOrImages.map((image) => image.caption || '');
+  } else {
+    urls = urlsOrImages;
+    captions = urls.map((_, index) => (index === 0 ? alt : ''));
+  }
+
   const mosaic = document.createElement('div');
   mosaic.className = 'photo-mosaic';
   if (!urls.length) {
@@ -699,7 +897,8 @@ function buildPhotoMosaic(urls, alt = '', { phenomenonId = '' } = {}) {
   }
 
   mosaic.dataset.allUrls = JSON.stringify(urls);
-  mosaic.dataset.imageAlt = alt;
+  mosaic.dataset.allCaptions = JSON.stringify(captions);
+  mosaic.dataset.imageAlt = captions[0] || alt;
   if (phenomenonId) mosaic.dataset.phenomenonId = phenomenonId;
   if (urls.length === 1) mosaic.classList.add('photo-mosaic--single');
 
@@ -707,22 +906,21 @@ function buildPhotoMosaic(urls, alt = '', { phenomenonId = '' } = {}) {
   track.className = 'photo-mosaic__track';
 
   urls.forEach((url, i) => {
-    const cell = document.createElement('button');
-    cell.type = 'button';
+    const cell = document.createElement('div');
     cell.className = 'photo-mosaic__cell';
+    cell.setAttribute('role', 'button');
+    cell.tabIndex = 0;
     if (i === 0) cell.classList.add('photo-mosaic__cell--main');
     cell.setAttribute('aria-label', t('home.detail.openPhoto', { index: i + 1, total: urls.length }));
 
     const media = appendMediaPreview(cell, url, {
-      alt: i === 0 ? alt : '',
+      alt: captions[i] || (i === 0 ? alt : ''),
       loading: i === 0 ? 'eager' : 'lazy',
     });
-    if (media.tagName === 'VIDEO') {
+    if (isVideoMediaUrl(url)) {
       cell.classList.add('photo-mosaic__cell--video');
-      media.addEventListener('loadedmetadata', () => applyPhotoSlideOrientation(cell, media), { once: true });
-    } else {
-      media.addEventListener('load', () => applyPhotoSlideOrientation(cell, media), { once: true });
     }
+    media.addEventListener('load', () => applyPhotoSlideOrientation(cell, media), { once: true });
     track.appendChild(cell);
   });
 
@@ -741,6 +939,66 @@ function buildPhotoMosaic(urls, alt = '', { phenomenonId = '' } = {}) {
 
 const GALLERY_TAP_MOVE_PX = 10;
 const GALLERY_SCROLL_MOVE_PX = 6;
+
+function bindGalleryTrackDrag(track, cells, onCellTap) {
+  if (!track || cells.length <= 1) return;
+
+  let drag = null;
+
+  track.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    const cell = e.target.closest('.photo-mosaic__cell');
+    if (!cell || !track.contains(cell)) return;
+    drag = {
+      cellIndex: cells.indexOf(cell),
+      startX: e.clientX,
+      startY: e.clientY,
+      scrollLeft: track.scrollLeft,
+      moved: false,
+      pointerId: e.pointerId,
+    };
+    if (drag.cellIndex < 0) {
+      drag = null;
+      return;
+    }
+    track.setPointerCapture(e.pointerId);
+  });
+
+  track.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    if (!drag.moved) {
+      if (Math.abs(dx) < GALLERY_TAP_MOVE_PX && Math.abs(dy) < GALLERY_TAP_MOVE_PX) return;
+      if (Math.abs(dx) <= Math.abs(dy)) return;
+      drag.moved = true;
+    }
+    track.scrollLeft = drag.scrollLeft - dx;
+    e.preventDefault();
+  });
+
+  const finishDrag = (e) => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    const { cellIndex, moved, startX, startY } = drag;
+    if (track.hasPointerCapture(e.pointerId)) {
+      track.releasePointerCapture(e.pointerId);
+    }
+    drag = null;
+    if (moved) {
+      mapSheetGestureMoved = true;
+      return;
+    }
+    const dx = Math.abs(e.clientX - startX);
+    const dy = Math.abs(e.clientY - startY);
+    if (dx > GALLERY_TAP_MOVE_PX || dy > GALLERY_TAP_MOVE_PX) return;
+    onCellTap(cellIndex, e);
+  };
+
+  track.addEventListener('pointerup', finishDrag);
+  track.addEventListener('pointercancel', () => {
+    drag = null;
+  });
+}
 
 /** Open lightbox on tap, not when the user was scrolling the gallery strip. */
 function bindGalleryTap(el, onTap, { scrollRoot = null } = {}) {
@@ -786,26 +1044,22 @@ function bindGalleryTap(el, onTap, { scrollRoot = null } = {}) {
 let photoLightboxEl = null;
 let photoLightboxIndex = 0;
 let photoLightboxUrls = [];
-let photoLightboxAlt = '';
+let photoLightboxCaptions = [];
 let photoLightboxScrollLock = '';
 
-function requestVideoFullscreen(video) {
-  if (!video) return;
-  if (video.requestFullscreen) {
-    video.requestFullscreen().catch(() => {});
-    return;
+function normalizeLightboxCaptions(urls, captions, index = 0) {
+  if (Array.isArray(captions)) {
+    return urls.map((_, i) => captions[i] || '');
   }
-  if (video.webkitEnterFullscreen) {
-    video.webkitEnterFullscreen();
-    return;
+  if (typeof captions === 'string' && captions) {
+    return urls.map((_, i) => (i === index ? captions : ''));
   }
-  if (video.webkitRequestFullscreen) {
-    video.webkitRequestFullscreen();
-  }
+  return urls.map(() => '');
 }
 
 function prepareLightboxVideo(video) {
   video.controls = true;
+  video.muted = false;
   video.playsInline = true;
   video.setAttribute('playsinline', '');
   video.setAttribute('webkit-playsinline', '');
@@ -813,9 +1067,55 @@ function prepareLightboxVideo(video) {
   video.controlsList = 'nodownload';
 }
 
+function activateInlineVideo(video) {
+  if (!video) return;
+  const item = video.closest('.detail__sighting-photo-item');
+  const poster = item?.querySelector('img.detail__sighting-media, img.detail__sighting-video');
+  prepareLightboxVideo(video);
+  const rawUrl = video.dataset.playbackUrl || video.getAttribute('src') || video.src || '';
+  const src = resolvePlayableMediaUrl(rawUrl);
+  if (src && !mediaUrlMatches(video, src)) {
+    video.src = src;
+  }
+  video.hidden = false;
+  if (poster) poster.hidden = true;
+  item?.classList.add('is-playing');
+  const tryPlay = () => { video.play().catch(() => {}); };
+  if (video.readyState >= 2) tryPlay();
+  else {
+    video.addEventListener('loadeddata', tryPlay, { once: true });
+    video.load();
+  }
+}
+
+function toggleInlineVideo(video) {
+  if (!video) return;
+  if (video.paused || video.muted) {
+    activateInlineVideo(video);
+  } else {
+    video.pause();
+  }
+}
+
+function mountMediaExpandButton(container, onExpand) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'detail-media__expand';
+  btn.setAttribute('aria-label', t('submit.photo.openPreview'));
+  btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9 V4 H9 M15 4 H20 V9 M20 15 V20 H15 M9 20 H4 V15" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onExpand(e);
+  });
+  container.appendChild(btn);
+  return btn;
+}
+
 function setLightboxVideoSource(video, url) {
   prepareLightboxVideo(video);
-  const src = resolvePlayableMediaUrl(url);
+  const originalUrl = String(url || '');
+  const src = resolvePlayableMediaUrl(originalUrl);
   if (!mediaUrlMatches(video, src)) {
     video.pause();
     video.removeAttribute('src');
@@ -823,10 +1123,11 @@ function setLightboxVideoSource(video, url) {
     video.load();
   }
   video.onerror = () => {
-    if (/\.mov(?=($|[?#]))/i.test(url) && !mediaUrlMatches(video, url)) {
-      video.src = url;
-      video.load();
-    }
+    const fallback = nextVideoSourceFallback(originalUrl, video.src);
+    if (!fallback || mediaUrlMatches(video, fallback)) return;
+    video.src = fallback;
+    video.load();
+    playLightboxVideo(video);
   };
   playLightboxVideo(video);
 }
@@ -850,11 +1151,8 @@ function ensurePhotoLightbox() {
       <button type="button" class="photo-lightbox__nav photo-lightbox__nav--next" aria-label="">
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M10 6 L16 12 L10 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
       </button>
-      <button type="button" class="photo-lightbox__fullscreen" data-lightbox-fullscreen aria-label="" hidden>
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 9 V4 H9 M15 4 H20 V9 M20 15 V20 H15 M9 20 H4 V15" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="photo-lightbox__fullscreen-label"></span>
-      </button>
       <span class="photo-lightbox__counter" aria-hidden="true"></span>
+      <p class="photo-lightbox__caption" hidden></p>
     </div>
   `;
   document.body.appendChild(lightbox);
@@ -866,17 +1164,10 @@ function ensurePhotoLightbox() {
   closeBtn.setAttribute('aria-label', t('home.close'));
   prev.setAttribute('aria-label', t('home.detail.prevPhoto'));
   next.setAttribute('aria-label', t('home.detail.nextPhoto'));
-  const fsLabel = lightbox.querySelector('.photo-lightbox__fullscreen-label');
-  if (fsLabel) fsLabel.textContent = t('home.detail.fullscreen');
-  lightbox.querySelector('[data-lightbox-fullscreen]')?.setAttribute('aria-label', t('home.detail.fullscreen'));
 
   closeEls.forEach((el) => el.addEventListener('click', closePhotoLightbox));
   prev.addEventListener('click', () => stepPhotoLightbox(-1));
   next.addEventListener('click', () => stepPhotoLightbox(1));
-  lightbox.querySelector('[data-lightbox-fullscreen]')
-    ?.addEventListener('click', () => {
-      requestVideoFullscreen(lightbox.querySelector('.photo-lightbox__video'));
-    });
   lightbox.addEventListener('click', (e) => {
     if (e.target === lightbox.querySelector('.photo-lightbox__stage')) closePhotoLightbox();
   });
@@ -902,29 +1193,34 @@ function renderPhotoLightbox() {
     img.insertAdjacentElement('afterend', video);
   }
   const counter = lightbox.querySelector('.photo-lightbox__counter');
+  const captionEl = lightbox.querySelector('.photo-lightbox__caption');
   const prev = lightbox.querySelector('.photo-lightbox__nav--prev');
   const next = lightbox.querySelector('.photo-lightbox__nav--next');
-  const fullscreen = lightbox.querySelector('[data-lightbox-fullscreen]');
   const stage = lightbox.querySelector('.photo-lightbox__stage');
   const url = photoLightboxUrls[photoLightboxIndex] || '';
+  const caption = photoLightboxCaptions[photoLightboxIndex] || '';
+
+  lightbox.classList.toggle('is-video-open', isVideoMediaUrl(url));
+  lightbox.classList.toggle('has-caption', Boolean(caption));
 
   if (isVideoMediaUrl(url)) {
     img.classList.remove('is-active');
     img.removeAttribute('src');
     video.classList.add('is-active');
     setLightboxVideoSource(video, url);
-    if (fullscreen) fullscreen.hidden = false;
   } else {
     video.classList.remove('is-active');
     video.pause();
     video.removeAttribute('src');
     img.classList.add('is-active');
     img.src = url;
-    img.alt = photoLightboxIndex === 0 ? photoLightboxAlt : '';
-    if (fullscreen) fullscreen.hidden = true;
+    img.alt = caption;
+  }
+  if (captionEl) {
+    captionEl.textContent = caption;
+    captionEl.hidden = !caption;
   }
   stage.setAttribute('aria-label', t('home.detail.photoLightbox'));
-  if (fullscreen) fullscreen.setAttribute('aria-label', t('home.detail.fullscreen'));
 
   const multi = photoLightboxUrls.length > 1;
   prev.hidden = !multi;
@@ -937,15 +1233,16 @@ function renderPhotoLightbox() {
   }
 }
 
-function openPhotoLightbox(urls, index = 0, alt = '') {
+function openPhotoLightbox(urls, index = 0, captions = '') {
   if (!urls.length) return;
   photoLightboxUrls = urls;
   photoLightboxIndex = Math.max(0, Math.min(urls.length - 1, index));
-  photoLightboxAlt = alt;
+  photoLightboxCaptions = normalizeLightboxCaptions(urls, captions, index);
   const lightbox = ensurePhotoLightbox();
   renderPhotoLightbox();
   photoLightboxScrollLock = document.body.style.overflow;
   document.body.style.overflow = 'hidden';
+  document.body.classList.add('is-photo-lightbox-open');
   lightbox.hidden = false;
   lightbox.classList.add('is-open');
   lightbox.querySelector('.photo-lightbox__close')?.focus();
@@ -955,7 +1252,8 @@ function closePhotoLightbox() {
   if (!photoLightboxEl || photoLightboxEl.hidden) return;
   photoLightboxEl.querySelector('.photo-lightbox__video')?.pause();
   photoLightboxEl.hidden = true;
-  photoLightboxEl.classList.remove('is-open');
+  photoLightboxEl.classList.remove('is-open', 'is-video-open');
+  document.body.classList.remove('is-photo-lightbox-open');
   document.body.style.overflow = photoLightboxScrollLock;
   photoLightboxScrollLock = '';
 }
@@ -979,6 +1277,12 @@ function initPhotoMosaic(mosaic) {
   if (!urls.length) return;
 
   const alt = mosaic.dataset.imageAlt || '';
+  let captions = [];
+  try {
+    captions = JSON.parse(mosaic.dataset.allCaptions || '[]');
+  } catch {
+    captions = [];
+  }
   const track = mosaic.querySelector('.photo-mosaic__track');
   const counter = mosaic.querySelector('.photo-mosaic__counter');
   const cells = [...mosaic.querySelectorAll('.photo-mosaic__cell')];
@@ -1004,17 +1308,29 @@ function initPhotoMosaic(mosaic) {
     window.requestAnimationFrame(updateCounter);
   }, { passive: true });
 
+  const handleCellTap = (index, e) => {
+    e.stopPropagation();
+    if (mapSheetPeekOpen() && mosaic.closest('.map-sheet__peek-row') && !isVideoMediaUrl(urls[index])) {
+      expandMapSheet();
+      return;
+    }
+    openPhotoLightbox(urls, index, captions.length ? captions : alt);
+  };
+
   cells.forEach((cell, index) => {
     applyPhotoSlideOrientation(cell, cell.querySelector('.photo-mosaic__img, .photo-mosaic__video'));
-    bindGalleryTap(cell, (e) => {
-      e.stopPropagation();
-      if (mapSheetPeekOpen() && mosaic.closest('.map-sheet__peek-row')) {
-        expandMapSheet();
-        return;
-      }
-      openPhotoLightbox(urls, index, alt);
-    }, { scrollRoot: track });
+    cell.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      handleCellTap(index, e);
+    });
   });
+
+  if (cells.length > 1 && track) {
+    bindGalleryTrackDrag(track, cells, handleCellTap);
+  } else if (cells.length === 1) {
+    bindGalleryTap(cells[0], (e) => handleCellTap(0, e));
+  }
 
   updateCounter();
 }
@@ -1024,7 +1340,7 @@ function mountDetailContent(container, card) {
   const item = getItemForCard(card);
   container.replaceChildren(...buildDetailNodes(item));
   container.querySelectorAll('.photo-mosaic').forEach(initPhotoMosaic);
-  initDetailMapCanvases(container);
+  finishDetailMount(container, item);
 }
 
 function buildDetailSection(item, { loop = '' } = {}) {
@@ -1049,18 +1365,19 @@ function findPrimaryDetailSection(id, root = detailScrollRoot) {
   );
 }
 
-function createPeekColButton(step) {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = `map-sheet__peek-col-btn map-sheet__peek-col-btn--${step < 0 ? 'prev' : 'next'}`;
-  btn.setAttribute('aria-label', t(step < 0 ? 'home.mapPrevPin' : 'home.mapNextPin'));
-  const path = step < 0 ? 'M14 6 L8 12 L14 18' : 'M10 6 L16 12 L10 18';
-  btn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="${path}" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
-  btn.addEventListener('click', (e) => {
+function bindMapSheetPeekNavButtons() {
+  mapSheetPeekPrev?.addEventListener('click', (e) => {
     e.stopPropagation();
-    navigateMapSheetPin(step);
+    navigateMapSheetPin(-1);
   });
-  return btn;
+  mapSheetPeekNext?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    navigateMapSheetPin(1);
+  });
+  [mapSheetPeekPrev, mapSheetPeekNext].forEach((btn) => {
+    btn?.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+    btn?.addEventListener('touchend', (e) => e.stopPropagation(), { passive: true });
+  });
 }
 
 function mountMapSheetDetail(card) {
@@ -1075,7 +1392,7 @@ function mountMapSheetDetail(card) {
   const section = buildDetailSection(item);
   mapSheetBody.appendChild(section);
   section.querySelectorAll('.photo-mosaic').forEach(initPhotoMosaic);
-  initDetailMapCanvases(section);
+  finishDetailMount(section, item);
 }
 
 function mountSplitDetail(card) {
@@ -1089,7 +1406,7 @@ function mountSplitDetail(card) {
   const section = buildDetailSection(getItemForCard(card));
   feedDetailBody.appendChild(section);
   section.querySelectorAll('.photo-mosaic').forEach(initPhotoMosaic);
-  initDetailMapCanvases(section);
+  finishDetailMount(section, getItemForCard(card));
 }
 
 function mountMapSheetPeek(card, { direction = 0 } = {}) {
@@ -1103,18 +1420,13 @@ function mountMapSheetPeek(card, { direction = 0 } = {}) {
   else delete mapSheetBody.dataset.peekDirection;
   if (!card) return;
 
-  const multi = getMapPinCards().length > 1;
   const row = document.createElement('div');
   row.className = 'map-sheet__peek-row';
-
-  if (multi) row.appendChild(createPeekColButton(-1));
-
   row.appendChild(buildDetailSection(getItemForCard(card)));
-
-  if (multi) row.appendChild(createPeekColButton(1));
 
   mapSheetBody.appendChild(row);
   row.querySelectorAll('.photo-mosaic').forEach(initPhotoMosaic);
+  finishDetailMount(row.querySelector('.feed-detail__section'), getItemForCard(card));
   syncMapSheetPeekLayout(row);
 
   if (direction) {
@@ -1159,7 +1471,11 @@ function mountContinuousDetail(container, { scrollTo } = {}) {
     visible.forEach((card) => container.appendChild(buildDetailSection(getItemForCard(card), { loop: 'after' })));
   }
   container.querySelectorAll('.photo-mosaic').forEach(initPhotoMosaic);
-  initDetailMapCanvases(container);
+  container.querySelectorAll('.feed-detail__section:not([data-loop])').forEach((section) => {
+    const id = section.dataset.id;
+    const cached = phenomenonCache.get(id);
+    if (cached) finishDetailMount(section, cached);
+  });
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       detailLoopHeight = measureDetailLoopHeight(container);
@@ -1305,10 +1621,10 @@ function appendDetailMeta(head, item) {
   const starter = buildStarterRow(item);
   if (starter) head.appendChild(starter);
 
-  if (item.location) {
+  if (resolveLocationText(item)) {
     const location = document.createElement('p');
     location.className = 'detail__subtitle detail__subtitle--location';
-    location.textContent = formatDetailLocationLabel(item.location);
+    location.textContent = formatDetailLocationLabel(resolveLocationText(item));
     head.appendChild(location);
   }
 
@@ -1353,6 +1669,7 @@ function renderCard(item) {
   if (item.lat != null) card.dataset.lat = String(item.lat);
   if (item.lng != null) card.dataset.lng = String(item.lng);
   if (item.location) card.dataset.location = item.location;
+  if (resolveLocationText(item)) card.dataset.locationSummary = resolveLocationText(item);
   if (item.notes) card.dataset.notes = item.notes;
   if (item.findingHint) card.dataset.findingHint = item.findingHint;
   card.dataset.sightingCount = String(item.sightingCount ?? 0);
@@ -1370,14 +1687,13 @@ function renderCard(item) {
   if (imageUrls[0]) {
     const first = imageUrls[0];
     if (isVideoMediaUrl(first)) {
-      const video = document.createElement('video');
-      video.className = 'card__photo-video';
-      video.src = first;
-      video.muted = true;
-      video.playsInline = true;
-      video.preload = 'metadata';
-      photo.appendChild(video);
-      tuneCardPhoto(video);
+      const img = appendVideoThumbnail(photo, {
+        videoUrl: first,
+        posterUrl: videoPosterUrl(first),
+        className: 'card__photo-video',
+      });
+      photo.appendChild(img);
+      tuneCardPhoto(img);
     } else {
       const img = document.createElement('img');
       img.src = first;
@@ -1397,7 +1713,8 @@ function renderCard(item) {
   title.textContent = item.title;
   body.appendChild(title);
 
-  if (item.location) appendCardLocation(body, item.location);
+  const locationText = resolveLocationText(item);
+  if (locationText) appendCardLocation(body, locationText);
 
   const seenText = buildCardSeenText(item.lastSeenAt);
   if (seenText) {
@@ -1483,26 +1800,220 @@ function openPhenomenonOnMap(item) {
   else openSplitDetail(card);
 }
 
-function googleMapsDirectionsUrl(item) {
-  const lat = Number(item.lat);
-  const lng = Number(item.lng);
+function googleMapsDirectionsUrlForCoords(lat, lng, label) {
   if (Number.isFinite(lat) && Number.isFinite(lng)) {
     return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
   }
-  const place = item.location?.trim();
+  const place = label?.trim();
   if (place) {
     return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place)}`;
   }
   return null;
 }
 
+function getReportedSpots(item) {
+  return (item?.spots ?? []).filter((spot) => {
+    const count = Number(spot.sightingCount ?? 0);
+    if (count > 0) return true;
+    return Boolean(spot.lastSeenAt);
+  });
+}
+
+function getSpotsWithCoords(item) {
+  return getReportedSpots(item).filter((spot) => {
+    const lat = Number(spot.lat);
+    const lng = Number(spot.lng);
+    return Number.isFinite(lat) && Number.isFinite(lng);
+  });
+}
+
+function getPreferredNavSpot(item) {
+  const withCoords = getSpotsWithCoords(item);
+  if (!withCoords.length) return null;
+  return [...withCoords].sort((a, b) => {
+    const aTime = a.lastSeenAt ? new Date(a.lastSeenAt).getTime() : 0;
+    const bTime = b.lastSeenAt ? new Date(b.lastSeenAt).getTime() : 0;
+    if (bTime !== aTime) return bTime - aTime;
+    return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+  })[0];
+}
+
+function getLatestSightingForSpot(item, spotId) {
+  if (!spotId) return null;
+  return (item.recentSightings ?? []).find((sighting) => sighting.spotId === spotId) ?? null;
+}
+
+function resolveDetailMapPoints(item) {
+  const spotPoints = getSpotsWithCoords(item).map((spot) => {
+    const latest = getLatestSightingForSpot(item, spot.id);
+    return {
+      id: spot.id,
+      lat: Number(spot.lat),
+      lng: Number(spot.lng),
+      label: spot.label || spot.name,
+      lastSeenAt: spot.lastSeenAt || latest?.seenAt || null,
+      latestNote: latest?.note?.trim() || null,
+    };
+  });
+  if (spotPoints.length) return spotPoints;
+
+  if ((item?.spots ?? []).length > 0) return [];
+
+  const lat = Number(item?.lat);
+  const lng = Number(item?.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    const latest = item.recentSightings?.[0] ?? null;
+    return [{
+      id: null,
+      lat,
+      lng,
+      label: resolveLocationText(item),
+      lastSeenAt: item.lastSeenAt || latest?.seenAt || null,
+      latestNote: latest?.note?.trim() || null,
+    }];
+  }
+  return [];
+}
+
+function detailSpotTooltipText(point) {
+  if (point.lastSeenAt) {
+    return formatRelativeTime(point.lastSeenAt) || formatSightingDate(point.lastSeenAt);
+  }
+  return point.label || '';
+}
+
+function detailSpotTooltipOptions() {
+  return {
+    permanent: false,
+    direction: 'top',
+    offset: [0, -34],
+    opacity: 1,
+    className: 'detail-map-tooltip',
+  };
+}
+
+function ensureDetailMapPinHint(canvas) {
+  const preview = canvas.closest('.detail__map-preview');
+  if (!preview) return null;
+  let hint = preview.querySelector('.detail__map-pin-hint');
+  if (!hint) {
+    hint = document.createElement('div');
+    hint.className = 'detail__map-pin-hint';
+    hint.hidden = true;
+    preview.appendChild(hint);
+  }
+  return hint;
+}
+
+function bindDetailSpotHoverHint(marker, point, canvas) {
+  const text = detailSpotTooltipText(point);
+  if (!text) return;
+  const hint = ensureDetailMapPinHint(canvas);
+  if (!hint) return;
+  marker.on('mouseover', () => {
+    hint.textContent = text;
+    hint.hidden = false;
+  });
+  marker.on('mouseout', () => {
+    hint.hidden = true;
+  });
+}
+
+function googleMapsDirectionsUrl(item, spot) {
+  if (spot) {
+    return googleMapsDirectionsUrlForCoords(
+      Number(spot.lat),
+      Number(spot.lng),
+      spot.label || spot.name,
+    );
+  }
+
+  const preferred = getPreferredNavSpot(item);
+  if (preferred) {
+    return googleMapsDirectionsUrlForCoords(
+      Number(preferred.lat),
+      Number(preferred.lng),
+      preferred.label || preferred.name,
+    );
+  }
+
+  return googleMapsDirectionsUrlForCoords(
+    Number(item?.lat),
+    Number(item?.lng),
+    resolveLocationText(item) || item?.location,
+  );
+}
+
+function buildSightingUrl(phenomenonId, spotId) {
+  const params = new URLSearchParams({ phenomenon: phenomenonId });
+  if (spotId) params.set('spot', spotId);
+  return `/sighting?${params.toString()}`;
+}
+
 const detailMiniMapRegistry = new WeakMap();
+const detailMapMarkerRegistry = new WeakMap();
 let detailMapOverlayEl = null;
 let detailMapOverlayMap = null;
 let detailMapOverlayScrollLock = '';
+let detailMapOverlayMarkers = null;
+let detailMapOverlayItem = null;
+let detailMapOverlayPoints = [];
+let detailMapOverlayCategory = 'plant';
+
+const DETAIL_PIN_SIZE = [22, 29];
+const DETAIL_PIN_ANCHOR = [11, 29];
+
+function detailSpotPinIcon(category, { active = false, dim = false } = {}) {
+  const classes = ['map-pin', 'map-pin--detail'];
+  if (active) classes.push('is-active');
+  else if (dim) classes.push('is-dim');
+  return L.divIcon({
+    html: `<span class="${classes.join(' ')}" data-category="${category}"></span>`,
+    className: 'map-pin-wrapper',
+    iconSize: DETAIL_PIN_SIZE,
+    iconAnchor: DETAIL_PIN_ANCHOR,
+  });
+}
+
+function fitDetailMiniMapToPoints(map, points) {
+  if (!map || points.length < 2) return;
+  map.fitBounds(
+    L.latLngBounds(points.map((point) => [point.lat, point.lng])),
+    {
+      paddingTopLeft: L.point(22, 30),
+      paddingBottomRight: L.point(22, 38),
+      maxZoom: 14,
+      animate: false,
+    },
+  );
+}
+
+const detailMiniMapDragState = new WeakMap();
+
+function bindDetailMiniMapInteraction(canvas, map) {
+  const preview = canvas.closest('.detail__map-preview');
+  if (!preview) return;
+
+  let state = detailMiniMapDragState.get(canvas);
+  if (!state) {
+    state = { dragged: false };
+    detailMiniMapDragState.set(canvas, state);
+    preview.addEventListener('click', (e) => {
+      if (state.dragged) {
+        state.dragged = false;
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+  }
+
+  map.on('dragstart', () => { state.dragged = false; });
+  map.on('drag', () => { state.dragged = true; });
+}
 
 function destroyDetailMaps(root) {
   root?.querySelectorAll('.detail__map-canvas').forEach((canvas) => {
+    detailMapMarkerRegistry.delete(canvas);
     const map = detailMiniMapRegistry.get(canvas);
     if (map) {
       map.remove();
@@ -1511,14 +2022,110 @@ function destroyDetailMaps(root) {
   });
 }
 
-function initDetailMiniMap(canvas, lat, lng) {
+function updateDetailMapSpotSelection(root, item, spotId) {
+  const canvas = root.querySelector('.detail__map-canvas');
+  if (!canvas) return;
+  const markers = detailMapMarkerRegistry.get(canvas);
+  if (!markers) return;
+
+  const category = canvas.dataset.category || item.category || 'plant';
+  const multi = markers.size > 1;
+  markers.forEach((marker, id) => {
+    const active = id === spotId;
+    marker.setIcon(detailSpotPinIcon(category, { active, dim: multi && !active }));
+  });
+}
+
+function applyDetailSpotSelection(root, item, spotId) {
+  const spot = item.spots?.find((entry) => entry.id === spotId);
+  if (!spot) return;
+
+  const hero = root.querySelector('.detail__hero') || root;
+  hero.dataset.selectedSpotId = spotId;
+
+  root.querySelectorAll('.detail__spot-item').forEach((li) => {
+    const selected = li.dataset.spotId === spotId;
+    li.classList.toggle('is-selected', selected);
+    li.setAttribute('aria-selected', selected ? 'true' : 'false');
+  });
+
+  const navBtn = root.querySelector('.detail__action--nav');
+  const reportBtn = root.querySelector('.detail__action--primary');
+  const mapsUrl = googleMapsDirectionsUrl(item, spot);
+  if (navBtn) {
+    if (mapsUrl) {
+      navBtn.href = mapsUrl;
+      navBtn.hidden = false;
+    } else {
+      navBtn.hidden = true;
+    }
+  }
+  if (reportBtn) {
+    reportBtn.href = buildSightingUrl(item.id, spotId);
+  }
+
+  updateDetailMapSpotSelection(root, item, spotId);
+}
+
+function initDetailSpotSelection(root, item) {
+  const spots = getReportedSpots(item);
+  if (!spots.length) return;
+
+  let defaultId = getPreferredNavSpot(item)?.id || spots[0].id;
+  const preferredFromLink = consumePendingDeepLinkSpotId();
+  if (preferredFromLink && spots.some((spot) => spot.id === preferredFromLink)) {
+    defaultId = preferredFromLink;
+  }
+  applyDetailSpotSelection(root, item, defaultId);
+
+  if (spots.length === 1) return;
+
+  root.querySelectorAll('.detail__spot-item').forEach((li) => {
+    li.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = li.dataset.spotId;
+      if (id) applyDetailSpotSelection(root, item, id);
+    });
+    li.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        li.click();
+      }
+    });
+  });
+}
+
+function finishDetailMount(root, item) {
+  initDetailMapCanvases(root);
+  if (item) initDetailSpotSelection(root, item);
+}
+
+function initDetailMiniMap(canvas) {
   if (!canvas || typeof L === 'undefined') return null;
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   if (detailMiniMapRegistry.has(canvas)) return detailMiniMapRegistry.get(canvas);
+
+  let points = [];
+  try {
+    points = JSON.parse(canvas.dataset.mapPoints || '[]');
+  } catch {
+    points = [];
+  }
+  if (!points.length) {
+    const lat = Number(canvas.dataset.lat);
+    const lng = Number(canvas.dataset.lng);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      points = [{ lat, lng, label: '' }];
+    }
+  }
+  if (!points.length) return null;
+
+  const category = canvas.dataset.category || 'plant';
+  const phenomenonId = canvas.dataset.phenomenonId;
+  const item = phenomenonId ? phenomenonCache.get(phenomenonId) : null;
 
   const map = L.map(canvas, {
     zoomControl: false,
-    dragging: false,
+    dragging: true,
     scrollWheelZoom: false,
     touchZoom: false,
     doubleClickZoom: false,
@@ -1527,18 +2134,53 @@ function initDetailMiniMap(canvas, lat, lng) {
     attributionControl: false,
   });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-  L.marker([lat, lng]).addTo(map);
-  map.setView([lat, lng], 15, { animate: false });
+  bindDetailMiniMapInteraction(canvas, map);
+
+  const markers = new Map();
+  const multi = points.length > 1;
+  points.forEach((point) => {
+    const marker = L.marker([point.lat, point.lng], {
+      icon: detailSpotPinIcon(category, { dim: multi }),
+    }).addTo(map);
+    bindDetailSpotHoverHint(marker, point, canvas);
+    if (point.id) {
+      markers.set(point.id, marker);
+      if (item) {
+        marker.on('click', (e) => {
+          if (e.originalEvent) {
+            e.originalEvent.stopPropagation();
+            e.originalEvent.preventDefault();
+          }
+          const root = canvas.closest('.feed-detail__section')
+            || canvas.closest('.card-modal__body')
+            || canvas.closest('.map-sheet__body')
+            || canvas.closest('.feed-detail__body')
+            || canvas.parentElement;
+          if (root) applyDetailSpotSelection(root, item, point.id);
+        });
+      }
+    }
+  });
+
+  if (points.length === 1) {
+    map.setView([points[0].lat, points[0].lng], 15, { animate: false });
+  } else {
+    fitDetailMiniMapToPoints(map, points);
+  }
+
   detailMiniMapRegistry.set(canvas, map);
-  requestAnimationFrame(() => map.invalidateSize({ animate: false }));
+  detailMapMarkerRegistry.set(canvas, markers);
+  const refit = () => {
+    map.invalidateSize({ animate: false });
+    if (points.length > 1) fitDetailMiniMapToPoints(map, points);
+  };
+  requestAnimationFrame(() => requestAnimationFrame(refit));
   return map;
 }
 
 function initDetailMapCanvases(root) {
   root?.querySelectorAll('.detail__map-canvas').forEach((canvas) => {
-    const lat = Number(canvas.dataset.lat);
-    const lng = Number(canvas.dataset.lng);
-    initDetailMiniMap(canvas, lat, lng);
+    initDetailMiniMap(canvas);
   });
 }
 
@@ -1551,7 +2193,141 @@ function closeDetailMapOverlay() {
     detailMapOverlayMap.remove();
     detailMapOverlayMap = null;
   }
+  detailMapOverlayMarkers = null;
+  detailMapOverlayItem = null;
+  detailMapOverlayPoints = [];
   detailMapOverlayEl.querySelector('.detail-map-overlay__canvas')?.replaceChildren();
+}
+
+function findDetailRootsForPhenomenon(phenomenonId) {
+  const roots = [];
+  document.querySelectorAll(
+    `.feed-detail__section[data-id="${CSS.escape(phenomenonId)}"]:not([data-loop])`,
+  ).forEach((el) => roots.push(el));
+  if (cardModalBody?.querySelector(`.detail__hero[data-phenomenon-id="${phenomenonId}"]`)) {
+    roots.push(cardModalBody);
+  }
+  return roots;
+}
+
+function syncDetailSpotFromOverlay(item, spotId) {
+  if (!spotId) return;
+  findDetailRootsForPhenomenon(item.id).forEach((root) => {
+    applyDetailSpotSelection(root, item, spotId);
+  });
+}
+
+function applyDetailOverlaySpotSelection(spotId) {
+  const item = detailMapOverlayItem;
+  const overlay = detailMapOverlayEl;
+  if (!item || !overlay || !detailMapOverlayPoints.length) return;
+
+  const point = detailMapOverlayPoints.find((entry) => entry.id === spotId)
+    || detailMapOverlayPoints[0];
+  if (!point) return;
+
+  const resolvedSpotId = point.id || spotId;
+  const spot = item.spots?.find((entry) => entry.id === resolvedSpotId) || point;
+  const multi = detailMapOverlayPoints.length > 1;
+
+  detailMapOverlayMarkers?.forEach((marker, id) => {
+    const active = id === resolvedSpotId;
+    marker.setIcon(detailSpotPinIcon(detailMapOverlayCategory, { active, dim: multi && !active }));
+  });
+
+  overlay.querySelectorAll('.detail-map-overlay__spot').forEach((btn) => {
+    const selected = btn.dataset.spotId === resolvedSpotId;
+    btn.classList.toggle('is-selected', selected);
+    btn.setAttribute('aria-selected', selected ? 'true' : 'false');
+  });
+
+  const metaEl = overlay.querySelector('.detail-map-overlay__spot-meta');
+  const noteEl = overlay.querySelector('.detail-map-overlay__spot-note');
+  if (metaEl) {
+    metaEl.replaceChildren();
+    const name = document.createElement('strong');
+    name.className = 'detail-map-overlay__spot-name';
+    name.textContent = point.label || spot.label || spot.name || '';
+    metaEl.appendChild(name);
+    if (point.lastSeenAt) {
+      const when = document.createElement('span');
+      when.className = 'detail-map-overlay__spot-when';
+      when.textContent = formatRelativeTime(point.lastSeenAt) || formatSightingDate(point.lastSeenAt);
+      metaEl.appendChild(when);
+    }
+  }
+
+  if (noteEl) {
+    noteEl.replaceChildren();
+    const latest = getLatestSightingForSpot(item, resolvedSpotId);
+    if (latest?.observerName || latest?.userId || latest?.note?.trim()) {
+      if (latest.observerName || latest.userId) {
+        const reporter = document.createElement('div');
+        reporter.className = 'detail-map-overlay__reporter';
+        reporter.append(
+          buildMemberAvatar({
+            userId: latest.userId,
+            name: latest.observerName,
+            avatarUrl: latest.observerAvatarUrl,
+            category: item.category,
+          }, { className: 'detail-map-overlay__avatar' }),
+          buildMemberName({
+            userId: latest.userId,
+            name: latest.observerName,
+            className: 'detail-map-overlay__reporter-name',
+          }),
+        );
+        noteEl.appendChild(reporter);
+      }
+      if (latest.note?.trim()) {
+        appendRichText(noteEl, latest.note, 'detail-map-overlay__note-text');
+      }
+    } else {
+      const empty = document.createElement('p');
+      empty.className = 'detail-map-overlay__note-empty';
+      empty.textContent = t('home.detail.overlayNoReport');
+      noteEl.appendChild(empty);
+    }
+  }
+
+  const navBtn = overlay.querySelector('.detail-map-overlay__action--nav');
+  const reportBtn = overlay.querySelector('.detail-map-overlay__action--report');
+  const mapsUrl = googleMapsDirectionsUrl(item, spot);
+  if (navBtn) {
+    if (mapsUrl) {
+      navBtn.href = mapsUrl;
+      navBtn.hidden = false;
+    } else {
+      navBtn.hidden = true;
+    }
+  }
+  if (reportBtn && resolvedSpotId) {
+    reportBtn.href = buildSightingUrl(item.id, resolvedSpotId);
+  }
+
+  overlay.dataset.selectedSpotId = resolvedSpotId || '';
+  if (resolvedSpotId) syncDetailSpotFromOverlay(item, resolvedSpotId);
+}
+
+function renderDetailMapOverlaySpots(points) {
+  const overlay = detailMapOverlayEl;
+  if (!overlay) return;
+  const listEl = overlay.querySelector('.detail-map-overlay__spots');
+  if (!listEl) return;
+
+  const selectable = points.filter((point) => point.id);
+  listEl.replaceChildren();
+  listEl.hidden = selectable.length <= 1;
+  selectable.forEach((point) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'detail-map-overlay__spot';
+    btn.dataset.spotId = point.id;
+    btn.setAttribute('role', 'option');
+    btn.textContent = point.label;
+    btn.addEventListener('click', () => applyDetailOverlaySpotSelection(point.id));
+    listEl.appendChild(btn);
+  });
 }
 
 function ensureDetailMapOverlay() {
@@ -1582,7 +2358,42 @@ function ensureDetailMapOverlay() {
   canvas.className = 'detail-map-overlay__canvas';
   canvasWrap.appendChild(canvas);
 
-  overlay.append(top, canvasWrap);
+  const panel = document.createElement('div');
+  panel.className = 'detail-map-overlay__panel';
+
+  const list = document.createElement('div');
+  list.className = 'detail-map-overlay__spots';
+  list.setAttribute('role', 'listbox');
+  list.hidden = true;
+
+  const info = document.createElement('div');
+  info.className = 'detail-map-overlay__spot-info';
+
+  const meta = document.createElement('div');
+  meta.className = 'detail-map-overlay__spot-meta';
+
+  const note = document.createElement('div');
+  note.className = 'detail-map-overlay__spot-note';
+
+  info.append(meta, note);
+
+  const actions = document.createElement('div');
+  actions.className = 'detail-map-overlay__actions';
+
+  const navBtn = document.createElement('a');
+  navBtn.className = 'detail__action detail__action--nav detail-map-overlay__action--nav';
+  navBtn.target = '_blank';
+  navBtn.rel = 'noopener noreferrer';
+  navBtn.innerHTML = `${detailActionIcon('navigate')}<span>${t('home.detail.navigateShort')}</span>`;
+
+  const reportBtn = document.createElement('a');
+  reportBtn.className = 'detail__action detail__action--primary detail-map-overlay__action--report';
+  reportBtn.innerHTML = `${detailActionIcon('report')}<span>${t('home.detail.iAlsoWent')}</span>`;
+
+  actions.append(navBtn, reportBtn);
+  panel.append(list, info, actions);
+
+  overlay.append(top, canvasWrap, panel);
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeDetailMapOverlay();
   });
@@ -1591,26 +2402,25 @@ function ensureDetailMapOverlay() {
   return overlay;
 }
 
-function openDetailMapOverlay(item) {
-  const lat = Number(item.lat);
-  const lng = Number(item.lng);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+async function openDetailMapOverlay(item, selectedSpotId) {
+  const fullItem = (await ensurePhenomenonDetail(item.id)) ?? item;
+  const points = resolveDetailMapPoints(fullItem);
+  if (!points.length) return;
+
+  detailMapOverlayItem = fullItem;
+  detailMapOverlayPoints = points;
+  detailMapOverlayCategory = fullItem.category || 'plant';
+  detailMapOverlayMarkers = new Map();
+
+  const defaultSpotId = selectedSpotId
+    || getPreferredNavSpot(fullItem)?.id
+    || points.find((point) => point.id)?.id
+    || null;
 
   const overlay = ensureDetailMapOverlay();
   const canvas = overlay.querySelector('.detail-map-overlay__canvas');
-  const navSlot = overlay.querySelector('.detail-map-overlay__nav-slot');
-  navSlot.replaceChildren();
-
-  const mapsUrl = googleMapsDirectionsUrl(item);
-  if (mapsUrl) {
-    const navBtn = document.createElement('a');
-    navBtn.className = 'detail__action detail-map-overlay__nav';
-    navBtn.href = mapsUrl;
-    navBtn.target = '_blank';
-    navBtn.rel = 'noopener noreferrer';
-    navBtn.innerHTML = `${detailActionIcon('navigate')}<span>${t('home.detail.navigate')}</span>`;
-    navSlot.appendChild(navBtn);
-  }
+  overlay.querySelector('.detail-map-overlay__nav-slot')?.replaceChildren();
+  renderDetailMapOverlaySpots(points);
 
   overlay.hidden = false;
   detailMapOverlayScrollLock = document.body.style.overflow;
@@ -1631,8 +2441,35 @@ function openDetailMapOverlay(item) {
       attribution: '&copy; OpenStreetMap',
       maxZoom: 19,
     }).addTo(detailMapOverlayMap);
-    L.marker([lat, lng]).addTo(detailMapOverlayMap);
-    detailMapOverlayMap.setView([lat, lng], 16, { animate: false });
+
+    const multi = points.length > 1;
+    points.forEach((point) => {
+      const active = Boolean(defaultSpotId && point.id === defaultSpotId);
+      const marker = L.marker([point.lat, point.lng], {
+        icon: detailSpotPinIcon(detailMapOverlayCategory, { active, dim: multi && !active }),
+      }).addTo(detailMapOverlayMap);
+      if (point.id) {
+        detailMapOverlayMarkers.set(point.id, marker);
+        marker.on('click', () => applyDetailOverlaySpotSelection(point.id));
+      }
+    });
+
+    if (defaultSpotId && multi) {
+      const focusPoint = points.find((point) => point.id === defaultSpotId);
+      if (focusPoint) {
+        detailMapOverlayMap.setView([focusPoint.lat, focusPoint.lng], 16, { animate: false });
+      }
+    } else if (points.length === 1) {
+      detailMapOverlayMap.setView([points[0].lat, points[0].lng], 16, { animate: false });
+    } else {
+      detailMapOverlayMap.fitBounds(
+        L.latLngBounds(points.map((point) => [point.lat, point.lng])),
+        { padding: [36, 36], maxZoom: 16, animate: false },
+      );
+    }
+
+    applyDetailOverlaySpotSelection(defaultSpotId || points[0]?.id);
+
     requestAnimationFrame(() => detailMapOverlayMap?.invalidateSize({ animate: false }));
   });
 }
@@ -1841,16 +2678,85 @@ function detailActionIcon(type, { filled = false } = {}) {
   return '';
 }
 
+function buildSpotsSection(item) {
+  const spotList = getReportedSpots(item);
+  if (spotList.length <= 1) return null;
+
+  const section = document.createElement('section');
+  section.className = 'detail__spots detail__block';
+
+  const heading = document.createElement('h4');
+  heading.className = 'detail__section-title detail__section-title--spots';
+  heading.textContent = t('home.detail.spotsHeading');
+  section.appendChild(heading);
+
+  const list = document.createElement('ul');
+  list.className = 'detail__spot-list';
+  list.setAttribute('role', 'listbox');
+  list.setAttribute('aria-label', t('home.detail.spotsHeading'));
+
+  spotList.forEach((spot) => {
+    const li = document.createElement('li');
+    li.className = 'detail__spot-item';
+    li.dataset.spotId = spot.id;
+    li.setAttribute('role', 'option');
+    li.tabIndex = 0;
+
+    const name = document.createElement('span');
+    name.className = 'detail__spot-name';
+    name.textContent = spot.label || spot.name;
+    li.appendChild(name);
+
+    const metaParts = [];
+    if (spot.lastSeenAt) {
+      const when = formatRelativeTime(spot.lastSeenAt) || formatSightingDate(spot.lastSeenAt);
+      if (when) metaParts.push(when);
+    }
+    if (metaParts.length) {
+      const meta = document.createElement('span');
+      meta.className = 'detail__spot-meta';
+      meta.textContent = metaParts.join(' · ');
+      li.appendChild(meta);
+    }
+
+    list.appendChild(li);
+  });
+
+  section.appendChild(list);
+  return section;
+}
+
 function buildSightingReportLink(item) {
   const reportLink = document.createElement('a');
   reportLink.className = 'detail__action detail__action--primary';
-  reportLink.href = `/sighting?phenomenon=${encodeURIComponent(item.id)}`;
+  const preferred = getPreferredNavSpot(item) || getReportedSpots(item)[0];
+  reportLink.href = buildSightingUrl(item.id, preferred?.id);
   reportLink.innerHTML = `${detailActionIcon('report')}<span>${t('home.detail.iAlsoWent')}</span>`;
   reportLink.addEventListener('click', (e) => e.stopPropagation());
   return reportLink;
 }
 
-function buildDetailMapActions(item, { includeTrack = true } = {}) {
+function buildDetailTrackButton(item) {
+  const trackBtn = document.createElement('button');
+  trackBtn.type = 'button';
+  trackBtn.className = 'detail__action detail__action--track detail__title-track';
+  trackBtn.dataset.id = item.id;
+  renderTrackButton(trackBtn, item.id);
+  trackBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setPhenomenonTracked(item.id, !isPhenomenonTracked(item.id));
+  });
+  return trackBtn;
+}
+
+function buildDetailReportHint() {
+  const hint = document.createElement('p');
+  hint.className = 'detail__report-hint';
+  hint.textContent = t('home.detail.reportElsewhereHint');
+  return hint;
+}
+
+function buildDetailMapActions(item) {
   const actions = document.createElement('div');
   actions.className = 'detail__map-actions';
 
@@ -1864,34 +2770,26 @@ function buildDetailMapActions(item, { includeTrack = true } = {}) {
     navBtn.innerHTML = `${detailActionIcon('navigate')}<span>${t('home.detail.navigateShort')}</span>`;
     navBtn.addEventListener('click', (e) => e.stopPropagation());
     actions.appendChild(navBtn);
+  } else {
+    actions.classList.add('detail__map-actions--solo');
   }
 
-  const reportLink = buildSightingReportLink(item);
-  actions.appendChild(reportLink);
-
-  if (includeTrack) {
-    const trackBtn = document.createElement('button');
-    trackBtn.type = 'button';
-    trackBtn.className = 'detail__action detail__action--track';
-    trackBtn.dataset.id = item.id;
-    renderTrackButton(trackBtn, item.id);
-    trackBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      setPhenomenonTracked(item.id, !isPhenomenonTracked(item.id));
-    });
-    actions.appendChild(trackBtn);
-  }
+  const reportCol = document.createElement('div');
+  reportCol.className = 'detail__map-report-col';
+  reportCol.append(buildSightingReportLink(item), buildDetailReportHint());
+  actions.appendChild(reportCol);
 
   return actions;
 }
 
 function buildDetailMapBlock(item) {
-  const lat = Number(item.lat);
-  const lng = Number(item.lng);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    const actions = buildDetailMapActions(item);
-    actions.className = 'detail__actions detail__actions--no-map';
-    return actions;
+  const mapPoints = resolveDetailMapPoints(item);
+  if (!mapPoints.length) {
+    const wrap = document.createElement('div');
+    wrap.className = 'detail__map-actions-wrap';
+    wrap.append(buildDetailMapActions(item));
+    wrap.classList.add('detail__actions', 'detail__actions--no-map');
+    return wrap;
   }
 
   const block = document.createElement('section');
@@ -1904,55 +2802,173 @@ function buildDetailMapBlock(item) {
 
   const canvas = document.createElement('div');
   canvas.className = 'detail__map-canvas';
-  canvas.dataset.lat = String(lat);
-  canvas.dataset.lng = String(lng);
+  canvas.dataset.mapPoints = JSON.stringify(mapPoints);
+  canvas.dataset.category = item.category || 'plant';
+  canvas.dataset.phenomenonId = item.id;
   previewBtn.appendChild(canvas);
 
   const expand = document.createElement('span');
   expand.className = 'detail__map-expand';
-  expand.textContent = t('home.detail.openMap');
+  expand.setAttribute('aria-hidden', 'true');
+  expand.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M8 4h12v12M20 4L10 14M14 20H4V10" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
   previewBtn.appendChild(expand);
 
   previewBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    openDetailMapOverlay(item);
+    const hero = previewBtn.closest('.detail__hero');
+    void openDetailMapOverlay(item, hero?.dataset?.selectedSpotId);
   });
 
   block.append(previewBtn, buildDetailMapActions(item));
   return block;
 }
 
-function buildObserverGroup(item) {
-  const observers = item.observers?.length
-    ? item.observers
-    : (item.observerName ? [{ userId: item.userId, name: item.observerName, avatarUrl: null }] : []);
-  if (!observers.length) return null;
+function bindObserverItemToggles(root = document) {
+  root.querySelectorAll('.observer-item__toggle').forEach((btn) => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+      const item = btn.closest('.observer-item');
+      if (!item) return;
+      const isOpen = item.classList.toggle('is-open');
+      btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+  });
+}
 
-  const row = document.createElement('div');
-  row.className = 'detail__observers';
-  const avatars = document.createElement('div');
-  avatars.className = 'detail__observer-avatars';
-  observers.slice(0, 4).forEach((observer) => {
-    avatars.appendChild(buildMemberAvatar({
+function resolveObserverProfiles(item) {
+  const apiObservers = item?.observers?.length ? item.observers : [];
+  if (!apiObservers.length) return [];
+
+  return apiObservers.map((observer) => {
+    const bio = observer.bio?.trim() || '';
+    return {
       userId: observer.userId,
       name: observer.name,
       avatarUrl: observer.avatarUrl,
-      category: item.category,
-    }, { className: 'detail__member-avatar detail__member-avatar--sm' }));
+      category: item.category || 'plant',
+      bioParagraphs: bio ? [bio] : [],
+    };
   });
-  if (observers.length > 4) {
-    const more = document.createElement('span');
-    more.className = 'detail__observer-more';
-    more.textContent = `+${observers.length - 4}`;
-    avatars.appendChild(more);
+}
+
+function buildObserverAvatarShell({ name, avatarUrl, category }, { className = 'avatar--sm' } = {}) {
+  const avatar = document.createElement('span');
+  avatar.className = `avatar ${className}`;
+  if (avatarUrl) {
+    const img = document.createElement('img');
+    img.src = avatarUrl;
+    img.alt = '';
+    img.className = 'detail__member-avatar-img';
+    avatar.appendChild(img);
+  } else {
+    avatar.dataset.cat = category || 'plant';
+    avatar.textContent = observerInitial(name);
   }
-  const label = document.createElement('p');
-  label.className = 'detail__observer-label';
-  label.textContent = observers.length === 1
-    ? t('home.detail.observersOne', { count: observers.length })
-    : t('home.detail.observersMany', { count: observers.length });
-  row.append(avatars, label);
-  return row;
+  return avatar;
+}
+
+function buildObserverListItem(profile) {
+  const li = document.createElement('li');
+  li.className = 'observer-item';
+  const hasBody = profile.bioParagraphs.length > 0 || profile.userId;
+
+  if (!hasBody) {
+    const row = document.createElement('div');
+    row.className = 'observer-item__row';
+    row.appendChild(buildObserverAvatarShell({
+      name: profile.name,
+      avatarUrl: profile.avatarUrl,
+      category: profile.category,
+    }));
+    const name = document.createElement('span');
+    name.className = 'observer-item__name';
+    name.textContent = profile.name;
+    row.appendChild(name);
+    li.appendChild(row);
+    return li;
+  }
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'observer-item__toggle';
+  toggle.setAttribute('aria-expanded', 'false');
+
+  toggle.appendChild(buildObserverAvatarShell({
+    name: profile.name,
+    avatarUrl: profile.avatarUrl,
+    category: profile.category,
+  }));
+
+  const name = document.createElement('span');
+  name.className = 'observer-item__name';
+  name.textContent = profile.name;
+  toggle.appendChild(name);
+
+  const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  chevron.setAttribute('class', 'observer-item__chevron');
+  chevron.setAttribute('viewBox', '0 0 24 24');
+  chevron.setAttribute('width', '14');
+  chevron.setAttribute('height', '14');
+  chevron.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M6 9 L12 15 L18 9');
+  path.setAttribute('stroke', 'currentColor');
+  path.setAttribute('stroke-width', '2.4');
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('stroke-linejoin', 'round');
+  path.setAttribute('fill', 'none');
+  chevron.appendChild(path);
+  toggle.appendChild(chevron);
+
+  const body = document.createElement('div');
+  body.className = 'observer-item__body';
+  const inner = document.createElement('div');
+  inner.className = 'observer-item__body-inner';
+  profile.bioParagraphs.forEach((paragraph) => {
+    const p = document.createElement('p');
+    p.textContent = paragraph;
+    inner.appendChild(p);
+  });
+  const profileUrl = memberProfileUrl(profile.userId);
+  if (profileUrl) {
+    const link = document.createElement('a');
+    link.className = 'observer-item__link';
+    link.href = profileUrl;
+    link.textContent = t('home.observers.viewProfile');
+    inner.appendChild(link);
+  }
+  body.appendChild(inner);
+
+  li.append(toggle, body);
+  return li;
+}
+
+function buildObserversSection(item) {
+  const profiles = resolveObserverProfiles(item);
+  if (!profiles.length) return null;
+
+  const section = document.createElement('section');
+  section.className = 'detail__observers-section';
+
+  const heading = document.createElement('h4');
+  heading.className = 'detail__section-title detail__section-title--observers';
+  heading.textContent = t('home.detail.observersTitle');
+  section.appendChild(heading);
+
+  const intro = document.createElement('p');
+  intro.className = 'detail__observers-intro';
+  intro.textContent = t('home.detail.observersIntro');
+  section.appendChild(intro);
+
+  const list = document.createElement('ul');
+  list.className = 'observer-list detail__observer-list';
+  profiles.forEach((profile) => {
+    list.appendChild(buildObserverListItem(profile));
+  });
+  section.appendChild(list);
+  bindObserverItemToggles(section);
+  return section;
 }
 
 function buildSightingsTimeline(item) {
@@ -2004,6 +3020,13 @@ function buildSightingsTimeline(item) {
     head.append(author, date);
     entry.appendChild(head);
 
+    if (sighting.spotLabel) {
+      const spot = document.createElement('p');
+      spot.className = 'detail__sighting-spot';
+      spot.textContent = sighting.spotLabel;
+      entry.appendChild(spot);
+    }
+
     if (sighting.note) {
       appendRichText(entry, sighting.note, 'detail__sighting-note');
     }
@@ -2020,29 +3043,50 @@ function buildSightingsTimeline(item) {
       const photos = document.createElement('div');
       photos.className = 'detail__sighting-photos';
       const urls = sighting.images.map((image) => image.imageUrl);
+      const captions = sighting.images.map((image) => image.imageAlt || '');
       sighting.images.forEach((image, imgIndex) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
         const isVideo = isVideoMediaUrl(image.imageUrl);
-        btn.className = `detail__sighting-photo-btn${isVideo ? ' is-video' : ''}`;
-        btn.setAttribute('aria-label', isVideo
+        const item = document.createElement('div');
+        item.className = `detail__sighting-photo-item${isVideo ? ' is-video' : ''}`;
+        item.setAttribute('role', 'button');
+        item.tabIndex = 0;
+        item.setAttribute('aria-label', isVideo
           ? t('submit.photo.openVideo')
           : t('home.detail.openPhoto', { index: imgIndex + 1, total: urls.length }));
-        appendMediaPreview(btn, image.imageUrl, {
+        appendMediaPreview(item, image.imageUrl, {
           alt: image.imageAlt || '',
           className: 'detail__sighting-media',
         });
         if (isVideo) {
-          const fsHint = document.createElement('span');
-          fsHint.className = 'detail__sighting-fullscreen-hint';
-          fsHint.textContent = t('home.detail.fullscreen');
-          btn.appendChild(fsHint);
+          const video = item.querySelector('video.detail__sighting-video');
+          mountMediaExpandButton(item, () => {
+            openPhotoLightbox(urls, imgIndex, captions);
+          });
+          item.addEventListener('click', (e) => {
+            if (e.target.closest('.detail-media__expand')) return;
+            e.stopPropagation();
+            toggleInlineVideo(video);
+          });
+          item.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              toggleInlineVideo(video);
+            }
+          });
+        } else {
+          const open = (e) => {
+            e.stopPropagation();
+            openPhotoLightbox(urls, imgIndex, captions);
+          };
+          bindGalleryTap(item, open, { scrollRoot: urls.length > 1 ? photos : null });
+          item.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              open(e);
+            }
+          });
         }
-        bindGalleryTap(btn, (e) => {
-          e.stopPropagation();
-          openPhotoLightbox(urls, imgIndex, image.imageAlt || '');
-        }, { scrollRoot: photos.length > 1 ? photos : null });
-        photos.appendChild(btn);
+        photos.appendChild(item);
       });
       entry.appendChild(photos);
     }
@@ -2055,9 +3099,12 @@ function buildSightingsTimeline(item) {
     }
   });
 
+  const reportWrap = document.createElement('div');
+  reportWrap.className = 'detail__sightings-report-wrap';
   const reportBtn = buildSightingReportLink(item);
   reportBtn.classList.add('detail__sightings-report');
-  wrap.appendChild(reportBtn);
+  reportWrap.append(reportBtn, buildDetailReportHint());
+  wrap.appendChild(reportWrap);
 
   return wrap;
 }
@@ -2124,11 +3171,12 @@ function buildAboutSection(item) {
 
 // Builds detail nodes shared by the map sheet, card modal, and split detail.
 function buildDetailNodes(item) {
-  const imageUrls = resolveImageUrls(item);
-  const photoWrap = buildPhotoMosaic(imageUrls, item.imageAlt || '', { phenomenonId: item.id });
+  const formImages = resolveFormImages(item);
+  const photoWrap = buildPhotoMosaic(formImages, item.imageAlt || '', { phenomenonId: item.id });
 
   const body = document.createElement('div');
   body.className = 'card__body detail__hero';
+  body.dataset.phenomenonId = item.id;
 
   const head = document.createElement('div');
   head.className = 'detail__head';
@@ -2140,6 +3188,9 @@ function buildDetailNodes(item) {
   title.textContent = item.title;
   titleRow.appendChild(title);
 
+  const titleActions = document.createElement('div');
+  titleActions.className = 'detail__title-actions';
+  titleActions.appendChild(buildDetailTrackButton(item));
   if (canEditPhenomenon(item)) {
     const editLink = document.createElement('a');
     editLink.className = 'detail__edit-btn';
@@ -2147,8 +3198,9 @@ function buildDetailNodes(item) {
     editLink.setAttribute('aria-label', t('home.detail.editObservation'));
     editLink.innerHTML = detailActionIcon('edit');
     bindDetailEditLink(editLink);
-    titleRow.appendChild(editLink);
+    titleActions.appendChild(editLink);
   }
+  titleRow.appendChild(titleActions);
   head.appendChild(titleRow);
 
   if (item.description) {
@@ -2158,6 +3210,9 @@ function buildDetailNodes(item) {
   appendDetailMeta(head, item);
 
   body.appendChild(head);
+
+  const spotsSection = buildSpotsSection(item);
+  if (spotsSection) body.appendChild(spotsSection);
 
   if (item.updatedAt) markTrackUpdateSeen(item.id, item.updatedAt);
 
@@ -2344,7 +3399,7 @@ function renderMapRailItem(card) {
   title.textContent = item.title;
   body.appendChild(title);
 
-  if (item.location) {
+  if (resolveLocationText(item)) {
     const location = document.createElement('p');
     location.className = 'map-rail__location';
     const pin = document.createElement('span');
@@ -2353,7 +3408,7 @@ function renderMapRailItem(card) {
     pin.textContent = '📍';
     const text = document.createElement('span');
     text.className = 'map-rail__location-text';
-    text.textContent = item.location;
+    text.textContent = resolveLocationText(item);
     location.append(pin, text);
     body.appendChild(location);
   }
@@ -2689,6 +3744,7 @@ mapSheetHandle?.addEventListener('click', () => {
 let mapSheetTouchStartX = 0;
 let mapSheetTouchStartY = 0;
 let mapSheetTouchOnGallery = false;
+let mapSheetTouchOnPeekNav = false;
 let mapSheetTouchAxis = '';
 function mapSheetPeekOpen() {
   return usesSheetDetail() && mapSheet.classList.contains('is-open') && !mapSheet.classList.contains('is-expanded');
@@ -2730,6 +3786,12 @@ function onMapSheetSwipeEnd(startX, startY, e) {
   const peek = !expanded;
   mapSheetGestureMoved = Math.abs(dx) > 8 || Math.abs(dy) > 8;
 
+  if (mapSheetTouchOnPeekNav) {
+    mapSheetTouchAxis = '';
+    mapSheetTouchOnPeekNav = false;
+    return;
+  }
+
   if (!mapSheetTouchOnGallery && (mapSheetTouchAxis === 'x' || (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 36))) {
     const pinCards = getMapPinCards();
     if (mapSheet.classList.contains('is-open') && pinCards.length > 1) {
@@ -2750,6 +3812,7 @@ function bindMapSheetSwipe(el, { trackAxis = false } = {}) {
     mapSheetTouchStartX = e.touches[0].clientX;
     mapSheetTouchStartY = e.touches[0].clientY;
     mapSheetTouchOnGallery = Boolean(e.target.closest('.photo-mosaic'));
+    mapSheetTouchOnPeekNav = Boolean(e.target.closest('.map-sheet__peek-nav-btn'));
     mapSheetTouchAxis = '';
   }, { passive: true });
   el?.addEventListener('touchmove', (e) => {
@@ -2769,12 +3832,13 @@ function bindMapSheetSwipe(el, { trackAxis = false } = {}) {
 bindMapSheetSwipe(mapSheetHandle);
 bindMapSheetSwipe(mapSheetBody, { trackAxis: true });
 bindMapSheetSwipe(mapSheetPeekNav, { trackAxis: true });
+bindMapSheetPeekNavButtons();
 
 let mapSheetTapStartX = 0;
 let mapSheetTapStartY = 0;
 function tryExpandMapSheetFromTap(e) {
   if (!mapSheetPeekOpen()) return;
-  if (e.target.closest('a, button, .detail__map-preview, .detail__edit-btn, .detail__map-actions')) return;
+  if (e.target.closest('a, button, .detail__map-preview, .detail__edit-btn, .detail__map-actions, .map-sheet__peek-nav-btn, .detail__action--track')) return;
   expandMapSheet();
 }
 mapSheetBody?.addEventListener('click', (e) => {
@@ -3021,11 +4085,16 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-document.querySelectorAll('.observer-item__toggle').forEach((btn) => btn.addEventListener('click', () => {
-  const item = btn.closest('.observer-item');
-  const isOpen = item.classList.toggle('is-open');
-  btn.setAttribute('aria-expanded', isOpen);
-}));
+document.querySelectorAll('.observer-item__toggle').forEach((btn) => {
+  if (btn.dataset.bound) return;
+  btn.dataset.bound = '1';
+  btn.addEventListener('click', () => {
+    const item = btn.closest('.observer-item');
+    if (!item) return;
+    const isOpen = item.classList.toggle('is-open');
+    btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  });
+});
 
 const floatingbar = document.getElementById('floatingbar');
 const feedControls = document.getElementById('feedControls');
@@ -3125,12 +4194,17 @@ loadWeather();
   await i18nReady;
   formatToday();
   syncFloatingLangOptions();
+  initAboutBird();
   document.addEventListener('fn:user-updated', () => {
     remountOpenDetailForAuth();
   });
   await loadPhenomena();
   void syncTrackedFromServer();
+  captureDeepLinkSpotId();
   const deepLinkId = new URLSearchParams(location.search).get('phenomenon');
+  if (deepLinkId && sessionStorage.getItem(REFRESH_PHENOMENON_KEY) === deepLinkId) {
+    await ensurePhenomenonDetail(deepLinkId);
+  }
   if (deepLinkId) {
     const card = cards.find((c) => c.dataset.id === deepLinkId);
     if (card) openCardDetail(card);

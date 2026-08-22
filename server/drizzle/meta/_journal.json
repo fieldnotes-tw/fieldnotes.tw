@@ -50,6 +50,13 @@
       "when": 1786448000000,
       "tag": "0006_phenomenon_images_finding",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786449000000,
+      "tag": "0007_spots",
+      "breakpoints": true
     }
   ]
 }

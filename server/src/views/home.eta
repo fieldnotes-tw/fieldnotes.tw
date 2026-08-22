@@ -161,13 +161,23 @@
         </button>
         <div class="map-sheet__body" id="mapSheetBody"></div>
         <div class="map-sheet__peek-footer" id="mapSheetPeekNav" hidden aria-hidden="true">
-          <div class="map-sheet__peek-dots" id="mapSheetPinDots" aria-hidden="true"></div>
-          <span class="map-sheet__peek-counter" id="mapSheetPinCounter" aria-live="polite"></span>
+          <button type="button" class="map-sheet__peek-nav-btn" id="mapSheetPeekPrev" aria-label="<%= it.t('home.mapPrevPin') %>">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M14 6 L8 12 L14 18" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+          </button>
+          <div class="map-sheet__peek-meta">
+            <div class="map-sheet__peek-dots" id="mapSheetPinDots" aria-hidden="true"></div>
+            <span class="map-sheet__peek-counter" id="mapSheetPinCounter" aria-live="polite"></span>
+          </div>
+          <button type="button" class="map-sheet__peek-nav-btn" id="mapSheetPeekNext" aria-label="<%= it.t('home.mapNextPin') %>">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M10 6 L16 12 L10 18" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+          </button>
         </div>
       </div>
     </div>
   </div>
 </section>
+
+<%~ include('partials/contributors', it) %>
 
 <div class="card-modal" id="cardModal">
   <div class="card-modal__backdrop" id="cardModalBackdrop"></div>
@@ -185,22 +195,27 @@
     <div class="about__head"><%= it.t('home.about.title') %></div>
     <div class="about__row">
       <div class="about__bird-wrap">
-        <p class="about__bird-bubble"><%= it.t('home.about.birdBubble') %></p>
-        <svg class="about__bird rough" viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="50" cy="50" r="16"/>
-          <path d="M64 46 L82 38 L68 56 Z"/>
-          <circle cx="44" cy="46" r="2" fill="currentColor" stroke="none"/>
-          <path d="M40 64 L34 84 M56 66 L58 86"/>
-        </svg>
+        <p class="about__bird-bubble" id="aboutBirdBubble" aria-live="polite"><%= it.t('home.about.birdBubble.0') %></p>
+        <button type="button" class="about__bird-btn" id="aboutBirdBtn" aria-label="<%= it.t('home.about.birdBubble.next') %>">
+          <svg class="about__bird rough" viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="50" cy="50" r="16"/>
+            <path d="M64 46 L82 38 L68 56 Z"/>
+            <circle cx="44" cy="46" r="2" fill="currentColor" stroke="none"/>
+            <path d="M40 64 L34 84 M56 66 L58 86"/>
+          </svg>
+        </button>
       </div>
       <div>
         <p class="about__text"><strong><%= it.t('home.about.bodyTitle') %></strong><%= it.t('home.about.body') %></p>
-        <p class="about__cta"><%= it.t('home.about.ctaBefore') %><a href="https://forms.gle/Ln8WBNaK5s8fggTYA" class="about__cta-link" target="_blank" rel="noopener"><%= it.t('home.about.ctaLink') %></a><%= it.t('home.about.ctaAfter') %></p>
+        <p class="about__text"><%= it.t('home.about.body2') %></p>
+        <p class="about__text"><span class="about__mark"><%= it.t('home.about.welcome') %></span><%= it.t('home.about.body3') %></p>
+        <div class="about__actions">
+          <a href="/register" class="about__btn about__btn--primary"><%= it.t('nav.register') %></a>
+        </div>
       </div>
     </div>
   </div>
   <div class="footer__row">
     <span class="credit"><%= it.t('home.footer.credit') %></span>
-    <span class="credit"><%= it.t('home.footer.prototype') %></span>
   </div>
 </footer>

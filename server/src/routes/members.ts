@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { db } from '../db/index.js';
 import { phenomena, sightings, users } from '../db/schema.js';
 import { localeOf, t } from '../lib/i18n.js';
+import { resolveMemberAvatarCategory } from '../lib/member-avatar.js';
 import { uuidSchema } from '../lib/validators.js';
 import type { LocaleEnv } from '../middleware/locale.js';
 
@@ -44,12 +45,15 @@ memberRoutes.get('/:id', async (c) => {
     .orderBy(desc(sightings.seenAt))
     .limit(12);
 
+  const avatarCategory = await resolveMemberAvatarCategory(user.id, user.displayName);
+
   return c.json({
     data: {
       id: user.id,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
       bio: user.bio,
+      avatarCategory,
       recentSightings,
     },
   });

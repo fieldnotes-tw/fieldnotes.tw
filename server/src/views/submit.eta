@@ -6,7 +6,10 @@
 <main class="auth-main auth-main--submit">
   <form class="submit-form" id="submitForm" novalidate>
     <header class="submit-form__intro">
-      <h1 class="submit-form__title" id="submitPageTitle"><%= it.t('submit.title') %></h1>
+      <div class="submit-form__intro-head">
+        <h1 class="submit-form__title" id="submitPageTitle"><%= it.t('submit.title') %></h1>
+        <button type="button" class="submit-form__delete submit-form__delete--intro" id="submitDeleteBtn" hidden><%= it.t('submit.delete') %></button>
+      </div>
     </header>
 
     <section class="submit-form__section" aria-labelledby="submitWhat">
@@ -75,32 +78,6 @@
     <section class="submit-form__section" aria-labelledby="submitWhen">
       <h2 class="submit-form__section-title" id="submitWhen"><%= it.t('submit.when.label') %></h2>
       <%~ include('partials/datetime-fields', it) %>
-    </section>
-
-    <section class="submit-form__section" aria-labelledby="submitStatus">
-      <h2 class="submit-form__section-title" id="submitStatus"><%= it.t('submit.status.label') %></h2>
-      <div class="submit-form__status" id="statusGroup" role="radiogroup" aria-labelledby="submitStatus">
-        <label class="submit-form__status-btn" data-status="upcoming">
-          <input type="radio" name="status" value="upcoming">
-          <span><%= it.t('submit.status.upcoming') %></span>
-        </label>
-        <label class="submit-form__status-btn" data-status="active">
-          <input type="radio" name="status" value="active">
-          <span><%= it.t('submit.status.active') %></span>
-        </label>
-        <label class="submit-form__status-btn" data-status="ending">
-          <input type="radio" name="status" value="ending">
-          <span><%= it.t('submit.status.ending') %></span>
-        </label>
-        <label class="submit-form__status-btn" data-status="other">
-          <input type="radio" name="status" value="other">
-          <span><%= it.t('submit.status.other') %></span>
-        </label>
-      </div>
-      <label class="submit-form__field submit-form__status-other" id="statusOtherWrap" hidden>
-        <span class="visually-hidden"><%= it.t('submit.status.other') %></span>
-        <input type="text" id="f_statusOther" maxlength="100">
-      </label>
     </section>
 
     <section class="submit-form__section" aria-labelledby="submitExtra">

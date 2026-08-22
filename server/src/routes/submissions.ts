@@ -16,10 +16,12 @@ import {
   ownerPhenomenonPatchSchema,
   submissionSchema,
   updatePhenomenonSchema,
+  normalizeFormImages,
   uuidSchema,
 } from '../lib/validators.js';
 import { validated } from '../lib/validate.js';
 import { getPhenomenonDetail } from '../lib/phenomena-query.js';
+import { createPrimarySpotForPhenomenon, resolveSightingSpotId } from '../lib/spots.js';
 import { requireAuth, type AuthEnv } from '../middleware/auth.js';
 import { sightingImages, sightings } from '../db/schema.js';
 
@@ -52,14 +54,17 @@ async function canEditPhenomenon(userId: string, role: string, phenomenonId: str
   return row.userId === userId;
 }
 
-async function replacePhenomenonImages(phenomenonId: string, imageUrls: string[], imageAlt?: string) {
+async function replacePhenomenonImages(
+  phenomenonId: string,
+  images: { url: string; caption?: string | null }[],
+) {
   await db.delete(phenomenonImages).where(eq(phenomenonImages.phenomenonId, phenomenonId));
-  if (!imageUrls.length) return;
+  if (!images.length) return;
   await db.insert(phenomenonImages).values(
-    imageUrls.map((imageUrl, index) => ({
+    images.map((image, index) => ({
       phenomenonId,
-      imageUrl,
-      imageAlt: index === 0 ? imageAlt ?? null : null,
+      imageUrl: image.url,
+      imageAlt: image.caption ?? null,
       sortOrder: index,
     })),
   );
@@ -71,7 +76,8 @@ submissionRoutes.post('/', validated('json', submissionSchema), async (c) => {
   const body = c.req.valid('json');
   const now = new Date();
   const observerName = await observerNameForUser(user.id);
-  const imageUrl = body.imageUrls?.[0];
+  const images = normalizeFormImages(body);
+  const imageUrl = images[0]?.url;
 
   const [row] = await db
     .insert(phenomena)
@@ -80,13 +86,13 @@ submissionRoutes.post('/', validated('json', submissionSchema), async (c) => {
       description: body.description,
       notes: body.extra || null,
       findingHint: body.findingHint || null,
-      status: body.status,
+      status: body.status ?? 'active',
       category: body.category ?? 'plant',
       location: body.location,
       lat: body.lat,
       lng: body.lng,
       imageUrl,
-      imageAlt: body.title,
+      imageAlt: images[0]?.caption ?? body.title,
       observerName,
       userId: user.id,
       lastNoticedAt: body.seenAt ?? now,
@@ -95,9 +101,16 @@ submissionRoutes.post('/', validated('json', submissionSchema), async (c) => {
     })
     .returning({ id: phenomena.id });
 
-  if (body.imageUrls?.length) {
-    await replacePhenomenonImages(row.id, body.imageUrls, body.title);
+  if (images.length) {
+    await replacePhenomenonImages(row.id, images);
   }
+
+  await createPrimarySpotForPhenomenon(row.id, {
+    location: body.location,
+    lat: body.lat,
+    lng: body.lng,
+    findingHint: body.findingHint || null,
+  });
 
   const detail = await getPhenomenonDetail(row.id);
   return c.json({ data: detail }, 201);
@@ -139,14 +152,20 @@ submissionRoutes.patch(
     }
 
     const body = c.req.valid('json');
-    const { imageUrls, ...fields } = body;
+    const { imageUrls, images, ...fields } = body;
     const now = new Date();
+    const normalizedImages = images || imageUrls
+      ? normalizeFormImages({ images, imageUrls })
+      : null;
 
     const [row] = await db
       .update(phenomena)
       .set({
         ...fields,
-        ...(imageUrls?.length ? { imageUrl: imageUrls[0] } : {}),
+        ...(normalizedImages?.length ? {
+          imageUrl: normalizedImages[0].url,
+          imageAlt: normalizedImages[0].caption ?? fields.title ?? undefined,
+        } : {}),
         updatedAt: now,
       })
       .where(eq(phenomena.id, id.data))
@@ -156,8 +175,8 @@ submissionRoutes.patch(
       return c.json({ error: t(locale, 'errors.notFound') }, 404);
     }
 
-    if (imageUrls) {
-      await replacePhenomenonImages(row.id, imageUrls, fields.title);
+    if (normalizedImages) {
+      await replacePhenomenonImages(row.id, normalizedImages);
     }
 
     const detail = await getPhenomenonDetail(row.id);
@@ -210,12 +229,23 @@ submissionRoutes.post(
     }
 
     const body = c.req.valid('json');
+    const images = normalizeFormImages(body);
     const observerName = await observerNameForUser(user.id);
+    let spotId: string;
+    try {
+      spotId = await resolveSightingSpotId(phenomenonId.data, {
+        spotId: body.spotId,
+        otherSpot: body.otherSpot,
+      });
+    } catch {
+      return c.json({ error: t(locale, 'errors.invalidRequest') }, 400);
+    }
 
     const [sighting] = await db
       .insert(sightings)
       .values({
         phenomenonId: phenomenonId.data,
+        spotId,
         userId: user.id,
         observerName,
         seenAt: body.seenAt ?? new Date(),
@@ -223,11 +253,12 @@ submissionRoutes.post(
       })
       .returning({ id: sightings.id });
 
-    if (body.imageUrls?.length) {
+    if (images.length) {
       await db.insert(sightingImages).values(
-        body.imageUrls.map((imageUrl, index) => ({
+        images.map((image, index) => ({
           sightingId: sighting.id,
-          imageUrl,
+          imageUrl: image.url,
+          imageAlt: image.caption ?? null,
           sortOrder: index,
         })),
       );
@@ -277,8 +308,8 @@ submissionRoutes.put('/uploads/local/:filename', async (c) => {
     if (!body.byteLength) {
       return c.json({ error: t(locale, 'errors.invalidRequest') }, 400);
     }
-    const publicPath = await saveLocalUpload(filename, body, contentType);
-    return c.json({ data: { publicPath } }, 201);
+    const upload = await saveLocalUpload(filename, body, contentType);
+    return c.json({ data: upload }, 201);
   } catch (err) {
     console.error('Submission local media upload failed', err);
     return c.json({ error: t(locale, 'errors.uploadUrlFailed') }, 500);
