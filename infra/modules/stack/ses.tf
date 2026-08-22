@@ -22,20 +22,8 @@ variable "manage_ses_identity" {
   default     = true
 }
 
-variable "ses_verified_recipients" {
-  type        = list(string)
-  description = "Sandbox: verify these recipient addresses in SES (AWS sends a confirmation link to each on apply)"
-  default     = []
-}
-
-variable "email_from_override" {
-  type        = string
-  description = "Override the From address (e.g. a verified mailbox while apex DKIM is still at the registrar)"
-  default     = null
-}
-
 locals {
-  email_from = coalesce(var.email_from_override, "${var.email_from_local_part}@${var.email_domain}")
+  email_from = "${var.email_from_local_part}@${var.email_domain}"
   # Only the owning env exposes DKIM tokens; others do not look up the identity
   # (a data source would block terraform destroy when the identity is missing).
   ses_dkim_tokens = var.manage_ses_identity ? try(aws_sesv2_email_identity.domain[0].dkim_signing_attributes[0].tokens, []) : []
@@ -46,11 +34,4 @@ resource "aws_sesv2_email_identity" "domain" {
   provider = aws.ses
 
   email_identity = var.email_domain
-}
-
-resource "aws_sesv2_email_identity" "recipient" {
-  for_each = toset(var.ses_verified_recipients)
-
-  provider       = aws.ses
-  email_identity = each.value
 }

@@ -22,11 +22,7 @@ aws secretsmanager get-secret-value --region ap-east-2 \
 
 SES identities are created in `ap-northeast-1` (Tokyo). **Production** owns the domain identity (`manage_ses_identity = true`); staging only looks it up so it can be destroyed without breaking mail. DKIM CNAMEs are managed in `infra/dns` from `ses_dkim_tokens` (production output). Until the domain verifies (and while the account is in the SES sandbox), confirmation mail only delivers to SES-verified recipient addresses. Request production access when ready.
 
-**Staging sandbox (current):** staging verifies `chao@newschool.edu` in SES and sends mail **from** that same verified address until `fieldnotes.tw` DKIM is live at the registrar. After each deploy that touches SES identities, check that inbox for an **Amazon SES** verification message (not the app) and click the link once.
-
-**Apex still at GoDaddy:** Route 53 already has SES DKIM records, but they only work publicly after apex nameservers move here—or add the three `._domainkey.fieldnotes.tw` CNAMEs manually at GoDaddy (tokens from `terraform -chdir=infra/production output ses_dkim_tokens`). Then switch staging back to `noreply@fieldnotes.tw` by removing `email_from_override`.
-
-**Exit sandbox:** run `infra/scripts/request-ses-production-access.sh` (needs local AWS admin creds in `ap-northeast-1`). AWS usually approves within 24h; then mail can go to any address and `noreply@fieldnotes.tw` works once the domain identity shows **Verified**.
+**DKIM for `noreply@fieldnotes.tw`:** `fieldnotes.tw` nameservers already point at Route 53, so DKIM records belong in this zone—not GoDaddy. After production has been applied at least once, run **Actions → Deploy DNS** (re-run is safe). The workflow reads `ses_dkim_tokens` from production state and creates the three `<token>._domainkey.fieldnotes.tw` CNAMEs. Confirm in SES console (`ap-northeast-1`) that `fieldnotes.tw` shows **Verified**. Only if apex NS were still at GoDaddy would you add those same CNAMEs manually there.
 
 **SES ownership cutover** (one-time, if staging still owns the identity): deploy production first so it creates/adopts the identity, then deploy staging with `manage_ses_identity = false`. Only after that is it safe to destroy staging.
 
