@@ -85,7 +85,7 @@ export const users = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     email: text('email').notNull(),
-    passwordHash: text('password_hash').notNull(),
+    passwordHash: text('password_hash'),
     displayName: text('display_name'),
     avatarUrl: text('avatar_url'),
     bio: text('bio'),
@@ -93,6 +93,10 @@ export const users = pgTable(
     emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
     emailConfirmTokenHash: text('email_confirm_token_hash'),
     emailConfirmExpiresAt: timestamp('email_confirm_expires_at', {
+      withTimezone: true,
+    }),
+    passwordResetTokenHash: text('password_reset_token_hash'),
+    passwordResetExpiresAt: timestamp('password_reset_expires_at', {
       withTimezone: true,
     }),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -103,6 +107,22 @@ export const users = pgTable(
       .defaultNow(),
   },
   (table) => [uniqueIndex('users_email_uidx').on(table.email)],
+);
+
+export const userIdentities = pgTable(
+  'user_identities',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    provider: text('provider').notNull(),
+    providerUserId: text('provider_user_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [uniqueIndex('user_identities_provider_uidx').on(table.provider, table.providerUserId)],
 );
 
 export const spots = pgTable('spots', {

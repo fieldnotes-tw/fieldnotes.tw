@@ -1,10 +1,12 @@
 i18nReady.then(() => {
+  const errorEl = document.getElementById('registerError');
+  showLineAuthError(errorEl);
+
   refreshCurrentUser().then((user) => {
     if (user) location.href = '/';
   }).catch(() => {});
 
   const form = document.getElementById('registerForm');
-  const errorEl = document.getElementById('registerError');
   const successEl = document.getElementById('registerSuccess');
   const resendBtn = document.getElementById('resendBtn');
   let pendingEmail = '';
@@ -56,5 +58,9 @@ i18nReady.then(() => {
       errorEl.textContent = err.message || t('auth.register.resendFailed');
       errorEl.hidden = false;
     }
+  });
+
+  document.getElementById('lineRegisterBtn')?.addEventListener('click', () => {
+    startLineLogin('/', '/register');
   });
 });

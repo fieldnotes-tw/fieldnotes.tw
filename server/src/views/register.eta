@@ -23,7 +23,7 @@
     <button type="submit" class="auth-form__submit"><%= it.t('auth.register.submit') %></button>
     <button type="button" class="auth-form__secondary" id="resendBtn" hidden><%= it.t('auth.register.resend') %></button>
     <div class="auth-form__divider"><span><%= it.t('auth.register.or') %></span></div>
-    <button type="button" class="auth-form__line-btn" id="lineRegisterBtn" disabled><%= it.t('auth.register.line') %></button>
+    <button type="button" class="auth-form__line-btn" id="lineRegisterBtn"><%= it.t('auth.register.line') %></button>
     <p class="auth-form__switch"><span><%= it.t('auth.register.switch') %></span><a href="/login"><%= it.t('auth.register.switchLink') %></a></p>
   </form>
 </main>

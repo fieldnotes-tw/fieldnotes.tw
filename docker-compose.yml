@@ -36,6 +36,8 @@ services:
       MAIL_MODE: log
       APP_BASE_URL: http://127.0.0.1:3001
       EMAIL_FROM: noreply@localhost
+      LINE_CHANNEL_ID: ''
+      LINE_CHANNEL_SECRET: ''
       MEDIA_BUCKET: ''
       MEDIA_PUBLIC_PREFIX: /media
       SEED_DEMO: '1'
