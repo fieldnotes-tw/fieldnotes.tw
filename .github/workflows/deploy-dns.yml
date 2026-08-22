@@ -73,4 +73,12 @@ jobs:
             echo '```json'
             terraform output -json acm_validation_records
             echo '```'
+            if [ "$tokens" != '[]' ] && [ -n "$tokens" ]; then
+              echo
+              echo 'SES DKIM at GoDaddy (apex still on GoDaddy NS — until full cutover):'
+              echo
+              echo '```'
+              echo "$tokens" | jq -r '.[] | "CNAME  " + . + "._domainkey  " + . + ".dkim.amazonses.com"'
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"

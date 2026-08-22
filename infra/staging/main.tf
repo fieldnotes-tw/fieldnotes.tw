@@ -38,6 +38,9 @@ module "stack" {
   seed_demo = true
   # Production owns the SES domain identity so staging can be destroyed without breaking mail.
   manage_ses_identity = false
+  # Sandbox: verify recipients and send from a verified mailbox until apex DKIM is live.
+  ses_verified_recipients = ["chao@newschool.edu"]
+  email_from_override     = "chao@newschool.edu"
   # Allow terraform destroy to wipe versioned objects (idle teardown).
   force_destroy = true
 
