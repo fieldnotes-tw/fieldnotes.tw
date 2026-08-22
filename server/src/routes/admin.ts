@@ -238,8 +238,8 @@ adminRoutes.put('/uploads/local/:filename', async (c) => {
     if (!body.byteLength) {
       return c.json({ error: t(locale, 'errors.invalidRequest') }, 400);
     }
-    const publicPath = await saveLocalUpload(filename, body, contentType);
-    return c.json({ data: { publicPath } }, 201);
+    const upload = await saveLocalUpload(filename, body, contentType);
+    return c.json({ data: upload }, 201);
   } catch (err) {
     console.error('Local media upload failed', err);
     return c.json({ error: t(locale, 'errors.uploadUrlFailed') }, 500);

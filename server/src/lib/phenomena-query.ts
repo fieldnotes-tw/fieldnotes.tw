@@ -50,11 +50,12 @@ export type SightingWithImages = {
 
 export type PhenomenonDetail = PhenomenonListItem & {
   imageUrls: string[];
+  images: { url: string; caption: string | null }[];
   locationSummary: string;
   spotCount: number;
   spots: SpotWithStats[];
   recentSightings: SightingWithImages[];
-  observers: { userId: string | null; name: string; avatarUrl: string | null }[];
+  observers: { userId: string | null; name: string; avatarUrl: string | null; bio: string | null }[];
 };
 
 function mapListRow(row: {
@@ -160,6 +161,20 @@ function mergeUniqueImageUrls(primary: string[], extra: string[]) {
     if (!url || seen.has(url)) continue;
     merged.push(url);
     seen.add(url);
+  }
+  return merged;
+}
+
+function mergeUniqueImages(
+  primary: { url: string; caption: string | null }[],
+  extra: { url: string; caption: string | null }[],
+) {
+  const merged = [...primary];
+  const seen = new Set(primary.map((image) => image.url));
+  for (const image of extra) {
+    if (!image.url || seen.has(image.url)) continue;
+    merged.push(image);
+    seen.add(image.url);
   }
   return merged;
 }
@@ -300,6 +315,7 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
       userId: sightings.userId,
       name: sql<string>`coalesce(${users.displayName}, ${sightings.observerName})`,
       avatarUrl: users.avatarUrl,
+      bio: users.bio,
       seenAt: sightings.seenAt,
     })
     .from(sightings)
@@ -308,7 +324,7 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
     .orderBy(desc(sightings.seenAt));
 
   const seenObservers = new Set<string>();
-  const observers: { userId: string | null; name: string; avatarUrl: string | null }[] = [];
+  const observers: { userId: string | null; name: string; avatarUrl: string | null; bio: string | null }[] = [];
   for (const row of observerSource) {
     if (!row.name) continue;
     const key = row.userId ?? row.name;
@@ -318,30 +334,43 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
       userId: row.userId,
       name: row.name,
       avatarUrl: row.avatarUrl ?? null,
+      bio: row.bio ?? null,
     });
     if (observers.length >= 8) break;
   }
 
   if (!observers.length && base.observerName) {
-    observers.push({ userId: base.userId, name: base.observerName, avatarUrl: null });
+    observers.push({ userId: base.userId, name: base.observerName, avatarUrl: null, bio: null });
   }
 
   const phenomenonImageRows = await db
     .select({
       imageUrl: phenomenonImages.imageUrl,
+      imageAlt: phenomenonImages.imageAlt,
       sortOrder: phenomenonImages.sortOrder,
     })
     .from(phenomenonImages)
     .where(eq(phenomenonImages.phenomenonId, id))
     .orderBy(asc(phenomenonImages.sortOrder));
 
-  const imageUrls = phenomenonImageRows.length
-    ? phenomenonImageRows.map((row) => row.imageUrl)
+  const phenomenonImageList = phenomenonImageRows.length
+    ? phenomenonImageRows.map((row) => ({
+      url: row.imageUrl,
+      caption: row.imageAlt,
+    }))
     : base.imageUrl
-      ? [base.imageUrl]
+      ? [{ url: base.imageUrl, caption: base.imageAlt }]
       : [];
 
-  const sightingImageUrls = imageRows.map((row) => row.imageUrl);
+  const sightingImageList = recentSightings.flatMap((sighting) =>
+    sighting.images.map((image) => ({
+      url: image.imageUrl,
+      caption: image.imageAlt,
+    })),
+  );
+
+  const images = mergeUniqueImages(phenomenonImageList, sightingImageList);
+  const imageUrls = images.map((image) => image.url);
   const spotList = await listSpotsWithStats(id);
   const locationSummary = buildLocationSummary(spotList) || base.location || '';
 
@@ -350,7 +379,8 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
     locationSummary,
     spotCount: spotList.length,
     spots: spotList,
-    imageUrls: mergeUniqueImageUrls(imageUrls, sightingImageUrls),
+    imageUrls,
+    images,
     recentSightings,
     observers,
   };

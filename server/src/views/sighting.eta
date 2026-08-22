@@ -6,7 +6,10 @@
 <main class="auth-main auth-main--submit">
   <form class="submit-form sighting-form" id="sightingForm" novalidate>
     <header class="submit-form__intro">
-      <h1 class="submit-form__title" id="sightingTitle"><%= it.t('sighting.form.title') %></h1>
+      <div class="submit-form__intro-head">
+        <h1 class="submit-form__title" id="sightingTitle"><%= it.t('sighting.form.title') %></h1>
+        <button type="button" class="submit-form__delete submit-form__delete--intro" id="sightingDeleteBtn" hidden><%= it.t('sighting.form.delete') %></button>
+      </div>
       <p class="submit-form__context" id="sightingContext" hidden></p>
     </header>
 
@@ -71,10 +74,7 @@
     </section>
 
     <p class="submit-form__error" id="sightingError" hidden></p>
-    <div class="submit-form__actions">
-      <button type="submit" class="submit-form__submit" id="sightingBtn"><%= it.t('sighting.form.send') %></button>
-      <button type="button" class="submit-form__delete" id="sightingDeleteBtn" hidden><%= it.t('sighting.form.delete') %></button>
-    </div>
+    <button type="submit" class="submit-form__submit" id="sightingBtn"><%= it.t('sighting.form.send') %></button>
   </form>
 
   <div class="submit-form__success" id="sightingSuccess" hidden>

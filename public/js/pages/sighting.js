@@ -149,8 +149,12 @@ function renderPhotoList() {
   list.replaceChildren();
   photos.forEach((photo, index) => {
     const li = document.createElement('li');
-    li.className = 'submit-form__photo-item';
+    li.className = 'submit-form__photo-item submit-form__photo-item--simple';
     if (photo.uploading) li.classList.add('is-uploading');
+
+    const body = document.createElement('div');
+    body.className = 'submit-form__photo-body';
+
     const frame = document.createElement('div');
     frame.className = 'submit-form__photo-frame';
     appendUploadPreview(frame, photo);
@@ -162,16 +166,21 @@ function renderPhotoList() {
     remove.disabled = photo.uploading;
     remove.addEventListener('click', () => removePhoto(photo.id));
     frame.appendChild(remove);
-    li.appendChild(frame);
+    body.appendChild(frame);
+    appendPhotoCaptionField(body, photo);
+
     if (photo.uploading) {
       const loading = document.createElement('span');
       loading.className = 'submit-form__photo-loading';
       loading.textContent = t('submit.photo.uploading');
-      li.appendChild(loading);
+      body.appendChild(loading);
     }
+
+    li.appendChild(body);
     list.appendChild(li);
   });
   list.hidden = photos.length === 0;
+  syncPhotoUploadLabel(photos.length);
   syncSubmitState();
 }
 
@@ -184,13 +193,20 @@ async function addPhotoFile(file) {
     id: randomId(),
     url: '',
     localUrl: URL.createObjectURL(file),
+    posterUrl: '',
     uploading: true,
     isVideo: isVideoUploadFile(file),
+    caption: '',
   };
   photos.push(photo);
   renderPhotoList();
+  if (photo.isVideo) {
+    primeVideoPoster(photo).then(() => renderPhotoList());
+  }
   try {
-    photo.url = await uploadImageFile(file);
+    const uploaded = await uploadImageFile(file);
+    photo.url = uploaded.url;
+    photo.posterUrl = uploaded.posterUrl || photo.posterUrl || videoPosterUrl(uploaded.url);
     photo.uploading = false;
     if (!photo.isVideo) revokePhotoPreview(photo);
     renderPhotoList();
@@ -244,8 +260,15 @@ async function loadEditSighting(id) {
   $('f_note').value = data.note || '';
   setSeenDateTimeInputs($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'), data.seenAt);
   clearPhotos();
-  for (const url of data.imageUrls || []) {
-    photos.push({ id: randomId(), url, localUrl: '', uploading: false });
+  for (const item of normalizeLoadedFormImages(data)) {
+    photos.push({
+      id: randomId(),
+      url: item.url,
+      caption: item.caption,
+      localUrl: '',
+      uploading: false,
+      isVideo: item.isVideo || isVideoMediaUrl(item.url),
+    });
   }
   renderPhotoList();
   $('sightingDeleteBtn').hidden = false;
@@ -352,7 +375,7 @@ function validateSightingForm() {
 function buildSightingPayload() {
   const payload = {
     note: $('f_note').value.trim(),
-    imageUrls: photos.map((p) => p.url).filter(Boolean),
+    images: formImagesPayload(photos),
   };
   const seenAt = resolveSeenAtIso();
   if (seenAt) payload.seenAt = seenAt;

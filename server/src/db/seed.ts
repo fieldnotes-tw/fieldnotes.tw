@@ -2,6 +2,7 @@ import { eq, or, sql } from 'drizzle-orm';
 import { db } from './index.js';
 import { phenomena, sightingImages, sightings, users } from './schema.js';
 import { createPrimarySpotForPhenomenon, getPrimarySpotId } from '../lib/spots.js';
+import { ensureChenEnMember, resolveChenEnUserId } from '../lib/demo-members.js';
 import { hashPassword } from '../lib/auth.js';
 
 const seedData = [
@@ -180,6 +181,17 @@ const sightingSeedByTitle: Record<string, {
       },
     ],
   },
+  '來找羅漢松的「小羅漢」，會慢慢變紅哦': {
+    sightings: [
+      {
+        observerName: '陳恩',
+        seenAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        note: '雌株的種子正慢慢成熟，可以找找看可愛的「小羅漢」。',
+        imageUrl: '/media/phenomena/podocarpus.jpg',
+        imageAlt: '凹子底公園旁、迷路小章魚左前方的羅漢松',
+      },
+    ],
+  },
 };
 
 async function resolveChaoUserId() {
@@ -267,6 +279,8 @@ async function seedSightings() {
 
     for (const entry of bundle.sightings) {
       const isChao = entry.observerName.toLowerCase() === 'chao';
+      const isChenEn = entry.observerName === '陳恩';
+      const chenEnUserId = isChenEn ? await resolveChenEnUserId() : null;
       const spotId = await getPrimarySpotId(row.id);
       if (!spotId) continue;
 
@@ -275,8 +289,14 @@ async function seedSightings() {
         .values({
           phenomenonId: row.id,
           spotId,
-          userId: isChao && chaoUserId ? chaoUserId : null,
-          observerName: isChao && chaoUserId ? null : entry.observerName,
+          userId: isChao && chaoUserId
+            ? chaoUserId
+            : isChenEn && chenEnUserId
+              ? chenEnUserId
+              : null,
+          observerName: (isChao && chaoUserId) || (isChenEn && chenEnUserId)
+            ? null
+            : entry.observerName,
           seenAt: entry.seenAt,
           condition: entry.condition,
           note: entry.note,
@@ -305,6 +325,7 @@ async function seed() {
     await linkChaoMemberContent();
     await promoteDemoMemberToAdmin();
   }
+  await ensureChenEnMember();
   process.exit(0);
 }
 

@@ -4,7 +4,7 @@ import { basename, join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { db } from './index.js';
 import { phenomena, phenomenonImages, sightingImages } from './schema.js';
-import { mediaPublicPrefix, transcodeVideoToMp4 } from '../lib/media.js';
+import { mediaPublicPrefix, transcodeVideoToMp4, extractVideoPoster } from '../lib/media.js';
 import { publicRoot } from '../lib/assets.js';
 
 const mediaDir = join(publicRoot(), 'media', 'phenomena');
@@ -28,15 +28,24 @@ async function main() {
   for (const filename of videoFiles) {
     const abs = join(mediaDir, filename);
     const publicPath = `${prefix}/phenomena/${filename}`;
-    console.log(`Transcoding ${filename}…`);
-    const mp4Abs = await transcodeVideoToMp4(abs);
-    if (!mp4Abs) {
-      console.warn(`Skipped ${filename} (transcode failed).`);
-      continue;
+    let finalAbs = abs;
+    let newPath = publicPath;
+
+    if (/\.(mov|webm)$/i.test(filename)) {
+      console.log(`Transcoding ${filename}…`);
+      const mp4Abs = await transcodeVideoToMp4(abs);
+      if (!mp4Abs) {
+        console.warn(`Skipped ${filename} (transcode failed).`);
+        continue;
+      }
+      finalAbs = mp4Abs;
+      newPath = `${prefix}/phenomena/${basename(mp4Abs)}`;
+      await replaceMediaUrl(publicPath, newPath);
+      console.log(`Done: ${basename(mp4Abs)}`);
     }
-    const newPath = `${prefix}/phenomena/${basename(mp4Abs)}`;
-    await replaceMediaUrl(publicPath, newPath);
-    console.log(`Done: ${basename(mp4Abs)}`);
+
+    console.log(`Poster for ${basename(finalAbs)}…`);
+    await extractVideoPoster(finalAbs);
   }
 }
 

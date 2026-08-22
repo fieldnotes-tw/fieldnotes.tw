@@ -9,7 +9,7 @@
       <div class="member-intro__avatar" id="memberAvatar"></div>
       <div class="member-intro__meta">
         <h1 class="submit-form__title member-intro__name" id="memberName"></h1>
-        <p class="member-intro__bio" id="memberBio" hidden></p>
+        <div class="member-intro__bio" id="memberBio" hidden></div>
       </div>
     </header>
 

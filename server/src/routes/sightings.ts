@@ -8,7 +8,7 @@ import {
   users,
 } from '../db/schema.js';
 import { localeOf, t } from '../lib/i18n.js';
-import { updateSightingSchema, uuidSchema } from '../lib/validators.js';
+import { updateSightingSchema, normalizeFormImages, uuidSchema } from '../lib/validators.js';
 import { validated } from '../lib/validate.js';
 import { requireAuth, type AuthEnv } from '../middleware/auth.js';
 
@@ -25,13 +25,17 @@ async function canEditSighting(userId: string, role: string, sightingId: string)
   return row.userId === userId;
 }
 
-async function replaceSightingImages(sightingId: string, imageUrls: string[]) {
+async function replaceSightingImages(
+  sightingId: string,
+  images: { url: string; caption?: string | null }[],
+) {
   await db.delete(sightingImages).where(eq(sightingImages.sightingId, sightingId));
-  if (!imageUrls.length) return;
+  if (!images.length) return;
   await db.insert(sightingImages).values(
-    imageUrls.map((imageUrl, index) => ({
+    images.map((image, index) => ({
       sightingId,
-      imageUrl,
+      imageUrl: image.url,
+      imageAlt: image.caption ?? null,
       sortOrder: index,
     })),
   );
@@ -54,7 +58,10 @@ sightingRoutes.patch(
     }
 
     const body = c.req.valid('json');
-    const { imageUrls, ...fields } = body;
+    const { imageUrls, images, ...fields } = body;
+    const normalizedImages = images || imageUrls
+      ? normalizeFormImages({ images, imageUrls })
+      : null;
 
     const [row] = await db
       .update(sightings)
@@ -71,8 +78,8 @@ sightingRoutes.patch(
       return c.json({ error: t(locale, 'errors.notFound') }, 404);
     }
 
-    if (imageUrls) {
-      await replaceSightingImages(id.data, imageUrls);
+    if (normalizedImages) {
+      await replaceSightingImages(id.data, normalizedImages);
     }
 
     return c.json({ data: row });
@@ -153,6 +160,10 @@ sightingRoutes.get('/:id', requireAuth, async (c) => {
       seenAt: row.seenAt,
       note: row.note,
       imageUrls: images.map((img) => img.imageUrl),
+      images: images.map((img) => ({
+        url: img.imageUrl,
+        caption: img.imageAlt,
+      })),
     },
   });
 });

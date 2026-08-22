@@ -151,7 +151,7 @@ function renderAuthNav(container) {
   }
 
   const submitLink = document.createElement('a');
-  submitLink.className = 'auth-nav__btn' + (user ? '' : ' auth-nav__btn--primary');
+  submitLink.className = 'auth-nav__btn auth-nav__btn--primary';
   submitLink.textContent = t('nav.submit');
   submitLink.href = user ? '/submit' : `/login?next=${encodeURIComponent('/submit')}`;
   container.appendChild(submitLink);

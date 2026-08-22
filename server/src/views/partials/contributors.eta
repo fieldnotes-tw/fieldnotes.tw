@@ -1,75 +1,39 @@
+<% if ((it.contributors || []).length) { %>
 <section class="contributors" id="contributors">
   <div class="contributors__head"><%= it.t('home.contributors.title') %></div>
-  <p class="contributors__intro">這些是目前參與觀察、和我們分享高雄生活與生態的在地朋友，點名字看更多介紹：</p>
   <ul class="observer-list">
-    <li class="observer-item">
+    <% it.contributors.forEach((person) => { %>
+    <li class="observer-item<%= (!person.bio && !person.id) ? ' observer-item--static' : '' %>">
+      <% if (person.bio || person.id) { %>
       <button type="button" class="observer-item__toggle" aria-expanded="false">
-        <span class="avatar avatar--sm" data-cat="plant">禕</span>
-        <span class="observer-item__name">禕騏</span>
+        <% if (person.avatarUrl) { %>
+        <span class="avatar avatar--sm"><img src="<%= person.avatarUrl %>" alt="" class="detail__member-avatar-img"></span>
+        <% } else { %>
+        <span class="avatar avatar--sm" data-cat="<%= person.avatarCategory %>"><%= Array.from(person.name).filter((ch) => !/\s/u.test(ch))[0] || person.name.charAt(0) %></span>
+        <% } %>
+        <span class="observer-item__name"><%= person.name %></span>
         <svg class="observer-item__chevron" viewBox="0 0 24 24" width="14" height="14"><path d="M6 9 L12 15 L18 9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
       </button>
       <div class="observer-item__body">
         <div class="observer-item__body-inner">
-          <p>禕騏住在左營，現在和女友一起經營植物工作室「踅踅實業社」（ㄒㄩㄝˊ，台語散步的意思）。他們在鼓山有一間園藝＋選物的小店，平常做植栽、景觀設計，還有很有趣的可食景觀！也會和創作者合作，做一些和植物相關的作品。</p>
-          <p class="observer-item__meta">踅踅實業社：鼓山三路214巷12號一號</p>
-          <a class="observer-item__link" href="https://www.instagram.com/sehseh_studio?igsh=YjJpaG9jN20yZ3Bw" target="_blank" rel="noopener">Instagram ↗</a>
+          <% if (person.bio) { %><p><%= person.bio %></p><% } %>
+          <% if (person.id) { %>
+          <a class="observer-item__link" href="/members/<%= person.id %>"><%= it.t('home.observers.viewProfile') %></a>
+          <% } %>
         </div>
       </div>
-    </li>
-    <li class="observer-item">
-      <button type="button" class="observer-item__toggle" aria-expanded="false">
-        <span class="avatar avatar--sm" data-cat="animal">美</span>
-        <span class="observer-item__name">美妃</span>
-        <svg class="observer-item__chevron" viewBox="0 0 24 24" width="14" height="14"><path d="M6 9 L12 15 L18 9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
-      </button>
-      <div class="observer-item__body">
-        <div class="observer-item__body-inner">
-          <p>美妃是文藻的老師，做了很多地方相關的計畫，包含以左營舊城、蓮池潭為基地的 OUR TOWN，還有在壽山國家自然公園、馬頭山做雙語導覽培訓、在地人文生態遊程和社區培力的「馬頭山返野」。</p>
-          <p>最喜歡的台灣動物是穿山甲，植物是月桃。</p>
-          <a class="observer-item__link" href="https://ourtown.tw" target="_blank" rel="noopener">OUR TOWN ↗</a>
-          <a class="observer-item__link" href="https://matoushan.tw" target="_blank" rel="noopener">馬頭山返野 ↗</a>
-        </div>
+      <% } else { %>
+      <div class="observer-item__row">
+        <% if (person.avatarUrl) { %>
+        <span class="avatar avatar--sm"><img src="<%= person.avatarUrl %>" alt="" class="detail__member-avatar-img"></span>
+        <% } else { %>
+        <span class="avatar avatar--sm" data-cat="<%= person.avatarCategory %>"><%= Array.from(person.name).filter((ch) => !/\s/u.test(ch))[0] || person.name.charAt(0) %></span>
+        <% } %>
+        <span class="observer-item__name"><%= person.name %></span>
       </div>
+      <% } %>
     </li>
-    <li class="observer-item">
-      <button type="button" class="observer-item__toggle" aria-expanded="false">
-        <span class="avatar avatar--sm" data-cat="sky">金</span>
-        <span class="observer-item__name">金蓮</span>
-        <svg class="observer-item__chevron" viewBox="0 0 24 24" width="14" height="14"><path d="M6 9 L12 15 L18 9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
-      </button>
-      <div class="observer-item__body">
-        <div class="observer-item__body-inner">
-          <p>金蓮正在參與高雄野鳥學會的公民科學計畫，每個月會到蓮池潭孔廟觀察、記錄黃鸝的數量。發現育雛或幼鳥時，鳥會人員會適時幫牠們繫腳環。</p>
-          <p>她喜歡賞鳥還有和先生去拍鳥，目前期待和穿山甲相遇。她也喜歡潛水，有超過 50 次的潛水經驗。</p>
-        </div>
-      </div>
-    </li>
-    <li class="observer-item">
-      <button type="button" class="observer-item__toggle" aria-expanded="false">
-        <span class="avatar avatar--sm" data-cat="taste">C</span>
-        <span class="observer-item__name">Claudia</span>
-        <svg class="observer-item__chevron" viewBox="0 0 24 24" width="14" height="14"><path d="M6 9 L12 15 L18 9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
-      </button>
-      <div class="observer-item__body">
-        <div class="observer-item__body-inner">
-          <p>Claudia 喜歡植物和大自然，家裡陽台種了很多植物，接近大自然的時候心情就會很好。平常喜歡旅行、到處走走看看，最近剛從西班牙獨旅回來，非常喜歡高第從植物和自然中找靈感的建築設計。</p>
-          <p>在家裡種的斑葉心葉黃槿，是她很喜歡的植物。</p>
-        </div>
-      </div>
-    </li>
-    <li class="observer-item">
-      <button type="button" class="observer-item__toggle" aria-expanded="false">
-        <span class="avatar avatar--sm" data-cat="workshop">陳</span>
-        <span class="observer-item__name">陳恩</span>
-        <svg class="observer-item__chevron" viewBox="0 0 24 24" width="14" height="14"><path d="M6 9 L12 15 L18 9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
-      </button>
-      <div class="observer-item__body">
-        <div class="observer-item__body-inner">
-          <p>陳恩是退休的大學老師，長期關心凹仔底公園的生態，會觀察黃鸝一年築了幾個巢、用了什麼材料，也留意落羽杉什麼時候變色、雀榕什麼時候整樹落葉，再重新長出新葉。</p>
-          <p>她擅長觀察不同生命怎麼在城市裡生活，她幫助我們注意到，人們種什麼植物、使用什麼材料、怎麼生活，其實都和鳥與其他生命息息相關。</p>
-        </div>
-      </div>
-    </li>
+    <% }) %>
   </ul>
-  <p class="contributors__note-full">網站上的示範照片，目前向 Mmsmr（CC0）、Yuksing（Public Domain）、Gaurav Dhwaj Khadka（CC BY-SA 4.0）、Rhododendrites（CC BY-SA 4.0）、Forest &amp; Kim Starr（CC BY 3.0）、Arthur Taksin（CC BY 4.0）等攝影師借用做示範，之後會逐步換成在地觀察員實際在高雄拍到的畫面。</p>
 </section>
+<% } %>

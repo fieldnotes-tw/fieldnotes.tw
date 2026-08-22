@@ -195,20 +195,6 @@ function showSuccess(phenomenonId) {
   }
 }
 
-function syncStatusOther() {
-  const wrap = $('statusOtherWrap');
-  const input = $('f_statusOther');
-  const checked = document.querySelector('input[name="status"]:checked');
-  const isOther = checked?.value === 'other';
-  wrap.hidden = !isOther;
-  if (!isOther) input.value = '';
-}
-
-function initStatusOther() {
-  $('statusGroup').addEventListener('change', syncStatusOther);
-  syncStatusOther();
-}
-
 function setImageStatus(msg) {
   const el = $('imageStatus');
   if (!msg) {
@@ -310,6 +296,8 @@ function renderPhotoList() {
 
     body.appendChild(frame);
 
+    appendPhotoCaptionField(body, photo);
+
     if (photo.uploading) {
       const loading = document.createElement('span');
       loading.className = 'submit-form__photo-loading';
@@ -383,6 +371,7 @@ function renderPhotoList() {
 
   list.hidden = photos.length === 0;
   $('photoDragHint').hidden = photos.length < 2;
+  syncPhotoUploadLabel(photos.length);
   syncSubmitState();
 }
 
@@ -395,14 +384,21 @@ async function addPhotoFile(file) {
     id: randomId(),
     url: '',
     localUrl: URL.createObjectURL(file),
+    posterUrl: '',
     uploading: true,
     isVideo: isVideoUploadFile(file),
+    caption: '',
   };
   photos.push(photo);
   renderPhotoList();
+  if (photo.isVideo) {
+    primeVideoPoster(photo).then(() => renderPhotoList());
+  }
 
   try {
-    photo.url = await uploadImageFile(file);
+    const uploaded = await uploadImageFile(file);
+    photo.url = uploaded.url;
+    photo.posterUrl = uploaded.posterUrl || photo.posterUrl || videoPosterUrl(uploaded.url);
     photo.uploading = false;
     if (!photo.isVideo) revokePhotoPreview(photo);
     renderPhotoList();
@@ -451,6 +447,11 @@ function setSubmitPrimaryLabel(key) {
   if (btn) btn.textContent = t(key);
 }
 
+function setSubmitDeleteVisible(visible) {
+  const btn = $('submitDeleteBtn');
+  if (btn) btn.hidden = !visible;
+}
+
 function resetForm() {
   editId = '';
   $('submitForm').reset();
@@ -460,8 +461,8 @@ function resetForm() {
   if (viewLink) viewLink.hidden = true;
   setSubmitFormTitle('submit.title');
   setSubmitPrimaryLabel('submit.send');
+  setSubmitDeleteVisible(false);
   setError('');
-  syncStatusOther();
   clearPhotos();
   if (pin) {
     pin.remove();
@@ -501,13 +502,6 @@ function validateForm() {
   if (!$('f_lat').value || !$('f_lng').value) {
     return t('submit.error.noLocation');
   }
-  if (!document.querySelector('input[name="status"]:checked')) {
-    return t('submit.error.noStatus');
-  }
-  const status = document.querySelector('input[name="status"]:checked').value;
-  if (status === 'other' && !$('f_statusOther').value.trim()) {
-    return t('submit.error.noStatusOther');
-  }
   if (photos.some((p) => p.uploading)) {
     return t('submit.error.uploadInProgress');
   }
@@ -518,6 +512,24 @@ function validateForm() {
     return t('submit.error.descriptionTooLong');
   }
   return '';
+}
+
+async function handleDelete() {
+  if (!editId) return;
+  const title = $('f_title').value.trim() || t('submit.editTitle');
+  if (!confirm(t('submit.confirmDelete', { title }))) return;
+
+  const btn = $('submitDeleteBtn');
+  btn.disabled = true;
+  setError('');
+
+  try {
+    await api(`/api/submissions/phenomena/${editId}`, { method: 'DELETE' });
+    location.href = '/';
+  } catch (err) {
+    setError(err.message || t('submit.error.deleteFailed'));
+    btn.disabled = false;
+  }
 }
 
 async function handleSubmit(e) {
@@ -533,20 +545,16 @@ async function handleSubmit(e) {
   const btn = $('submitBtn');
   btn.disabled = true;
 
-  const statusEl = document.querySelector('input[name="status"]:checked');
-  const status = statusEl.value;
   const payload = {
     title: $('f_title').value.trim(),
     description: $('f_description').value.trim(),
     extra: $('f_extra').value.trim(),
     findingHint: $('f_finding').value.trim(),
-    status: status === 'other' ? 'other' : status,
-    statusLabel: status === 'other' ? $('f_statusOther').value.trim() : undefined,
     location: $('f_location').value.trim(),
     lat: Number($('f_lat').value),
     lng: Number($('f_lng').value),
     seenAt: seenDateTimeIso($('f_seenDate'), $('f_seenHour'), $('f_seenMinute')),
-    imageUrls: photos.map((p) => p.url).filter(Boolean),
+    images: formImagesPayload(photos),
   };
 
   try {
@@ -559,11 +567,10 @@ async function handleSubmit(e) {
           description: payload.description,
           notes: payload.extra || undefined,
           findingHint: payload.findingHint || undefined,
-          status: payload.status === 'other' ? 'active' : payload.status,
           location: payload.location,
           lat: payload.lat,
           lng: payload.lng,
-          imageUrls: payload.imageUrls,
+          images: payload.images,
           lastNoticedAt: payload.seenAt,
         }),
       });
@@ -574,7 +581,6 @@ async function handleSubmit(e) {
           ...payload,
           extra: payload.extra || undefined,
           findingHint: payload.findingHint || undefined,
-          status: payload.status === 'other' ? 'active' : payload.status,
         }),
       });
       phenomenonId = result?.data?.id || '';
@@ -597,26 +603,24 @@ async function loadEditPhenomenon(id) {
   $('f_finding').value = data.findingHint || '';
   $('f_location').value = data.location || '';
   if (data.lat != null && data.lng != null) setPin(data.lat, data.lng);
-  if (data.status) {
-    const radio = document.querySelector(`input[name="status"][value="${data.status}"]`);
-    if (radio) radio.checked = true;
-  }
   if (data.lastNoticedAt) {
     setSeenDateTimeInputs($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'), data.lastNoticedAt);
   }
-  syncStatusOther();
   clearPhotos();
-  const urls = Array.isArray(data.imageUrls) && data.imageUrls.length
-    ? data.imageUrls
-    : data.imageUrl
-      ? [data.imageUrl]
-      : [];
-  for (const url of urls) {
-    photos.push({ id: randomId(), url, localUrl: '', uploading: false });
+  for (const item of normalizeLoadedFormImages(data)) {
+    photos.push({
+      id: randomId(),
+      url: item.url,
+      caption: item.caption,
+      localUrl: '',
+      uploading: false,
+      isVideo: item.isVideo || isVideoMediaUrl(item.url),
+    });
   }
   renderPhotoList();
   setSubmitFormTitle('submit.editTitle');
   setSubmitPrimaryLabel('submit.save');
+  setSubmitDeleteVisible(true);
   syncRichPreviews();
 }
 
@@ -641,12 +645,12 @@ async function boot() {
     initMap();
   }
   initSearch();
-  initStatusOther();
   initPhotoUpload();
   defaultSeenDate();
   mountRichField($('f_extra'), $('extraPreview'));
   initDescriptionCounter();
   $('submitForm').addEventListener('submit', handleSubmit);
+  $('submitDeleteBtn')?.addEventListener('click', handleDelete);
   $('submitAgain').addEventListener('click', resetForm);
 
   const params = new URLSearchParams(location.search);

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { getAssets } from '../lib/assets.js';
+import { loadFeaturedContributors } from '../lib/contributors.js';
 import { isDev } from '../lib/env.js';
 import { renderPage } from '../lib/render.js';
 import type { LocaleEnv } from '../middleware/locale.js';
@@ -19,14 +20,15 @@ for (const [from, to] of Object.entries(htmlRedirects)) {
   pageRoutes.get(from, (c) => c.redirect(to, 301));
 }
 
-pageRoutes.get('/', (c) =>
-  renderPage(c, 'home', {
+pageRoutes.get('/', async (c) => {
+  const contributors = await loadFeaturedContributors();
+  return renderPage(c, 'home', {
     titleKey: 'brand.title',
     leaflet: true,
-    // Dev: Vite serves /client/main.js with HMR. Prod: hashed bundle.
+    contributors,
     moduleScript: isDev() ? '/client/main.js' : getAssets().js,
-  }),
-);
+  });
+});
 
 pageRoutes.get('/login', (c) =>
   renderPage(c, 'login', {

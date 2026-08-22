@@ -9,9 +9,10 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed.ts",
-    "db:promote-admin": "tsx src/db/promote-demo-admin.ts",
+    "db:ensure-members": "tsx src/db/ensure-demo-members.ts",
     "db:clear-sightings": "tsx src/db/clear-phenomenon-sightings.ts",
     "db:transcode-videos": "tsx src/db/transcode-existing-videos.ts",
+    "db:ensure-posters": "tsx src/db/ensure-video-posters.ts",
     "db:studio": "drizzle-kit studio",
     "media:upload-seed": "tsx scripts/upload-seed-media.ts"
   },
