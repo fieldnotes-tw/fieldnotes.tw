@@ -9,7 +9,20 @@ i18nReady.then(() => {
   const form = document.getElementById('registerForm');
   const successEl = document.getElementById('registerSuccess');
   const resendBtn = document.getElementById('resendBtn');
+  const signupEl = document.getElementById('registerSignup');
+  const oauthEl = document.getElementById('registerOauth');
+  const titleEl = document.getElementById('registerTitle');
   let pendingEmail = '';
+
+  function showRegisterPending(email) {
+    pendingEmail = email;
+    signupEl.hidden = true;
+    oauthEl.hidden = true;
+    if (titleEl) titleEl.textContent = t('auth.register.pendingTitle');
+    successEl.textContent = t('auth.register.sent', { email });
+    successEl.hidden = false;
+    resendBtn.hidden = false;
+  }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -32,12 +45,7 @@ i18nReady.then(() => {
     successEl.hidden = true;
     try {
       const data = await register(email, password);
-      pendingEmail = data.email;
-      successEl.textContent = t('auth.register.sent', { email: data.email });
-      successEl.hidden = false;
-      resendBtn.hidden = false;
-      form.password.value = '';
-      form.confirmPassword.value = '';
+      showRegisterPending(data.email);
     } catch (err) {
       errorEl.textContent = err.status === 409
         ? t('auth.register.alreadyRegistered')

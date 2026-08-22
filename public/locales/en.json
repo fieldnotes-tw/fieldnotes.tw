@@ -165,6 +165,7 @@
   "auth.login.line": "Continue with LINE",
   "auth.login.failed": "Login failed",
   "auth.register.title": "Create account",
+  "auth.register.pendingTitle": "Confirm your email",
   "auth.register.pageTitle": "Create account · 最近高雄",
   "auth.register.submit": "Create account",
   "auth.register.confirmPassword": "Confirm password",

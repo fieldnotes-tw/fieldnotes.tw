@@ -2560,6 +2560,7 @@ body.is-photo-lightbox-open .map-sheet.is-open{
   .grid-feed{
     grid-template-columns:repeat(4, minmax(0, 1fr));
     gap:0.5rem;
+    padding-block:0.5rem;
     background:var(--grid-feed-seam);
   }
   .feed-stage.is-detail-open .grid-feed{
@@ -3287,13 +3288,24 @@ footer .credit{ font-size:var(--type-meta); color:var(--ink-faint); }
 }
 .auth-form__divider::before, .auth-form__divider::after{ content:""; flex:1; height:1px; background:var(--line); }
 .auth-form__line-btn{
-  width:100%; display:flex; align-items:center; justify-content:center; gap:0.5rem;
-  font:inherit; font-weight:700; font-size:var(--btn-fs-primary);
+  width:100%; display:flex; align-items:center; justify-content:center; gap:0.55rem;
+  font:inherit; font-size:var(--btn-fs-primary); font-weight:800; line-height:1.25;
   min-height:var(--btn-h-primary); padding:0.7rem var(--btn-px-primary);
-  border-radius:var(--btn-radius); border:2px solid var(--ink); background:#06C755; color:#fff; cursor:pointer;
+  border-radius:var(--btn-radius);
+  border:2px solid #2f7a4a;
+  background:#049e4a;
+  color:#fff;
+  cursor:pointer;
 }
-.auth-form__line-btn:hover{ filter:brightness(1.05); }
-.auth-form__line-btn:disabled{ opacity:0.55; cursor:not-allowed; filter:none; }
+.auth-form__line-btn::before{
+  content:"";
+  flex:0 0 auto;
+  width:1.28em; height:1.22em;
+  background:center/contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M12 2.25C6.6 2.25 2.25 6.05 2.25 10.75c0 2.75 1.4 5.2 3.65 6.75-.15.85-.48 3.1-.48 3.1s2.3-1.2 3.35-1.8c.98.28 2 .42 3.08.42 5.4 0 9.75-3.8 9.75-8.5S17.4 2.25 12 2.25z'/%3E%3C/svg%3E");
+}
+.auth-form__line-btn:hover{ background:#048942; border-color:#29653f; }
+.auth-form__line-btn:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
+.auth-form__line-btn:disabled{ opacity:0.55; cursor:not-allowed; }
 .auth-form__switch{ text-align:center; font-size:0.85rem; color:var(--ink-soft); margin-top:1.3rem; }
 .auth-form__switch--compact{ margin:-0.15rem 0 1rem; text-align:left; }
 .auth-form__switch a{ font-weight:700; color:var(--ink); text-decoration:underline; text-underline-offset:2px; }

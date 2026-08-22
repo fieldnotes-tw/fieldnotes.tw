@@ -493,6 +493,10 @@ async function boot() {
   syncCommentOnlyMode();
   $('f_commentOnly')?.addEventListener('change', syncCommentOnlyMode);
   $('f_image').addEventListener('change', (e) => handleImagePick(e.target.files));
+  preventSubmitFormEnterSubmit($('sightingForm'), {
+    searchInputId: 'f_otherSpotLocation',
+    onSearchEnter: () => otherSpotMap?.selectFirstSearchResult?.(),
+  });
   $('sightingForm').addEventListener('submit', handleSubmit);
   $('sightingDeleteBtn')?.addEventListener('click', handleDelete);
 }
