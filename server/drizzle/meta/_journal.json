@@ -85,6 +85,13 @@
       "when": 1786453000000,
       "tag": "0011_sighting_comment_only",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786454000000,
+      "tag": "0012_ensure_phenomenon_categories",
+      "breakpoints": true
     }
   ]
 }
