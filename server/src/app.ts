@@ -16,6 +16,7 @@ import { sightingRoutes } from './routes/sightings.js';
 import { submissionRoutes } from './routes/submissions.js';
 import { memberRoutes } from './routes/members.js';
 import { phenomenaRoutes } from './routes/phenomena.js';
+import { weatherRoutes } from './routes/weather.js';
 
 export function createApp() {
   const app = new Hono<LocaleEnv>();
@@ -72,6 +73,7 @@ export function createApp() {
   app.route('/api/submissions', submissionRoutes);
   app.route('/api/sightings', sightingRoutes);
   app.route('/api/phenomena', phenomenaRoutes);
+  app.route('/api/weather', weatherRoutes);
   app.route('/api/members', memberRoutes);
   app.route('/', pageRoutes);
 

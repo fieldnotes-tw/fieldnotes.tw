@@ -436,27 +436,29 @@ function weatherTextForCode(code) {
   return t(`weather.${code}`) || '';
 }
 
-const WEATHER_URL =
-  'https://api.open-meteo.com/v1/forecast?latitude=22.688&longitude=120.297&current=temperature_2m,weather_code&timezone=Asia%2FTaipei';
-
 async function loadWeather() {
   const weatherEl = document.getElementById('weatherText');
   if (!weatherEl) return;
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 4000);
+  const timer = setTimeout(() => controller.abort(), 8000);
 
   try {
-    // Low priority so feed/API work isn't starved; overlaps i18n load.
-    const res = await fetch(WEATHER_URL, {
+    const res = await fetch('/api/weather', {
       signal: controller.signal,
-      priority: 'low',
+      headers: {
+        'Accept-Language': typeof getLocale === 'function' ? getLocale() : 'zh-Hant',
+      },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const payload = await res.json();
+    const data = payload?.data;
+    if (!data || typeof data.temperature !== 'number' || typeof data.weatherCode !== 'number') {
+      throw new Error('Invalid weather payload');
+    }
     await i18nReady;
-    const temp = Math.round(data.current.temperature_2m);
-    const desc = weatherTextForCode(data.current.weather_code);
+    const temp = Math.round(data.temperature);
+    const desc = weatherTextForCode(data.weatherCode);
     weatherEl.textContent = t('home.weatherLine', { temp, desc });
     weatherEl.title = t('home.weatherLine', { temp, desc });
   } catch {
