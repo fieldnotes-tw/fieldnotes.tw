@@ -1834,12 +1834,18 @@ html[lang="en"] .sitehead__menu-oval{
 .detail-map-tooltip.leaflet-tooltip-top{
   margin-top:-6px;
 }
+.detail__map-actions-wrap{
+  width:100%;
+}
 .detail__map-actions{
   display:grid;
-  grid-template-columns:minmax(5.5rem, 1fr) minmax(0, 1.25fr);
+  grid-template-columns:1fr;
   align-items:start;
   gap:0.65rem;
   margin-top:0.65rem;
+}
+.detail__map-actions:not(.detail__map-actions--solo){
+  grid-template-columns:auto minmax(0, 1fr);
 }
 .detail__map-actions--solo{
   grid-template-columns:1fr;
@@ -1872,6 +1878,7 @@ html[lang="en"] .sitehead__menu-oval{
   min-width:5.5rem;
   padding-left:1rem;
   padding-right:1rem;
+  white-space:nowrap;
 }
 .detail__actions--no-map{
   margin-top:0.85rem;
@@ -1921,8 +1928,8 @@ html[lang="en"] .sitehead__menu-oval{
   .detail-map-overlay__nav{
     width:auto;
   }
-  .detail__map-actions{
-    grid-template-columns:minmax(6.75rem, 1fr) minmax(0, 1.35fr);
+  .detail__map-actions:not(.detail__map-actions--solo){
+    grid-template-columns:auto minmax(0, 1fr);
   }
   .detail__map-actions .detail__action:not(.detail__action--primary){
     width:auto;

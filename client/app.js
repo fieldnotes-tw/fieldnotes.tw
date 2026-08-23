@@ -2833,7 +2833,7 @@ function buildDetailMapBlock(item) {
     const wrap = document.createElement('div');
     wrap.className = 'detail__map-actions-wrap';
     wrap.append(buildDetailMapActions(item));
-    wrap.classList.add('detail__actions', 'detail__actions--no-map');
+    wrap.classList.add('detail__actions--no-map');
     return wrap;
   }
 
