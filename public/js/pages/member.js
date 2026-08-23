@@ -19,14 +19,15 @@ function memberIdFromPath() {
   return parts[1];
 }
 
-function renderAvatar(container, { displayName, avatarUrl }) {
+function renderAvatar(container, { displayName, avatarUrl, avatarCategory = 'plant' }) {
   container.replaceChildren();
   const frame = document.createElement('div');
   frame.className = 'profile-form__avatar-frame';
   const fallback = document.createElement('span');
   fallback.className = 'avatar avatar--lg';
+  fallback.dataset.cat = avatarCategory;
   const label = displayName || '?';
-  fallback.textContent = Array.from(label.trim())[0]?.toUpperCase() || '?';
+  fallback.textContent = Array.from(label.trim()).find((ch) => !/\s/u.test(ch)) || label.charAt(0) || '?';
   frame.appendChild(fallback);
   if (avatarUrl) {
     const img = document.createElement('img');
@@ -93,8 +94,16 @@ async function boot() {
     document.title = `${name} · ${t('member.pageTitle')}`;
     renderAvatar($('memberAvatar'), data);
     if (data.bio) {
-      $('memberBio').hidden = false;
-      $('memberBio').textContent = data.bio;
+      const bioEl = $('memberBio');
+      bioEl.hidden = false;
+      bioEl.replaceChildren();
+      data.bio.split(/\n\n+/).forEach((paragraph) => {
+        const trimmed = paragraph.trim();
+        if (!trimmed) return;
+        const p = document.createElement('p');
+        p.textContent = trimmed;
+        bioEl.appendChild(p);
+      });
     }
     renderReports(data.recentSightings || []);
   } catch (err) {

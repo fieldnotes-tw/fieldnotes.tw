@@ -29,5 +29,7 @@ resource "aws_secretsmanager_secret_version" "app" {
     media_bucket        = aws_s3_bucket.media.bucket
     media_public_prefix = "/media"
     seed_demo           = var.seed_demo ? "1" : "0"
+    line_channel_id     = var.line_channel_id
+    line_channel_secret = var.line_channel_secret
   })
 }

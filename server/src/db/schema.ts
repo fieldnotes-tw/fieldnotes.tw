@@ -51,10 +51,15 @@ export const sightingConditionEnum = pgEnum(
   SIGHTING_CONDITIONS,
 );
 
+export const SPOT_KINDS = ['fixed', 'area'] as const;
+
+export const spotKindEnum = pgEnum('spot_kind', SPOT_KINDS);
+
 export const phenomena = pgTable('phenomena', {
   id: uuid('id').defaultRandom().primaryKey(),
   status: phenomenonStatusEnum('status').notNull().default('active'),
   category: phenomenonCategoryEnum('category').notNull(),
+  categories: text('categories').array().notNull().default([]),
   title: text('title').notNull(),
   description: text('description').notNull(),
   location: text('location'),
@@ -81,7 +86,7 @@ export const users = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     email: text('email').notNull(),
-    passwordHash: text('password_hash').notNull(),
+    passwordHash: text('password_hash'),
     displayName: text('display_name'),
     avatarUrl: text('avatar_url'),
     bio: text('bio'),
@@ -89,6 +94,10 @@ export const users = pgTable(
     emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
     emailConfirmTokenHash: text('email_confirm_token_hash'),
     emailConfirmExpiresAt: timestamp('email_confirm_expires_at', {
+      withTimezone: true,
+    }),
+    passwordResetTokenHash: text('password_reset_token_hash'),
+    passwordResetExpiresAt: timestamp('password_reset_expires_at', {
       withTimezone: true,
     }),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -101,11 +110,49 @@ export const users = pgTable(
   (table) => [uniqueIndex('users_email_uidx').on(table.email)],
 );
 
+export const userIdentities = pgTable(
+  'user_identities',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    provider: text('provider').notNull(),
+    providerUserId: text('provider_user_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [uniqueIndex('user_identities_provider_uidx').on(table.provider, table.providerUserId)],
+);
+
+export const spots = pgTable('spots', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  phenomenonId: uuid('phenomenon_id')
+    .notNull()
+    .references(() => phenomena.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  locationDetail: text('location_detail'),
+  kind: spotKindEnum('kind').notNull().default('fixed'),
+  lat: doublePrecision('lat'),
+  lng: doublePrecision('lng'),
+  findingHint: text('finding_hint'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const sightings = pgTable('sightings', {
   id: uuid('id').defaultRandom().primaryKey(),
   phenomenonId: uuid('phenomenon_id')
     .notNull()
     .references(() => phenomena.id, { onDelete: 'cascade' }),
+  spotId: uuid('spot_id')
+    .references(() => spots.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
   observerName: text('observer_name'),
   seenAt: timestamp('seen_at', { withTimezone: true }).notNull(),
@@ -159,6 +206,9 @@ export type NewUser = typeof users.$inferInsert;
 export type UserRole = (typeof USER_ROLES)[number];
 export type Sighting = typeof sightings.$inferSelect;
 export type NewSighting = typeof sightings.$inferInsert;
+export type Spot = typeof spots.$inferSelect;
+export type NewSpot = typeof spots.$inferInsert;
+export type SpotKind = (typeof SPOT_KINDS)[number];
 export type SightingImage = typeof sightingImages.$inferSelect;
 export type PhenomenonImage = typeof phenomenonImages.$inferSelect;
 export type SightingCondition = (typeof SIGHTING_CONDITIONS)[number];

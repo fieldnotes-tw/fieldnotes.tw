@@ -22,6 +22,8 @@ aws secretsmanager get-secret-value --region ap-east-2 \
 
 SES identities are created in `ap-northeast-1` (Tokyo). **Production** owns the domain identity (`manage_ses_identity = true`); staging only looks it up so it can be destroyed without breaking mail. DKIM CNAMEs are managed in `infra/dns` from `ses_dkim_tokens` (production output). Until the domain verifies (and while the account is in the SES sandbox), confirmation mail only delivers to SES-verified recipient addresses. Request production access when ready.
 
+**DKIM for `noreply@fieldnotes.tw`:** `fieldnotes.tw` nameservers already point at Route 53, so DKIM records belong in this zone—not GoDaddy. After production has been applied at least once, run **Actions → Deploy DNS** (re-run is safe). The workflow reads `ses_dkim_tokens` from production state and creates the three `<token>._domainkey.fieldnotes.tw` CNAMEs. Confirm in SES console (`ap-northeast-1`) that `fieldnotes.tw` shows **Verified**. Only if apex NS were still at GoDaddy would you add those same CNAMEs manually there.
+
 **SES ownership cutover** (one-time, if staging still owns the identity): deploy production first so it creates/adopts the identity, then deploy staging with `manage_ses_identity = false`. Only after that is it safe to destroy staging.
 
 CI authenticates with **GitHub OIDC** (no long-lived access keys in the repo).

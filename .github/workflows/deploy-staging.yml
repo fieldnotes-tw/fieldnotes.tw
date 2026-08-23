@@ -32,6 +32,9 @@ jobs:
     # Native arm64 — matches t4g.* API hosts (no QEMU cross-build).
     runs-on: ubuntu-24.04-arm
     environment: staging
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
 
@@ -84,6 +87,27 @@ jobs:
           bucket = "${TF_BACKEND_BUCKET}"
           EOF
           terraform init -input=false -backend-config=backend.hcl
+
+          # Cancelled runs can leave a stale DynamoDB lock; release if older than 5m.
+          LOCK_KEY="${TF_BACKEND_BUCKET}/staging/terraform.tfstate"
+          ITEM=$(aws dynamodb get-item \
+            --table-name fieldnotes-tw-tf-locks \
+            --key "{\"LockID\":{\"S\":\"${LOCK_KEY}\"}}" \
+            --output json 2>/dev/null || echo '{}')
+          INFO=$(echo "$ITEM" | jq -r '.Item.Info.S // empty')
+          if [ -n "$INFO" ]; then
+            LOCK_ID=$(echo "$INFO" | jq -r '.ID // empty')
+            CREATED=$(echo "$INFO" | jq -r '.Created // empty')
+            if [ -n "$LOCK_ID" ] && [ -n "$CREATED" ]; then
+              CREATED_EPOCH=$(date -d "$CREATED" +%s 2>/dev/null || echo 0)
+              NOW_EPOCH=$(date +%s)
+              if [ "$CREATED_EPOCH" -gt 0 ] && [ $((NOW_EPOCH - CREATED_EPOCH)) -gt 300 ]; then
+                echo "Releasing stale Terraform lock ${LOCK_ID}"
+                terraform force-unlock -force "$LOCK_ID"
+              fi
+            fi
+          fi
+
           terraform apply -auto-approve -input=false
           echo "distribution=$(terraform output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
           echo "ecr=$(terraform output -raw ecr_repository_url)" >> "$GITHUB_OUTPUT"

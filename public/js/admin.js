@@ -27,6 +27,41 @@ function formatWhen(value) {
   }
 }
 
+function formatUserLabel(row) {
+  const lineId = row.lineUserId
+    || (row.email?.startsWith('line_') && row.email.endsWith('@oauth.local')
+      ? row.email.slice(5, -('@oauth.local'.length))
+      : null);
+  if (lineId) {
+    const name = row.displayName?.trim();
+    return name ? `${name} · LINE ${lineId}` : `LINE ${lineId}`;
+  }
+  return row.email;
+}
+
+function renderUserIdentity(row) {
+  const lineId = row.lineUserId
+    || (row.email?.startsWith('line_') && row.email.endsWith('@oauth.local')
+      ? row.email.slice(5, -('@oauth.local'.length))
+      : null);
+  if (!lineId) return row.email;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'admin-user-identity';
+  const name = row.displayName?.trim();
+  if (name) {
+    const nameEl = document.createElement('div');
+    nameEl.className = 'admin-user-identity__name';
+    nameEl.textContent = name;
+    wrap.appendChild(nameEl);
+  }
+  const lineEl = document.createElement('code');
+  lineEl.className = 'admin-user-identity__line';
+  lineEl.textContent = lineId;
+  wrap.appendChild(lineEl);
+  return wrap;
+}
+
 function setFormError(message) {
   const el = $('phenomenonError');
   if (!message) {
@@ -74,7 +109,7 @@ function currentStatusFilter() {
 }
 
 async function deleteUser(row) {
-  if (!confirm(t('admin.users.deleteConfirm', { email: row.email }))) return;
+  if (!confirm(t('admin.users.deleteConfirm', { email: formatUserLabel(row) }))) return;
   try {
     await api(`/api/admin/users/${row.id}`, { method: 'DELETE' });
     await loadUsers();
@@ -88,7 +123,7 @@ async function setUserRole(row, role) {
     role === 'admin'
       ? 'admin.users.promoteConfirm'
       : 'admin.users.demoteConfirm';
-  if (!confirm(t(key, { email: row.email }))) return;
+  if (!confirm(t(key, { email: formatUserLabel(row) }))) return;
   try {
     await api(`/api/admin/users/${row.id}`, {
       method: 'PATCH',
@@ -140,7 +175,7 @@ async function loadUsers() {
     tbody.replaceChildren(...data.map((row) => {
       const tr = document.createElement('tr');
       const email = document.createElement('td');
-      email.textContent = row.email;
+      email.appendChild(renderUserIdentity(row));
       const role = document.createElement('td');
       role.textContent = row.role === 'admin' ? t('admin.users.roleAdmin') : t('admin.users.roleUser');
       const verified = document.createElement('td');

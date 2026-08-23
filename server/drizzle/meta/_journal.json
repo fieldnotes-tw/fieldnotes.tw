@@ -50,6 +50,34 @@
       "when": 1786448000000,
       "tag": "0006_phenomenon_images_finding",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786449000000,
+      "tag": "0007_spots",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786450000000,
+      "tag": "0008_password_reset",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786451000000,
+      "tag": "0009_line_oauth",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786453000000,
+      "tag": "0011_sighting_comment_only",
+      "breakpoints": true
     }
   ]
 }

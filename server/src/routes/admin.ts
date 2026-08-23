@@ -1,10 +1,12 @@
-import { and, asc, desc, eq, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, sql, type SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { db } from '../db/index.js';
-import { USER_ROLES, phenomena, users } from '../db/schema.js';
+import { USER_ROLES, phenomena, userIdentities, users } from '../db/schema.js';
 import { hashPassword, normalizeEmail } from '../lib/auth.js';
 import { localeOf, t } from '../lib/i18n.js';
+import { createPrimarySpotForPhenomenon } from '../lib/spots.js';
+import { resolveCategoryFields } from '../lib/categories.js';
 import {
   createUploadUrl,
   isAllowedContentType,
@@ -59,11 +61,17 @@ adminRoutes.get('/users', async (c) => {
     .select({
       id: users.id,
       email: users.email,
+      displayName: users.displayName,
       role: users.role,
       emailVerifiedAt: users.emailVerifiedAt,
       createdAt: users.createdAt,
+      lineUserId: userIdentities.providerUserId,
     })
     .from(users)
+    .leftJoin(
+      userIdentities,
+      and(eq(userIdentities.userId, users.id), eq(userIdentities.provider, 'line')),
+    )
     .orderBy(desc(users.createdAt));
 
   return c.json({ data: rows });
@@ -237,8 +245,8 @@ adminRoutes.put('/uploads/local/:filename', async (c) => {
     if (!body.byteLength) {
       return c.json({ error: t(locale, 'errors.invalidRequest') }, 400);
     }
-    const publicPath = await saveLocalUpload(filename, body, contentType);
-    return c.json({ data: { publicPath } }, 201);
+    const upload = await saveLocalUpload(filename, body, contentType);
+    return c.json({ data: upload }, 201);
   } catch (err) {
     console.error('Local media upload failed', err);
     return c.json({ error: t(locale, 'errors.uploadUrlFailed') }, 500);
@@ -265,7 +273,9 @@ adminRoutes.get('/phenomena', async (c) => {
     if (!category.success) {
       return c.json({ error: t(locale, 'errors.invalidCategoryFilter') }, 400);
     }
-    filters.push(eq(phenomena.category, category.data));
+    filters.push(
+      sql`(${phenomena.category} = ${category.data} OR ${category.data} = ANY(${phenomena.categories}))`,
+    );
   }
 
   const rows = await db
@@ -280,13 +290,23 @@ adminRoutes.get('/phenomena', async (c) => {
 adminRoutes.post('/phenomena', validated('json', createPhenomenonSchema), async (c) => {
   const body = c.req.valid('json');
   const now = new Date();
+  const { category, categories, ...fields } = body;
+  const categoryFields = resolveCategoryFields({ category, categories });
   const [row] = await db
     .insert(phenomena)
     .values({
-      ...body,
+      ...fields,
+      ...categoryFields,
       updatedAt: now,
     })
     .returning();
+
+  await createPrimarySpotForPhenomenon(row.id, {
+    location: row.location,
+    lat: row.lat,
+    lng: row.lng,
+    findingHint: row.findingHint,
+  });
 
   return c.json({ data: row }, 201);
 });
@@ -302,10 +322,15 @@ adminRoutes.patch(
     }
 
     const body = c.req.valid('json');
+    const { category, categories, ...fields } = body;
+    const categoryFields = (category !== undefined || categories !== undefined)
+      ? resolveCategoryFields({ category, categories })
+      : {};
     const [row] = await db
       .update(phenomena)
       .set({
-        ...body,
+        ...fields,
+        ...categoryFields,
         updatedAt: new Date(),
       })
       .where(eq(phenomena.id, id.data))

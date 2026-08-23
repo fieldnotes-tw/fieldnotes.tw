@@ -4,18 +4,23 @@
 </header>
 
 <main class="auth-main">
-  <form class="auth-form" id="loginForm" novalidate>
+  <div class="auth-form">
     <h1 class="auth-form__title"><%= it.t('auth.login.title') %></h1>
-    <label class="auth-form__field">
-      <span><%= it.t('auth.field.email') %></span>
-      <input type="email" name="email" autocomplete="email" required>
-    </label>
-    <label class="auth-form__field">
-      <span><%= it.t('auth.field.password') %></span>
-      <input type="password" name="password" autocomplete="current-password" required minlength="8">
-    </label>
-    <p class="auth-form__error" id="loginError" hidden></p>
-    <button type="submit" class="auth-form__submit"><%= it.t('auth.login.submit') %></button>
+    <form id="loginForm" novalidate>
+      <label class="auth-form__field">
+        <span><%= it.t('auth.field.email') %></span>
+        <input type="email" name="email" autocomplete="email" required>
+      </label>
+      <label class="auth-form__field">
+        <span><%= it.t('auth.field.password') %></span>
+        <input type="password" name="password" autocomplete="current-password" required minlength="8">
+      </label>
+      <p class="auth-form__error" id="loginError" hidden></p>
+      <p class="auth-form__switch auth-form__switch--compact"><a href="/forgot-password"><%= it.t('auth.login.forgotLink') %></a></p>
+      <button type="submit" class="auth-form__submit"><%= it.t('auth.login.submit') %></button>
+    </form>
+    <div class="auth-form__divider"><span><%= it.t('auth.register.or') %></span></div>
+    <button type="button" class="auth-form__line-btn" id="lineLoginBtn"><%= it.t('auth.login.line') %></button>
     <p class="auth-form__switch"><span><%= it.t('auth.login.switch') %></span><a href="/register"><%= it.t('auth.login.switchLink') %></a></p>
-  </form>
+  </div>
 </main>

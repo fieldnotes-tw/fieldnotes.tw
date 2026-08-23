@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { mkdir, rename, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +24,34 @@ const here = dirname(fileURLToPath(import.meta.url));
 const localMediaRoot = join(here, '../../public');
 const execFileAsync = promisify(execFile);
 
+export function videoPosterPublicPath(publicPath: string) {
+  if (!/\.(mp4|webm|mov)(\?|#|$)/i.test(publicPath)) return undefined;
+  return publicPath.replace(/\.(mp4|webm|mov)(?=($|[?#]))/i, '-poster.jpg');
+}
+
+async function extractVideoPoster(sourceAbs: string) {
+  const dir = dirname(sourceAbs);
+  const base = basename(sourceAbs).replace(/\.(mp4|mov|webm)$/i, '');
+  const posterAbs = join(dir, `${base}-poster.jpg`);
+  try {
+    await execFileAsync('ffmpeg', [
+      '-i', sourceAbs,
+      '-ss', '0.5',
+      '-frames:v', '1',
+      '-update', '1',
+      '-vf', 'scale=960:-2',
+      '-q:v', '3',
+      '-y', posterAbs,
+    ], { timeout: 120_000 });
+    await stat(posterAbs);
+    return posterAbs;
+  } catch (err) {
+    await unlink(posterAbs).catch(() => {});
+    console.error('Video poster extraction failed', basename(sourceAbs), err);
+    return null;
+  }
+}
+
 async function transcodeVideoToMp4(sourceAbs: string) {
   const dir = dirname(sourceAbs);
   const base = basename(sourceAbs).replace(/\.(mov|webm|mp4)$/i, '');
@@ -44,13 +72,14 @@ async function transcodeVideoToMp4(sourceAbs: string) {
     await unlink(destAbs).catch(() => {});
     await rename(tempAbs, destAbs);
     return destAbs;
-  } catch {
+  } catch (err) {
     await unlink(tempAbs).catch(() => {});
+    console.error('Video transcode failed', basename(sourceAbs), err);
     return null;
   }
 }
 
-export { transcodeVideoToMp4 };
+export { transcodeVideoToMp4, extractVideoPoster };
 
 export function mediaBucket() {
   return process.env.MEDIA_BUCKET?.trim() || '';
@@ -66,8 +95,12 @@ export function mediaBackend(): 's3' | 'local' {
   return mediaBucket() ? 's3' : 'local';
 }
 
+export function normalizeContentType(contentType: string) {
+  return contentType.split(';')[0]?.trim().toLowerCase() || '';
+}
+
 export function isAllowedContentType(contentType: string) {
-  return Boolean(ALLOWED_TYPES[contentType]);
+  return Boolean(ALLOWED_TYPES[normalizeContentType(contentType)]);
 }
 
 export function isSafeMediaFilename(filename: string) {
@@ -79,7 +112,7 @@ export function isSafeServeMediaFilename(filename: string) {
 }
 
 function newObjectName(contentType: string) {
-  const ext = ALLOWED_TYPES[contentType];
+  const ext = ALLOWED_TYPES[normalizeContentType(contentType)];
   if (!ext) {
     throw new Error('Unsupported content type');
   }
@@ -128,15 +161,25 @@ export async function createUploadUrl(
   };
 }
 
-export async function saveLocalUpload(filename: string, body: ArrayBuffer, contentType: string) {
+export type LocalUploadResult = {
+  publicPath: string;
+  posterPath?: string;
+};
+
+export async function saveLocalUpload(
+  filename: string,
+  body: ArrayBuffer,
+  contentType: string,
+): Promise<LocalUploadResult> {
   if (!isSafeMediaFilename(filename)) {
     throw new Error('Invalid filename');
   }
-  if (!isAllowedContentType(contentType)) {
+  const normalizedType = normalizeContentType(contentType);
+  if (!isAllowedContentType(normalizedType)) {
     throw new Error('Unsupported content type');
   }
 
-  const expectedExt = ALLOWED_TYPES[contentType];
+  const expectedExt = ALLOWED_TYPES[normalizedType];
   if (!filename.toLowerCase().endsWith(`.${expectedExt}`)) {
     throw new Error('Content type mismatch');
   }
@@ -146,10 +189,23 @@ export async function saveLocalUpload(filename: string, body: ArrayBuffer, conte
   await writeFile(abs, Buffer.from(body));
 
   let finalFilename = filename;
-  if (contentType.startsWith('video/')) {
+  let finalAbs = abs;
+  let posterPath: string | undefined;
+
+  if (normalizedType.startsWith('video/')) {
     const mp4Abs = await transcodeVideoToMp4(abs);
-    if (mp4Abs) finalFilename = basename(mp4Abs);
+    if (mp4Abs) {
+      finalFilename = basename(mp4Abs);
+      finalAbs = mp4Abs;
+    }
+    const posterAbs = await extractVideoPoster(finalAbs);
+    if (posterAbs) {
+      posterPath = `${mediaPublicPrefix()}/phenomena/${basename(posterAbs)}`;
+    }
   }
 
-  return `${mediaPublicPrefix()}/phenomena/${finalFilename}`;
+  return {
+    publicPath: `${mediaPublicPrefix()}/phenomena/${finalFilename}`,
+    posterPath,
+  };
 }

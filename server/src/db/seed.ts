@@ -1,6 +1,8 @@
 import { eq, or, sql } from 'drizzle-orm';
 import { db } from './index.js';
 import { phenomena, sightingImages, sightings, users } from './schema.js';
+import { createPrimarySpotForPhenomenon, getPrimarySpotId } from '../lib/spots.js';
+import { ensureChenEnMember, resolveChenEnUserId } from '../lib/demo-members.js';
 import { hashPassword } from '../lib/auth.js';
 
 const seedData = [
@@ -132,8 +134,8 @@ async function seedPhenomena() {
   const reset = process.env.SEED_RESET === '1';
 
   if (reset) {
-    await db.execute(sql`TRUNCATE TABLE sightings, phenomena CASCADE`);
-    console.log('Truncated phenomena and sightings.');
+    await db.execute(sql`TRUNCATE TABLE sightings, spots, phenomena CASCADE`);
+    console.log('Truncated phenomena, spots, and sightings.');
   } else {
     const existing = await db.select({ id: phenomena.id }).from(phenomena).limit(1);
     if (existing.length > 0) {
@@ -142,8 +144,23 @@ async function seedPhenomena() {
     }
   }
 
-  await db.insert(phenomena).values(seedData);
-  console.log(`Seeded ${seedData.length} demo phenomena.`);
+  for (const entry of seedData) {
+    const [row] = await db
+      .insert(phenomena)
+      .values({
+        ...entry,
+        categories: [entry.category],
+      })
+      .returning({ id: phenomena.id });
+
+    await createPrimarySpotForPhenomenon(row.id, {
+      location: entry.location,
+      lat: entry.lat,
+      lng: entry.lng,
+      findingHint: entry.findingHint ?? null,
+    });
+  }
+  console.log(`Seeded ${seedData.length} demo phenomena with primary spots.`);
 }
 
 const sightingSeedByTitle: Record<string, {
@@ -164,6 +181,17 @@ const sightingSeedByTitle: Record<string, {
         condition: 'abundant',
         note: '大概六點，龍虎塔東邊水岸，三隻小的跟成鳥在找吃的，會鑽蘆葦。聽說是亞成鳥幫忙帶？有人看過嗎',
         imageUrl: '/media/phenomena/moorhen-chick.jpg',
+      },
+    ],
+  },
+  '來找羅漢松的「小羅漢」，會慢慢變紅哦': {
+    sightings: [
+      {
+        observerName: '陳恩',
+        seenAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        note: '雌株的種子正慢慢成熟，可以找找看可愛的「小羅漢」。',
+        imageUrl: '/media/phenomena/podocarpus.jpg',
+        imageAlt: '凹子底公園旁、迷路小章魚左前方的羅漢松',
       },
     ],
   },
@@ -254,12 +282,24 @@ async function seedSightings() {
 
     for (const entry of bundle.sightings) {
       const isChao = entry.observerName.toLowerCase() === 'chao';
+      const isChenEn = entry.observerName === '陳恩';
+      const chenEnUserId = isChenEn ? await resolveChenEnUserId() : null;
+      const spotId = await getPrimarySpotId(row.id);
+      if (!spotId) continue;
+
       const [inserted] = await db
         .insert(sightings)
         .values({
           phenomenonId: row.id,
-          userId: isChao && chaoUserId ? chaoUserId : null,
-          observerName: isChao && chaoUserId ? null : entry.observerName,
+          spotId,
+          userId: isChao && chaoUserId
+            ? chaoUserId
+            : isChenEn && chenEnUserId
+              ? chenEnUserId
+              : null,
+          observerName: (isChao && chaoUserId) || (isChenEn && chenEnUserId)
+            ? null
+            : entry.observerName,
           seenAt: entry.seenAt,
           condition: entry.condition,
           note: entry.note,
@@ -288,6 +328,7 @@ async function seed() {
     await linkChaoMemberContent();
     await promoteDemoMemberToAdmin();
   }
+  await ensureChenEnMember();
   process.exit(0);
 }
 

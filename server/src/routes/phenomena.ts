@@ -1,8 +1,9 @@
-import { eq, inArray, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { phenomena } from '../db/schema.js';
 import {
   attachImageUrls,
+  attachLocationSummaries,
   getPhenomenonDetail,
   listPhenomenaWithStats,
 } from '../lib/phenomena-query.js';
@@ -41,11 +42,14 @@ phenomenaRoutes.get('/', async (c) => {
     if (!category.success) {
       return c.json({ error: t(locale, 'errors.invalidCategoryFilter') }, 400);
     }
-    filters.push(eq(phenomena.category, category.data));
+    filters.push(
+      sql`(${phenomena.category} = ${category.data} OR ${category.data} = ANY(${phenomena.categories}))`,
+    );
   }
 
   const rows = await listPhenomenaWithStats(filters);
-  const data = await attachImageUrls(rows);
+  const withSummaries = await attachLocationSummaries(rows);
+  const data = await attachImageUrls(withSummaries);
   return c.json({ data });
 });
 

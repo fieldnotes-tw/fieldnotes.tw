@@ -69,6 +69,8 @@ locals {
     MEDIA_BUCKET=$(echo "$APP_JSON" | jq -r .media_bucket)
     MEDIA_PUBLIC_PREFIX=$(echo "$APP_JSON" | jq -r .media_public_prefix)
     SEED_DEMO=$(echo "$APP_JSON" | jq -r '.seed_demo // "0"')
+    LINE_CHANNEL_ID=$(echo "$APP_JSON" | jq -r '.line_channel_id // ""')
+    LINE_CHANNEL_SECRET=$(echo "$APP_JSON" | jq -r '.line_channel_secret // ""')
 
     # Port is baked by Terraform; quoted heredoc keeps nginx $vars literal.
     cat >/etc/nginx/conf.d/api.conf <<'NGINX'
@@ -109,6 +111,8 @@ locals {
       -e MEDIA_BUCKET="$MEDIA_BUCKET" \
       -e MEDIA_PUBLIC_PREFIX="$MEDIA_PUBLIC_PREFIX" \
       -e SEED_DEMO="$SEED_DEMO" \
+      -e LINE_CHANNEL_ID="$LINE_CHANNEL_ID" \
+      -e LINE_CHANNEL_SECRET="$LINE_CHANNEL_SECRET" \
       "$REPO:$IMAGE_TAG"
     SCRIPT
     chmod +x /usr/local/bin/fieldnotes-deploy.sh

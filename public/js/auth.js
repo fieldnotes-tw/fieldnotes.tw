@@ -134,6 +134,52 @@ async function confirmEmail(token) {
   return setCurrentUser(data);
 }
 
+async function requestPasswordReset(email) {
+  return api('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+async function resetPassword(token, password) {
+  const { data } = await api('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  });
+  return setCurrentUser(data);
+}
+
+function startLineLogin(next, returnTo) {
+  const params = new URLSearchParams();
+  if (next && next.startsWith('/') && !next.startsWith('//')) {
+    params.set('next', next);
+  }
+  const page = returnTo || location.pathname;
+  if (page === '/login' || page === '/register') {
+    params.set('returnTo', page);
+  }
+  const qs = params.toString();
+  location.href = `/api/auth/line/start${qs ? `?${qs}` : ''}`;
+}
+
+function showLineAuthError(errorEl) {
+  if (!errorEl) return;
+  const params = new URLSearchParams(location.search);
+  const line = params.get('line');
+  if (!line) return;
+
+  const messageParam = params.get('message');
+  const messages = {
+    unavailable: 'auth.line.unavailable',
+    denied: 'auth.line.denied',
+    invalid: 'auth.line.invalid',
+    failed: 'auth.line.failed',
+  };
+
+  errorEl.textContent = messageParam || t(messages[line] || 'auth.line.failed');
+  errorEl.hidden = false;
+}
+
 async function logout() {
   try {
     await api('/api/auth/logout', { method: 'POST', body: '{}' });
@@ -151,7 +197,7 @@ function renderAuthNav(container) {
   }
 
   const submitLink = document.createElement('a');
-  submitLink.className = 'auth-nav__btn' + (user ? '' : ' auth-nav__btn--primary');
+  submitLink.className = 'auth-nav__btn auth-nav__btn--primary';
   submitLink.textContent = t('nav.submit');
   submitLink.href = user ? '/submit' : `/login?next=${encodeURIComponent('/submit')}`;
   container.appendChild(submitLink);

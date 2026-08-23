@@ -1,20 +1,10 @@
-<div class="submit-form__datetime">
-  <label class="submit-form__field submit-form__datetime-part">
-    <span class="submit-form__datetime-label"><%= it.t('form.datetime.date') %></span>
+<div class="submit-form__datetime submit-form__datetime--combo">
+  <label class="submit-form__datetime-date">
+    <span class="visually-hidden"><%= it.t('form.datetime.date') %></span>
     <input type="date" id="f_seenDate" required>
   </label>
-  <div class="submit-form__field submit-form__datetime-part">
-    <span class="submit-form__datetime-label" id="f_seenTimeLabel"><%= it.t('form.datetime.time') %></span>
-    <div class="submit-form__time-row" role="group" aria-labelledby="f_seenTimeLabel">
-      <label class="submit-form__time-select">
-        <span class="visually-hidden"><%= it.t('form.datetime.hour') %></span>
-        <select id="f_seenHour" required></select>
-      </label>
-      <span class="submit-form__time-sep" aria-hidden="true">:</span>
-      <label class="submit-form__time-select">
-        <span class="visually-hidden"><%= it.t('form.datetime.minute') %></span>
-        <select id="f_seenMinute" required></select>
-      </label>
-    </div>
-  </div>
+  <label class="submit-form__datetime-time">
+    <span class="visually-hidden"><%= it.t('form.datetime.time') %></span>
+    <input type="time" id="f_seenTime" required>
+  </label>
 </div>

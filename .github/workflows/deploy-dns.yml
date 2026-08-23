@@ -73,4 +73,15 @@ jobs:
             echo '```json'
             terraform output -json acm_validation_records
             echo '```'
+            if [ "$tokens" != '[]' ] && [ -n "$tokens" ]; then
+              echo
+              echo 'SES DKIM CNAMEs applied in Route 53 (fieldnotes.tw NS must point here):'
+              echo
+              echo '```'
+              echo "$tokens" | jq -r '.[] | . + "._domainkey.fieldnotes.tw → " + . + ".dkim.amazonses.com"'
+              echo '```'
+            else
+              echo
+              echo 'SES DKIM: no tokens in production state yet — deploy production first, then re-run Deploy DNS.'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"

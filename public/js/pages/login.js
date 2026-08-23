@@ -5,13 +5,27 @@ function loginRedirectTarget(user) {
   return user.role === 'admin' ? '/admin' : '/';
 }
 
+function lineLoginNextTarget() {
+  const params = new URLSearchParams(location.search);
+  const next = params.get('next');
+  if (next && next.startsWith('/') && !next.startsWith('//')) return next;
+  return '/';
+}
+
 i18nReady.then(() => {
+  const errorEl = document.getElementById('loginError');
+  showLineAuthError(errorEl);
+
   refreshCurrentUser().then((user) => {
     if (user) location.href = loginRedirectTarget(user);
   }).catch(() => {});
 
   const form = document.getElementById('loginForm');
-  const errorEl = document.getElementById('loginError');
+  const lineBtn = document.getElementById('lineLoginBtn');
+
+  lineBtn?.addEventListener('click', () => {
+    startLineLogin(lineLoginNextTarget(), '/login');
+  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();

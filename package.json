@@ -19,9 +19,10 @@
     "db:push": "npm --prefix server run db:push",
     "db:seed": "npm --prefix server run db:seed",
     "db:reseed": "SEED_DEMO=1 SEED_RESET=1 npm --prefix server run db:seed",
-    "db:promote-admin": "npm --prefix server run db:promote-admin",
+    "db:ensure-members": "npm --prefix server run db:ensure-members",
     "db:clear-sightings": "npm --prefix server run db:clear-sightings",
-    "db:transcode-videos": "npm --prefix server run db:transcode-videos"
+    "db:transcode-videos": "npm --prefix server run db:transcode-videos",
+    "db:ensure-posters": "npm --prefix server run db:ensure-posters"
   },
   "devDependencies": {
     "vite": "^5.4.21"
