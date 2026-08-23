@@ -1,0 +1,1 @@
+ALTER TABLE "sightings" ALTER COLUMN "spot_id" DROP NOT NULL;

@@ -5,6 +5,10 @@ import {
 } from '../db/schema.js';
 
 export const categorySchema = z.enum(PHENOMENON_CATEGORIES);
+export const categoriesSchema = z
+  .array(categorySchema)
+  .min(1)
+  .max(PHENOMENON_CATEGORIES.length);
 export const statusSchema = z.enum(PHENOMENON_STATUSES);
 export const uuidSchema = z.string().uuid();
 export const PHENOMENON_SUMMARY_MAX = 120;
@@ -34,7 +38,8 @@ export function normalizeFormImages(input: {
 
 export const createPhenomenonSchema = z.object({
   status: statusSchema.optional(),
-  category: categorySchema,
+  category: categorySchema.optional(),
+  categories: categoriesSchema.optional(),
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().min(1).max(PHENOMENON_SUMMARY_MAX),
   location: z.string().trim().max(300).optional(),
@@ -62,6 +67,7 @@ export const submissionSchema = z.object({
   status: statusSchema.optional(),
   statusLabel: z.string().trim().max(100).optional(),
   category: categorySchema.optional(),
+  categories: categoriesSchema.optional(),
   location: z.string().trim().max(300).optional(),
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
@@ -83,6 +89,7 @@ export const ownerPhenomenonPatchSchema = createPhenomenonSchema
 export const createSightingSchema = z.object({
   seenAt: z.coerce.date().optional(),
   note: z.string().trim().min(1).max(2000),
+  commentOnly: z.boolean().optional(),
   images: z.array(formImageSchema).max(8).optional(),
   imageUrls: z.array(z.string().trim().max(1000)).max(8).optional(),
   spotId: z.string().uuid().optional(),
@@ -93,6 +100,8 @@ export const createSightingSchema = z.object({
     lng: z.number().min(-180).max(180).optional(),
   }).optional(),
 }).refine((value) => !(value.spotId && value.otherSpot), {
+  message: 'errors.invalidRequest',
+}).refine((value) => !value.commentOnly || (!value.spotId && !value.otherSpot), {
   message: 'errors.invalidRequest',
 });
 

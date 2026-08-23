@@ -147,7 +147,10 @@ async function seedPhenomena() {
   for (const entry of seedData) {
     const [row] = await db
       .insert(phenomena)
-      .values(entry)
+      .values({
+        ...entry,
+        categories: [entry.category],
+      })
       .returning({ id: phenomena.id });
 
     await createPrimarySpotForPhenomenon(row.id, {

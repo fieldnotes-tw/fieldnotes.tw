@@ -228,8 +228,39 @@ function initSearch() {
   });
 }
 
-function defaultSeenDate() {
-  setDefaultSeenDateTime($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'));
+function defaultSeenDate(force = false) {
+  setDefaultSeenDateTime($('f_seenDate'), $('f_seenTime'), { force });
+}
+
+function hasPinPosition() {
+  return Boolean($('f_lat').value && $('f_lng').value);
+}
+
+function initCurrentLocation() {
+  if (!navigator.geolocation || !map || hasPinPosition()) return;
+
+  const hint = $('submitMapHint');
+  if (hint) hint.textContent = t('submit.where.locating');
+
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      if (hasPinPosition()) return;
+      const { latitude, longitude } = pos.coords;
+      setPin(latitude, longitude);
+      try {
+        const row = await nominatim(
+          `/reverse?lat=${latitude}&lon=${longitude}&format=json&zoom=18`,
+        );
+        if (row?.display_name) setLocationLabel(formatPlaceName(row));
+      } catch {
+        syncMapPinState();
+      }
+    },
+    () => {
+      syncMapPinState();
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
+  );
 }
 
 function showSuccess(phenomenonId) {
@@ -359,22 +390,25 @@ function renderPhotoList() {
     const actions = document.createElement('div');
     actions.className = 'submit-form__photo-actions';
 
-    const earlier = document.createElement('button');
-    earlier.type = 'button';
-    earlier.className = 'submit-form__photo-move';
-    earlier.textContent = t('submit.photo.moveEarlier');
-    earlier.disabled = index === 0 || photo.uploading;
-    earlier.addEventListener('click', () => movePhoto(photo.id, -1));
+    if (photos.length > 1) {
+      const earlier = document.createElement('button');
+      earlier.type = 'button';
+      earlier.className = 'submit-form__photo-move';
+      earlier.textContent = t('submit.photo.moveEarlier');
+      earlier.disabled = index === 0 || photo.uploading;
+      earlier.addEventListener('click', () => movePhoto(photo.id, -1));
 
-    const later = document.createElement('button');
-    later.type = 'button';
-    later.className = 'submit-form__photo-move';
-    later.textContent = t('submit.photo.moveLater');
-    later.disabled = index === photos.length - 1 || photo.uploading;
-    later.addEventListener('click', () => movePhoto(photo.id, 1));
+      const later = document.createElement('button');
+      later.type = 'button';
+      later.className = 'submit-form__photo-move';
+      later.textContent = t('submit.photo.moveLater');
+      later.disabled = index === photos.length - 1 || photo.uploading;
+      later.addEventListener('click', () => movePhoto(photo.id, 1));
 
-    actions.append(earlier, later);
-    body.appendChild(actions);
+      actions.append(earlier, later);
+      body.appendChild(actions);
+    }
+
     li.append(handle, body);
 
     handle.addEventListener('dragstart', (e) => {
@@ -484,10 +518,6 @@ function initPhotoUpload() {
   renderPhotoList();
 }
 
-function syncRichPreviews() {
-  $('f_extra')?.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
 function setSubmitFormTitle(key) {
   const title = $('submitPageTitle');
   if (title) title.textContent = t(key);
@@ -503,6 +533,43 @@ function setSubmitDeleteVisible(visible) {
   if (btn) btn.hidden = !visible;
 }
 
+function getSelectedCategories() {
+  return [...document.querySelectorAll('input[name="category"]:checked')].map((input) => input.value);
+}
+
+function setSelectedCategories(values) {
+  const selected = new Set(Array.isArray(values) && values.length ? values : ['plant']);
+  document.querySelectorAll('input[name="category"]').forEach((input) => {
+    input.checked = selected.has(input.value);
+  });
+  if (!getSelectedCategories().length) {
+    const plant = document.querySelector('input[name="category"][value="plant"]');
+    if (plant) plant.checked = true;
+  }
+}
+
+function setExtraPanelOpen(open) {
+  const toggle = $('extraToggle');
+  const panel = $('extraPanel');
+  if (!panel) return;
+  panel.hidden = !open;
+  if (toggle) {
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.textContent = t(open ? 'submit.extra.collapse' : 'submit.extra.toggle');
+  }
+}
+
+function initExtraToggle() {
+  const toggle = $('extraToggle');
+  const panel = $('extraPanel');
+  if (!toggle || !panel) return;
+  toggle.addEventListener('click', () => {
+    const open = panel.hidden;
+    setExtraPanelOpen(open);
+    if (open) panel.querySelector('textarea')?.focus();
+  });
+}
+
 function resetForm() {
   editId = '';
   $('submitForm').reset();
@@ -513,8 +580,11 @@ function resetForm() {
   setSubmitFormTitle('submit.title');
   setSubmitPrimaryLabel('submit.send');
   setSubmitDeleteVisible(false);
+  setSelectedCategories(['plant']);
   setError('');
   clearPhotos();
+  $('f_extra').value = '';
+  setExtraPanelOpen(false);
   if (pin) {
     pin.remove();
     pin = null;
@@ -522,10 +592,10 @@ function resetForm() {
   placedLabel = '';
   $('f_lat').value = '';
   $('f_lng').value = '';
-  defaultSeenDate();
-  syncRichPreviews();
+  defaultSeenDate(true);
   map?.setView(ZUOYING_CENTER, 14);
   syncMapPinState();
+  initCurrentLocation();
 }
 
 function initDescriptionCounter() {
@@ -548,8 +618,11 @@ function validateForm() {
   if (!$('f_description').value.trim()) {
     return t('submit.error.noDescription');
   }
-  if (!combineSeenDateTime($('f_seenDate').value, $('f_seenHour').value, $('f_seenMinute').value)) {
+  if (!combineSeenDateTime($('f_seenDate').value, $('f_seenTime').value)) {
     return t('submit.error.noSeenDate');
+  }
+  if (!getSelectedCategories().length) {
+    return t('submit.error.noCategory');
   }
   if (!$('f_lat').value || !$('f_lng').value) {
     return t('submit.error.noLocation');
@@ -600,12 +673,13 @@ async function handleSubmit(e) {
   const payload = {
     title: $('f_title').value.trim(),
     description: $('f_description').value.trim(),
+    categories: getSelectedCategories(),
     extra: $('f_extra').value.trim(),
     findingHint: $('f_finding').value.trim(),
     location: $('f_location').value.trim(),
     lat: Number($('f_lat').value),
     lng: Number($('f_lng').value),
-    seenAt: seenDateTimeIso($('f_seenDate'), $('f_seenHour'), $('f_seenMinute')),
+    seenAt: seenDateTimeIso($('f_seenDate'), $('f_seenTime')),
     images: formImagesPayload(photos),
   };
 
@@ -617,6 +691,7 @@ async function handleSubmit(e) {
         body: JSON.stringify({
           title: payload.title,
           description: payload.description,
+          categories: payload.categories,
           notes: payload.extra || undefined,
           findingHint: payload.findingHint || undefined,
           location: payload.location,
@@ -652,11 +727,13 @@ async function loadEditPhenomenon(id) {
   $('f_title').value = data.title;
   $('f_description').value = data.description;
   $('f_extra').value = data.notes || '';
+  setExtraPanelOpen(Boolean(data.notes?.trim()));
   $('f_finding').value = data.findingHint || '';
+  setSelectedCategories(data.categories?.length ? data.categories : [data.category]);
   $('f_location').value = data.location || '';
   if (data.lat != null && data.lng != null) setPin(data.lat, data.lng);
   if (data.lastNoticedAt) {
-    setSeenDateTimeInputs($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'), data.lastNoticedAt);
+    setSeenDateTimeInputs($('f_seenDate'), $('f_seenTime'), data.lastNoticedAt);
   }
   clearPhotos();
   for (const item of normalizeLoadedFormImages(data)) {
@@ -673,7 +750,6 @@ async function loadEditPhenomenon(id) {
   setSubmitFormTitle('submit.editTitle');
   setSubmitPrimaryLabel('submit.save');
   setSubmitDeleteVisible(true);
-  syncRichPreviews();
 }
 
 async function boot() {
@@ -699,8 +775,15 @@ async function boot() {
   initSearch();
   initPhotoUpload();
   defaultSeenDate();
-  mountRichField($('f_extra'), $('extraPreview'));
   initDescriptionCounter();
+  initExtraToggle();
+
+  const params = new URLSearchParams(location.search);
+  const editParam = params.get('edit');
+  if (!editParam) {
+    initCurrentLocation();
+  }
+
   $('submitForm').addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' || e.target.tagName === 'TEXTAREA') return;
     e.preventDefault();
@@ -710,8 +793,6 @@ async function boot() {
   $('submitDeleteBtn')?.addEventListener('click', handleDelete);
   $('submitAgain').addEventListener('click', resetForm);
 
-  const params = new URLSearchParams(location.search);
-  const editParam = params.get('edit');
   if (editParam) {
     try {
       await loadEditPhenomenon(editParam);

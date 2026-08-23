@@ -36,7 +36,7 @@ export type PhenomenonListItem = Phenomenon & {
 export type SightingWithImages = {
   id: string;
   phenomenonId: string;
-  spotId: string;
+  spotId: string | null;
   spotName: string | null;
   spotLabel: string | null;
   userId: string | null;
@@ -62,6 +62,7 @@ function mapListRow(row: {
   id: string;
   status: Phenomenon['status'];
   category: Phenomenon['category'];
+  categories: Phenomenon['categories'];
   title: string;
   description: string;
   location: string | null;
@@ -88,6 +89,7 @@ function mapListRow(row: {
     id: row.id,
     status: row.status,
     category: row.category,
+    categories: row.categories,
     title: row.title,
     description: row.description,
     location: row.location,
@@ -117,6 +119,7 @@ export async function listPhenomenaWithStats(filters: SQL[] = []) {
       id: phenomena.id,
       status: phenomena.status,
       category: phenomena.category,
+      categories: phenomena.categories,
       title: phenomena.title,
       description: phenomena.description,
       location: phenomena.location,
@@ -325,22 +328,70 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
 
   const seenObservers = new Set<string>();
   const observers: { userId: string | null; name: string; avatarUrl: string | null; bio: string | null }[] = [];
-  for (const row of observerSource) {
-    if (!row.name) continue;
-    const key = row.userId ?? row.name;
-    if (seenObservers.has(key)) continue;
+  const addObserver = (row: {
+    userId: string | null;
+    name: string | null | undefined;
+    avatarUrl?: string | null;
+    bio?: string | null;
+  }) => {
+    const name = row.name?.trim();
+    if (!name) return;
+    const key = row.userId ?? name;
+    if (seenObservers.has(key)) return;
     seenObservers.add(key);
     observers.push({
       userId: row.userId,
-      name: row.name,
+      name,
       avatarUrl: row.avatarUrl ?? null,
-      bio: row.bio ?? null,
+      bio: row.bio?.trim() || null,
     });
+  };
+
+  for (const row of observerSource) {
+    addObserver(row);
     if (observers.length >= 8) break;
   }
 
-  if (!observers.length && base.observerName) {
-    observers.push({ userId: base.userId, name: base.observerName, avatarUrl: null, bio: null });
+  if (base.userId) {
+    const [creatorUser] = await db
+      .select({
+        displayName: users.displayName,
+        avatarUrl: users.avatarUrl,
+        bio: users.bio,
+      })
+      .from(users)
+      .where(eq(users.id, base.userId))
+      .limit(1);
+
+    if (creatorUser?.displayName?.trim()) {
+      const creatorEntry = {
+        userId: base.userId,
+        name: creatorUser.displayName.trim(),
+        avatarUrl: creatorUser.avatarUrl ?? null,
+        bio: creatorUser.bio?.trim() || null,
+      };
+      const existingIndex = observers.findIndex((observer) => observer.userId === base.userId);
+      if (existingIndex >= 0) {
+        observers[existingIndex] = {
+          ...creatorEntry,
+          avatarUrl: observers[existingIndex].avatarUrl ?? creatorEntry.avatarUrl,
+          bio: observers[existingIndex].bio ?? creatorEntry.bio,
+        };
+      } else {
+        observers.unshift(creatorEntry);
+        seenObservers.add(base.userId);
+        if (observers.length > 8) observers.pop();
+      }
+    }
+  }
+
+  if (!observers.length && base.observerName?.trim()) {
+    addObserver({
+      userId: base.userId,
+      name: base.creatorName ?? base.observerName,
+      avatarUrl: base.creatorAvatarUrl,
+      bio: null,
+    });
   }
 
   const phenomenonImageRows = await db

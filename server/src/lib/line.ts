@@ -189,6 +189,11 @@ function lineOAuthEmail(providerUserId: string) {
   return `line_${providerUserId}@oauth.local`;
 }
 
+export function parseLineOAuthEmail(email: string) {
+  const match = /^line_(.+)@oauth\.local$/i.exec(email.trim());
+  return match?.[1] ?? null;
+}
+
 export async function upsertLineUser(profile: LineProfile): Promise<SessionUser> {
   const providerUserId = profile.userId;
   const now = new Date();
@@ -203,14 +208,42 @@ export async function upsertLineUser(profile: LineProfile): Promise<SessionUser>
     .limit(1);
 
   if (identity) {
+    const [existing] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        role: users.role,
+        displayName: users.displayName,
+        avatarUrl: users.avatarUrl,
+        bio: users.bio,
+      })
+      .from(users)
+      .where(eq(users.id, identity.userId))
+      .limit(1);
+
+    if (!existing) {
+      throw new Error('LINE identity user missing');
+    }
+
+    const profilePatch: {
+      emailVerifiedAt: Date;
+      updatedAt: Date;
+      displayName?: string;
+      avatarUrl?: string | null;
+    } = {
+      emailVerifiedAt: now,
+      updatedAt: now,
+    };
+    if (!existing.displayName?.trim()) {
+      profilePatch.displayName = profile.displayName;
+    }
+    if (!existing.avatarUrl?.trim()) {
+      profilePatch.avatarUrl = profile.pictureUrl || null;
+    }
+
     const [updated] = await db
       .update(users)
-      .set({
-        displayName: profile.displayName,
-        avatarUrl: profile.pictureUrl || null,
-        emailVerifiedAt: now,
-        updatedAt: now,
-      })
+      .set(profilePatch)
       .where(eq(users.id, identity.userId))
       .returning({
         id: users.id,
@@ -221,17 +254,47 @@ export async function upsertLineUser(profile: LineProfile): Promise<SessionUser>
         bio: users.bio,
       });
 
-    if (!updated) {
-      throw new Error('LINE identity user missing');
+    return toPublicUser(updated);
+  }
+
+  const oauthEmail = lineOAuthEmail(providerUserId);
+  const [existingByEmail] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, oauthEmail))
+    .limit(1);
+
+  if (existingByEmail) {
+    await db.insert(userIdentities).values({
+      userId: existingByEmail.id,
+      provider: 'line',
+      providerUserId,
+    });
+
+    const [linked] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        role: users.role,
+        displayName: users.displayName,
+        avatarUrl: users.avatarUrl,
+        bio: users.bio,
+      })
+      .from(users)
+      .where(eq(users.id, existingByEmail.id))
+      .limit(1);
+
+    if (!linked) {
+      throw new Error('LINE linked user missing');
     }
 
-    return toPublicUser(updated);
+    return toPublicUser(linked);
   }
 
   const [created] = await db
     .insert(users)
     .values({
-      email: lineOAuthEmail(providerUserId),
+      email: oauthEmail,
       passwordHash: null,
       displayName: profile.displayName,
       avatarUrl: profile.pictureUrl || null,

@@ -1,4 +1,4 @@
-import { eq, inArray, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { phenomena } from '../db/schema.js';
 import {
@@ -42,7 +42,9 @@ phenomenaRoutes.get('/', async (c) => {
     if (!category.success) {
       return c.json({ error: t(locale, 'errors.invalidCategoryFilter') }, 400);
     }
-    filters.push(eq(phenomena.category, category.data));
+    filters.push(
+      sql`(${phenomena.category} = ${category.data} OR ${category.data} = ANY(${phenomena.categories}))`,
+    );
   }
 
   const rows = await listPhenomenaWithStats(filters);

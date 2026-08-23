@@ -114,7 +114,7 @@ export function buildLocationSummary(
     return summarySpotLabel(spotList[0]);
   }
 
-  const shortNames = spotList.map((spot) => compactSpotName(spot.name));
+  const shortNames = [...new Set(spotList.map((spot) => compactSpotName(spot.name)))];
   const count = spotList.length;
 
   if (count === 2) {
@@ -249,7 +249,7 @@ async function loadSpotsWithStats(phenomenonId: string): Promise<SpotWithStats[]
       lastSeenAt: stats.lastSeenAt,
       latestCondition: conditionBySpot.get(spot.id) ?? null,
     };
-  }).filter((spot) => spot.sightingCount > 0);
+  });
 }
 
 export async function createPrimarySpotForPhenomenon(

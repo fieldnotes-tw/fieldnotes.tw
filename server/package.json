@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --exclude '../node_modules/**' --exclude '**/node_modules/**' --exclude '**/.vite-temp/**' --exclude '../vite.config.js.timestamp-*.mjs' src/index.ts",
+    "dev": "npm run db:migrate && tsx watch --exclude '../node_modules/**' --exclude '**/node_modules/**' --exclude '**/.vite-temp/**' --exclude '../vite.config.js.timestamp-*.mjs' src/index.ts",
     "start": "NODE_ENV=production tsx src/index.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

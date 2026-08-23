@@ -29,7 +29,7 @@ function setError(msg) {
 
 function defaultSeenAt() {
   if ($('f_commentOnly')?.checked) return;
-  setDefaultSeenDateTime($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'));
+  setDefaultSeenDateTime($('f_seenDate'), $('f_seenTime'));
 }
 
 function isCommentOnly() {
@@ -65,15 +65,14 @@ function syncCommentOnlyMode() {
   const spotSection = $('sightingSpotSection');
   const whenSection = $('sightingWhenSection');
   if (spotSection) {
-    const hideSpot = on || !phenomenonSpots.length;
-    spotSection.hidden = hideSpot;
-    spotSection.classList.toggle('is-collapsed', hideSpot);
+    spotSection.hidden = on;
+    spotSection.classList.toggle('is-collapsed', on);
   }
   if (whenSection) {
     whenSection.hidden = on;
     whenSection.classList.toggle('is-collapsed', on);
   }
-  ['f_seenDate', 'f_seenHour', 'f_seenMinute'].forEach((id) => {
+  ['f_seenDate', 'f_seenTime'].forEach((id) => {
     const el = $(id);
     if (el) el.required = !on;
   });
@@ -98,7 +97,7 @@ function resolveSeenAtIso() {
   if (isCommentOnly() || !$('f_seenDate').value) {
     return new Date().toISOString();
   }
-  return seenDateTimeIso($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'))
+  return seenDateTimeIso($('f_seenDate'), $('f_seenTime'))
     || new Date().toISOString();
 }
 
@@ -258,7 +257,7 @@ async function loadEditSighting(id) {
   $('sightingContext').textContent = data.phenomenonTitle;
   $('sightingCommentOnlySection').hidden = true;
   $('f_note').value = data.note || '';
-  setSeenDateTimeInputs($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'), data.seenAt);
+  setSeenDateTimeInputs($('f_seenDate'), $('f_seenTime'), data.seenAt);
   clearPhotos();
   for (const item of normalizeLoadedFormImages(data)) {
     photos.push({
@@ -281,7 +280,7 @@ function renderSpotChoices() {
   if (!wrap || !section) return;
 
   wrap.replaceChildren();
-  if (!phenomenonSpots.length || isCommentOnly()) {
+  if (isCommentOnly()) {
     section.hidden = true;
     section.classList.add('is-collapsed');
     return;
@@ -289,6 +288,11 @@ function renderSpotChoices() {
 
   section.hidden = false;
   section.classList.remove('is-collapsed');
+
+  if (!phenomenonSpots.length) {
+    spotChoiceMode = 'other';
+    selectedSpotId = '';
+  }
 
   phenomenonSpots.forEach((spot) => {
     const label = document.createElement('label');
@@ -362,8 +366,7 @@ function validateSightingForm() {
     if ($('f_seenDate').value) {
       const parsed = combineSeenDateTime(
         $('f_seenDate').value,
-        $('f_seenHour').value,
-        $('f_seenMinute').value,
+        $('f_seenTime').value,
       );
       if (!parsed) return t('sighting.error.noSeenAt');
     }
@@ -392,6 +395,8 @@ function buildSightingPayload() {
     } else if (selectedSpotId) {
       payload.spotId = selectedSpotId;
     }
+  } else {
+    payload.commentOnly = true;
   }
 
   return payload;

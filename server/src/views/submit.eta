@@ -18,20 +18,6 @@
         <span class="visually-hidden"><%= it.t('submit.what.label') %></span>
         <input type="text" id="f_title" maxlength="200" required>
       </label>
-    </section>
-
-    <section class="submit-form__section" aria-labelledby="submitDesc">
-      <h2 class="submit-form__section-title" id="submitDesc"><%= it.t('submit.description.label') %></h2>
-      <p class="submit-form__hint" id="submitDescHint"><%= it.t('submit.description.hint') %></p>
-      <label class="submit-form__field">
-        <span class="visually-hidden"><%= it.t('submit.description.label') %></span>
-        <textarea id="f_description" rows="3" maxlength="120" required aria-describedby="submitDescHint descriptionCounter"></textarea>
-      </label>
-      <p class="submit-form__counter" id="descriptionCounter" aria-live="polite">0 / 120</p>
-    </section>
-
-    <section class="submit-form__section" aria-labelledby="submitPhoto">
-      <h2 class="submit-form__section-title" id="submitPhoto"><%= it.t('submit.photo.label') %></h2>
       <p class="submit-form__hint submit-form__photo-hint" id="photoDragHint" hidden><%= it.t('submit.photo.dragHint') %></p>
       <div class="submit-form__photo">
         <ul class="submit-form__photo-list" id="photoList" aria-live="polite"></ul>
@@ -43,53 +29,87 @@
       </div>
     </section>
 
-    <section class="submit-form__section" aria-labelledby="submitWhere">
-      <h2 class="submit-form__section-title" id="submitWhere"><%= it.t('submit.where.label') %></h2>
-      <div class="submit-form__search">
-        <input
-          type="search"
-          id="f_location"
-          class="submit-form__search-input"
-          maxlength="300"
-          autocomplete="off"
-          placeholder="<%= it.t('submit.where.placeholder') %>"
-          aria-controls="searchResults"
-          aria-expanded="false"
-        >
-        <ul class="submit-form__search-results" id="searchResults" hidden role="listbox"></ul>
-      </div>
-      <p class="submit-form__hint submit-form__map-hint" id="submitMapHint" aria-live="polite"><%= it.t('submit.where.mapHintEmpty') %></p>
-      <div class="submit-form__map-wrap submit-form__map-wrap--unpinned">
-        <div class="submit-form__map" id="submitMap" role="application" aria-label="<%= it.t('submit.where.mapLabel') %>"></div>
-      </div>
-      <input type="hidden" id="f_lat">
-      <input type="hidden" id="f_lng">
+    <section class="submit-form__section" aria-labelledby="submitCategory">
+      <h2 class="submit-form__section-title" id="submitCategory"><%= it.t('submit.category.label') %></h2>
+      <p class="submit-form__hint"><%= it.t('submit.category.hint') %></p>
+      <fieldset class="submit-form__category">
+        <legend class="visually-hidden"><%= it.t('submit.category.label') %></legend>
+        <label class="submit-form__category-btn" data-category="plant">
+          <input type="checkbox" name="category" value="plant" checked>
+          <span><%= it.t('category.plant') %></span>
+        </label>
+        <label class="submit-form__category-btn" data-category="animal">
+          <input type="checkbox" name="category" value="animal">
+          <span><%= it.t('category.animal') %></span>
+        </label>
+        <label class="submit-form__category-btn" data-category="sky">
+          <input type="checkbox" name="category" value="sky">
+          <span><%= it.t('category.sky') %></span>
+        </label>
+        <label class="submit-form__category-btn" data-category="taste">
+          <input type="checkbox" name="category" value="taste">
+          <span><%= it.t('category.taste') %></span>
+        </label>
+        <label class="submit-form__category-btn" data-category="workshop">
+          <input type="checkbox" name="category" value="workshop">
+          <span><%= it.t('category.workshop') %></span>
+        </label>
+      </fieldset>
     </section>
 
-    <section class="submit-form__section" aria-labelledby="submitFinding">
-      <h2 class="submit-form__section-title" id="submitFinding"><%= it.t('submit.finding.label') %></h2>
-      <p class="submit-form__hint"><%= it.t('submit.finding.hint') %></p>
-      <label class="submit-form__field">
-        <span class="visually-hidden"><%= it.t('submit.finding.label') %></span>
-        <textarea id="f_finding" rows="2" maxlength="500" placeholder="<%= it.t('submit.finding.placeholder') %>"></textarea>
+    <section class="submit-form__section submit-form__section--desc" aria-labelledby="submitDesc">
+      <h2 class="submit-form__section-title" id="submitDesc"><%= it.t('submit.description.label') %></h2>
+      <p class="submit-form__hint" id="submitDescHint"><%= it.t('submit.description.hint') %></p>
+      <label class="submit-form__field submit-form__field--desc">
+        <span class="visually-hidden"><%= it.t('submit.description.label') %></span>
+        <textarea id="f_description" rows="3" maxlength="120" required aria-describedby="submitDescHint descriptionCounter"></textarea>
+        <p class="submit-form__counter" id="descriptionCounter" aria-live="polite">0 / 120</p>
       </label>
     </section>
 
-    <section class="submit-form__section" aria-labelledby="submitWhen">
-      <h2 class="submit-form__section-title" id="submitWhen"><%= it.t('submit.when.label') %></h2>
-      <%~ include('partials/datetime-fields', it) %>
+    <section class="submit-form__section" aria-labelledby="submitWhenWhere">
+      <h2 class="submit-form__section-title" id="submitWhenWhere"><%= it.t('submit.whenWhere.label') %></h2>
+      <div class="submit-form__whenwhere">
+        <div class="submit-form__whenwhere-block">
+          <%~ include('partials/datetime-fields', it) %>
+        </div>
+        <div class="submit-form__whenwhere-block">
+          <div class="submit-form__search">
+            <input
+              type="search"
+              id="f_location"
+              class="submit-form__search-input"
+              maxlength="300"
+              autocomplete="off"
+              placeholder="<%= it.t('submit.where.placeholder') %>"
+              aria-controls="searchResults"
+              aria-expanded="false"
+            >
+            <ul class="submit-form__search-results" id="searchResults" hidden role="listbox"></ul>
+          </div>
+          <p class="submit-form__hint submit-form__map-hint" id="submitMapHint" aria-live="polite"><%= it.t('submit.where.mapHintEmpty') %></p>
+          <div class="submit-form__map-wrap submit-form__map-wrap--unpinned">
+            <div class="submit-form__map" id="submitMap" role="application" aria-label="<%= it.t('submit.where.mapLabel') %>"></div>
+          </div>
+          <input type="hidden" id="f_lat">
+          <input type="hidden" id="f_lng">
+          <label class="submit-form__field submit-form__whenwhere-note">
+            <span class="visually-hidden"><%= it.t('submit.whenWhere.note') %></span>
+            <textarea id="f_finding" rows="2" maxlength="500" placeholder="<%= it.t('submit.whenWhere.notePlaceholder') %>"></textarea>
+          </label>
+        </div>
+      </div>
     </section>
 
-    <section class="submit-form__section" aria-labelledby="submitExtra">
-      <h2 class="submit-form__section-title" id="submitExtra"><%= it.t('submit.extra.label') %></h2>
-      <p class="submit-form__hint" id="submitExtraHint"><%= it.t('submit.extra.hint') %></p>
-      <div class="rich-field">
-        <div class="rich-field__toolbar"></div>
+    <section class="submit-form__section submit-form__section--extra">
+      <button type="button" class="submit-form__extra-toggle" id="extraToggle" aria-expanded="false" aria-controls="extraPanel">
+        <%= it.t('submit.extra.toggle') %>
+      </button>
+      <div class="submit-form__extra-panel" id="extraPanel" hidden>
         <label class="submit-form__field">
           <span class="visually-hidden"><%= it.t('submit.extra.label') %></span>
-          <textarea id="f_extra" rows="6" aria-describedby="submitExtraHint"></textarea>
+          <textarea id="f_extra" rows="6"></textarea>
         </label>
-        <div class="rich-text-preview" id="extraPreview" aria-live="polite"></div>
       </div>
     </section>
 

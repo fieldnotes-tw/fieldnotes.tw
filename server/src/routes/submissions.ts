@@ -22,6 +22,7 @@ import {
 import { validated } from '../lib/validate.js';
 import { getPhenomenonDetail } from '../lib/phenomena-query.js';
 import { createPrimarySpotForPhenomenon, resolveSightingSpotId } from '../lib/spots.js';
+import { resolveCategoryFields } from '../lib/categories.js';
 import { requireAuth, type AuthEnv } from '../middleware/auth.js';
 import { sightingImages, sightings } from '../db/schema.js';
 
@@ -78,6 +79,7 @@ submissionRoutes.post('/', validated('json', submissionSchema), async (c) => {
   const observerName = await observerNameForUser(user.id);
   const images = normalizeFormImages(body);
   const imageUrl = images[0]?.url;
+  const categoryFields = resolveCategoryFields(body);
 
   const [row] = await db
     .insert(phenomena)
@@ -87,7 +89,8 @@ submissionRoutes.post('/', validated('json', submissionSchema), async (c) => {
       notes: body.extra || null,
       findingHint: body.findingHint || null,
       status: body.status ?? 'active',
-      category: body.category ?? 'plant',
+      category: categoryFields.category,
+      categories: categoryFields.categories,
       location: body.location,
       lat: body.lat,
       lng: body.lng,
@@ -152,7 +155,8 @@ submissionRoutes.patch(
     }
 
     const body = c.req.valid('json');
-    const { imageUrls, images, ...fields } = body;
+    const { imageUrls, images, category, categories, ...fields } = body;
+    const categoryFields = resolveCategoryFields({ category, categories });
     const now = new Date();
     const normalizedImages = images || imageUrls
       ? normalizeFormImages({ images, imageUrls })
@@ -162,6 +166,8 @@ submissionRoutes.patch(
       .update(phenomena)
       .set({
         ...fields,
+        category: categoryFields.category,
+        categories: categoryFields.categories,
         ...(normalizedImages?.length ? {
           imageUrl: normalizedImages[0].url,
           imageAlt: normalizedImages[0].caption ?? fields.title ?? undefined,
@@ -231,14 +237,16 @@ submissionRoutes.post(
     const body = c.req.valid('json');
     const images = normalizeFormImages(body);
     const observerName = await observerNameForUser(user.id);
-    let spotId: string;
-    try {
-      spotId = await resolveSightingSpotId(phenomenonId.data, {
-        spotId: body.spotId,
-        otherSpot: body.otherSpot,
-      });
-    } catch {
-      return c.json({ error: t(locale, 'errors.invalidRequest') }, 400);
+    let spotId: string | null = null;
+    if (!body.commentOnly) {
+      try {
+        spotId = await resolveSightingSpotId(phenomenonId.data, {
+          spotId: body.spotId,
+          otherSpot: body.otherSpot,
+        });
+      } catch {
+        return c.json({ error: t(locale, 'errors.invalidRequest') }, 400);
+      }
     }
 
     const [sighting] = await db

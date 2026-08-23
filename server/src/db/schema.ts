@@ -59,6 +59,7 @@ export const phenomena = pgTable('phenomena', {
   id: uuid('id').defaultRandom().primaryKey(),
   status: phenomenonStatusEnum('status').notNull().default('active'),
   category: phenomenonCategoryEnum('category').notNull(),
+  categories: text('categories').array().notNull().default([]),
   title: text('title').notNull(),
   description: text('description').notNull(),
   location: text('location'),
@@ -151,7 +152,6 @@ export const sightings = pgTable('sightings', {
     .notNull()
     .references(() => phenomena.id, { onDelete: 'cascade' }),
   spotId: uuid('spot_id')
-    .notNull()
     .references(() => spots.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
   observerName: text('observer_name'),

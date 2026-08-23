@@ -78,7 +78,7 @@ function applyFilters() {
   const catActive = selectedCats.size > 0;
   const query = keywordQuery.trim().toLowerCase();
   cards.forEach((c) => {
-    const catOk = !catActive || selectedCats.has(c.dataset.category);
+    const catOk = !catActive || cardCategories(c).some((cat) => selectedCats.has(cat));
     const kwOk = !query || cardMatchesKeyword(c, query);
     c.classList.toggle('is-filtered-out', !catOk || !kwOk);
   });
@@ -89,6 +89,10 @@ function applyFilters() {
     if (!show && leafletMap.hasLayer(marker)) marker.remove();
   });
   syncMapRail();
+
+  if (feedStage.classList.contains('is-map-view') && !mapView.classList.contains('is-hidden')) {
+    fitMapToVisiblePins();
+  }
 
   const sheetOpen = usesSheetDetail() && mapSheet.classList.contains('is-open');
   const focusedHidden = focusedCard?.classList.contains('is-filtered-out');
@@ -113,7 +117,7 @@ function cardMatchesKeyword(card, query) {
     resolveLocationText(item),
     item.location,
     item.notes,
-    categoryLabel(item.category),
+    ...itemCategories(item).map(categoryLabel),
     card.querySelector('.card__title')?.textContent,
     card.querySelector('.card__desc')?.textContent,
   ];
@@ -125,15 +129,19 @@ function remountOpenDetail() {
     ? focusedCard
     : getVisibleCards()[0];
   if (feedStage.classList.contains('is-detail-open')) {
-    mountSplitDetail(keep);
-    if (keep) syncFocusedFromDetailScroll(keep);
-    renderFeedDetailMenu();
+    void ensurePhenomenonDetail(keep?.dataset.id).then((item) => {
+      mountSplitDetail(keep, item ?? getItemForCard(keep));
+      if (keep) syncFocusedFromDetailScroll(keep);
+      renderFeedDetailMenu();
+    });
   } else if (usesSheetDetail() && mapSheet.classList.contains('is-open') && keep) {
     if (mapSheet.classList.contains('is-expanded')) {
-      mountMapSheetDetail(keep);
-      setFocusedCard(keep);
-      const entry = findMarkerEntry(keep);
-      if (entry) setActiveMapPin(entry.marker);
+      void ensurePhenomenonDetail(keep.dataset.id).then((item) => {
+        mountMapSheetDetail(keep, item ?? getItemForCard(keep));
+        setFocusedCard(keep);
+        const entry = findMarkerEntry(keep);
+        if (entry) setActiveMapPin(entry.marker);
+      });
     } else {
       mountMapSheetPeek(keep);
       setFocusedCard(keep);
@@ -179,8 +187,8 @@ function renderFeedDetailMenu() {
     item.setAttribute('aria-selected', card === focusedCard ? 'true' : 'false');
     item.addEventListener('click', () => {
       if (prefersMapRail()) {
-        void ensurePhenomenonDetail(card.dataset.id).then(() => {
-          mountSplitDetail(card);
+        void ensurePhenomenonDetail(card.dataset.id).then((item) => {
+          mountSplitDetail(card, item ?? getItemForCard(card));
           syncFocusedFromDetailScroll(card);
           setFeedDetailMenuOpen(false);
         });
@@ -562,6 +570,17 @@ function categoryLabel(category) {
   return t(`category.${category}`) || category;
 }
 
+function itemCategories(item) {
+  if (item?.categories?.length) return item.categories;
+  return item?.category ? [item.category] : [];
+}
+
+function cardCategories(card) {
+  const raw = card.dataset.categories;
+  if (raw) return raw.split(',').filter(Boolean);
+  return card.dataset.category ? [card.dataset.category] : [];
+}
+
 function cachePhenomena(items) {
   items.forEach((item) => phenomenonCache.set(item.id, item));
 }
@@ -575,6 +594,7 @@ function cardToFallbackItem(card) {
     id: card.dataset.id,
     status: card.dataset.status,
     category: card.dataset.category,
+    categories: cardCategories(card),
     title: card.querySelector('.card__title')?.textContent || '',
     description: card.querySelector('.card__desc')?.textContent || '',
     location: card.dataset.location || '',
@@ -723,7 +743,13 @@ async function ensurePhenomenonDetail(id, { force = false } = {}) {
     force = true;
   }
   const cached = phenomenonCache.get(id);
-  if (!force && cached?.recentSightings) return cached;
+  const cacheHasObservers = Array.isArray(cached?.observers) && cached.observers.length > 0;
+  const cacheMissingCreator = Boolean(
+    cached?.userId && cached?.creatorName && !cacheHasObservers,
+  );
+  if (!force && cached?.recentSightings && cacheHasObservers && !cacheMissingCreator) {
+    return cached;
+  }
   try {
     const res = await fetch(`/api/phenomena/${id}`, {
       headers: { 'Accept-Language': getLocale() },
@@ -1335,12 +1361,12 @@ function initPhotoMosaic(mosaic) {
   updateCounter();
 }
 
-function mountDetailContent(container, card) {
+function mountDetailContent(container, card, item = null) {
   destroyDetailMaps(container);
-  const item = getItemForCard(card);
-  container.replaceChildren(...buildDetailNodes(item));
+  const detailItem = item ?? getItemForCard(card);
+  container.replaceChildren(...buildDetailNodes(detailItem));
   container.querySelectorAll('.photo-mosaic').forEach(initPhotoMosaic);
-  finishDetailMount(container, item);
+  finishDetailMount(container, detailItem);
 }
 
 function buildDetailSection(item, { loop = '' } = {}) {
@@ -1380,7 +1406,7 @@ function bindMapSheetPeekNavButtons() {
   });
 }
 
-function mountMapSheetDetail(card) {
+function mountMapSheetDetail(card, item = null) {
   detailScrollRoot = null;
   detailLoopHeight = 0;
   destroyDetailMaps(mapSheetBody);
@@ -1388,14 +1414,14 @@ function mountMapSheetDetail(card) {
   mapSheetBody.style.paddingBottom = '';
   mapSheetBody.scrollTop = 0;
   if (!card) return;
-  const item = getItemForCard(card);
-  const section = buildDetailSection(item);
+  const detailItem = item ?? getItemForCard(card);
+  const section = buildDetailSection(detailItem);
   mapSheetBody.appendChild(section);
   section.querySelectorAll('.photo-mosaic').forEach(initPhotoMosaic);
-  finishDetailMount(section, item);
+  finishDetailMount(section, detailItem);
 }
 
-function mountSplitDetail(card) {
+function mountSplitDetail(card, item = null) {
   detailScrollRoot = null;
   detailLoopHeight = 0;
   destroyDetailMaps(feedDetailBody);
@@ -1403,13 +1429,14 @@ function mountSplitDetail(card) {
   feedDetailBody.style.paddingBottom = '';
   feedDetailBody.scrollTop = 0;
   if (!card) return;
-  const section = buildDetailSection(getItemForCard(card));
+  const detailItem = item ?? getItemForCard(card);
+  const section = buildDetailSection(detailItem);
   feedDetailBody.appendChild(section);
   section.querySelectorAll('.photo-mosaic').forEach(initPhotoMosaic);
-  finishDetailMount(section, getItemForCard(card));
+  finishDetailMount(section, detailItem);
 }
 
-function mountMapSheetPeek(card, { direction = 0 } = {}) {
+function mountMapSheetPeek(card, { direction = 0, item = null } = {}) {
   detailScrollRoot = null;
   detailLoopHeight = 0;
   mapSheetBody.replaceChildren();
@@ -1420,13 +1447,14 @@ function mountMapSheetPeek(card, { direction = 0 } = {}) {
   else delete mapSheetBody.dataset.peekDirection;
   if (!card) return;
 
+  const detailItem = item ?? getItemForCard(card);
   const row = document.createElement('div');
   row.className = 'map-sheet__peek-row';
-  row.appendChild(buildDetailSection(getItemForCard(card)));
+  row.appendChild(buildDetailSection(detailItem));
 
   mapSheetBody.appendChild(row);
   row.querySelectorAll('.photo-mosaic').forEach(initPhotoMosaic);
-  finishDetailMount(row.querySelector('.feed-detail__section'), getItemForCard(card));
+  finishDetailMount(row.querySelector('.feed-detail__section'), detailItem);
   syncMapSheetPeekLayout(row);
 
   if (direction) {
@@ -1665,7 +1693,9 @@ function renderCard(item) {
   card.className = 'card';
   card.dataset.id = item.id;
   card.dataset.status = item.status;
-  card.dataset.category = item.category;
+  const cats = itemCategories(item);
+  card.dataset.category = cats[0] || 'plant';
+  card.dataset.categories = cats.join(',');
   if (item.lat != null) card.dataset.lat = String(item.lat);
   if (item.lng != null) card.dataset.lng = String(item.lng);
   if (item.location) card.dataset.location = item.location;
@@ -2098,6 +2128,9 @@ function initDetailSpotSelection(root, item) {
 function finishDetailMount(root, item) {
   initDetailMapCanvases(root);
   if (item) initDetailSpotSelection(root, item);
+  if (item && !canEditPhenomenon(item)) {
+    root?.querySelectorAll('.detail__edit-btn').forEach((btn) => btn.remove());
+  }
 }
 
 function initDetailMiniMap(canvas) {
@@ -2496,7 +2529,8 @@ function canEditPhenomenon(item) {
   const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
   if (!user) return false;
   if (user.role === 'admin') return true;
-  return item.userId != null && String(item.userId) === String(user.id);
+  const ownerId = item?.userId ?? null;
+  return ownerId != null && String(ownerId) === String(user.id);
 }
 
 function canEditSighting(sighting) {
@@ -2508,37 +2542,46 @@ function canEditSighting(sighting) {
 
 function remountOpenDetailForAuth() {
   if (!focusedCard) return;
-  if (feedStage.classList.contains('is-detail-open')) {
-    mountSplitDetail(focusedCard);
-    return;
-  }
-  if (cardModal?.classList.contains('is-open')) {
-    mountDetailContent(cardModalBody, focusedCard);
-    return;
-  }
-  if (mapSheet?.classList.contains('is-open')) {
-    if (mapSheet.classList.contains('is-expanded')) mountMapSheetDetail(focusedCard);
-    else mountMapSheetPeek(focusedCard);
-  }
+  void (async () => {
+    const detailItem = (await ensurePhenomenonDetail(focusedCard.dataset.id, { force: true }))
+      ?? getItemForCard(focusedCard);
+    if (feedStage.classList.contains('is-detail-open')) {
+      mountSplitDetail(focusedCard, detailItem);
+      return;
+    }
+    if (cardModal?.classList.contains('is-open')) {
+      mountDetailContent(cardModalBody, focusedCard, detailItem);
+      return;
+    }
+    if (mapSheet?.classList.contains('is-open')) {
+      if (mapSheet.classList.contains('is-expanded')) mountMapSheetDetail(focusedCard, detailItem);
+      else mountMapSheetPeek(focusedCard, { item: detailItem });
+    }
+  })();
 }
 
 function getRenderRichText() {
   return typeof globalThis.renderRichText === 'function' ? globalThis.renderRichText : null;
 }
 
+function fillRichTextContent(container, text) {
+  const render = getRenderRichText();
+  if (render && text) {
+    container.appendChild(render(text));
+    return;
+  }
+  if (!text) return;
+  String(text).split('\n').forEach((line, index) => {
+    if (index > 0) container.appendChild(document.createElement('br'));
+    container.appendChild(document.createTextNode(line));
+  });
+}
+
 function appendRichText(parent, text, className) {
   const el = document.createElement('div');
   if (className) el.className = className;
   el.classList.add('rich-text');
-  const render = getRenderRichText();
-  if (render && text) {
-    el.appendChild(render(text));
-  } else if (text) {
-    String(text).split('\n').forEach((line, index) => {
-      if (index > 0) el.appendChild(document.createElement('br'));
-      el.appendChild(document.createTextNode(line));
-    });
-  }
+  fillRichTextContent(el, text);
   parent.appendChild(el);
   return el;
 }
@@ -2837,7 +2880,16 @@ function bindObserverItemToggles(root = document) {
 }
 
 function resolveObserverProfiles(item) {
-  const apiObservers = item?.observers?.length ? item.observers : [];
+  const apiObservers = item?.observers?.length
+    ? item.observers
+    : (item?.userId && item?.creatorName
+      ? [{
+        userId: item.userId,
+        name: item.creatorName,
+        avatarUrl: item.creatorAvatarUrl ?? null,
+        bio: null,
+      }]
+      : []);
   if (!apiObservers.length) return [];
 
   return apiObservers.map((observer) => {
@@ -3124,8 +3176,7 @@ function buildNotesContent(notes) {
       if (lines.length > 1) {
         const para = document.createElement('div');
         para.className = 'detail__about-para';
-        const render = getRenderRichText();
-        if (render) para.appendChild(render(lines.slice(1).join('\n')));
+        fillRichTextContent(para, lines.slice(1).join('\n'));
         container.appendChild(para);
       }
       return;
@@ -3139,8 +3190,7 @@ function buildNotesContent(notes) {
       if (lines.length > 1) {
         const para = document.createElement('div');
         para.className = 'detail__about-para';
-        const render = getRenderRichText();
-        if (render) para.appendChild(render(lines.slice(1).join('\n')));
+        fillRichTextContent(para, lines.slice(1).join('\n'));
         container.appendChild(para);
       }
       return;
@@ -3148,8 +3198,7 @@ function buildNotesContent(notes) {
 
     const para = document.createElement('div');
     para.className = index === 0 ? 'detail__about-lead' : 'detail__about-para';
-    const render = getRenderRichText();
-    if (render) para.appendChild(render(trimmed));
+    fillRichTextContent(para, trimmed);
     container.appendChild(para);
   });
   return container;
@@ -3239,8 +3288,10 @@ function buildDetailNodes(item) {
   if (extras.childElementCount) body.appendChild(extras);
 
   const nodes = [photoWrap, body];
+  const observersSection = buildObserversSection(item);
   const about = buildAboutSection(item);
   const timeline = buildSightingsTimeline(item);
+  if (observersSection) nodes.push(observersSection);
   if (about) nodes.push(about);
   if (timeline) nodes.push(timeline);
 
@@ -3260,6 +3311,28 @@ function getMapPinCards() {
   return getVisibleCards().filter((c) => c.dataset.lat && c.dataset.lng && findMarkerEntry(c));
 }
 
+function fitMapToVisiblePins() {
+  if (!leafletMap || mapView.classList.contains('is-hidden')) return;
+  const pinCards = getMapPinCards();
+  if (!pinCards.length) return;
+
+  const latlngs = pinCards
+    .map((card) => L.latLng(parseFloat(card.dataset.lat), parseFloat(card.dataset.lng)))
+    .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
+  if (!latlngs.length) return;
+
+  if (latlngs.length === 1) {
+    leafletMap.setView(latlngs[0], 15, { animate: false });
+    return;
+  }
+
+  leafletMap.fitBounds(L.latLngBounds(latlngs), {
+    padding: [48, 48],
+    maxZoom: 15,
+    animate: false,
+  });
+}
+
 function navigateMapSheetPin(step) {
   const pinCards = getMapPinCards();
   if (pinCards.length < 2 || !focusedCard) return;
@@ -3272,8 +3345,8 @@ function navigateMapSheetPin(step) {
   setFocusedCard(nextCard);
   setActiveMapPin(entry.marker);
   if (mapSheet.classList.contains('is-expanded')) {
-    void ensurePhenomenonDetail(nextCard.dataset.id).then(() => {
-      if (focusedCard === nextCard) mountMapSheetDetail(nextCard);
+    void ensurePhenomenonDetail(nextCard.dataset.id).then((item) => {
+      if (focusedCard === nextCard) mountMapSheetDetail(nextCard, item ?? getItemForCard(nextCard));
     });
   } else {
     mountMapSheetPeek(nextCard, { direction: step });
@@ -3457,6 +3530,7 @@ function settleMapLayout({ pan = false, animate = false } = {}) {
       requestAnimationFrame(() => {
         if (!leafletMap || mapView.classList.contains('is-hidden')) return;
         leafletMap.invalidateSize({ animate: false });
+        if (!pan) fitMapToVisiblePins();
         if (pan && focusedCard) scheduleCenterMapOnCard(focusedCard, { animate, waitForSheet: usesSheetDetail() && mapSheet.classList.contains('is-open') });
       });
     });
@@ -3603,8 +3677,8 @@ function expandMapSheet() {
   mapSheetHandle?.setAttribute('aria-label', t('home.close'));
   void (async () => {
     if (focusedCard) {
-      await ensurePhenomenonDetail(focusedCard.dataset.id);
-      mountMapSheetDetail(focusedCard);
+      const item = (await ensurePhenomenonDetail(focusedCard.dataset.id)) ?? getItemForCard(focusedCard);
+      mountMapSheetDetail(focusedCard, item);
     }
     updateMapSheetPeekNav();
     settleMapLayout({ pan: Boolean(focusedCard), animate: false });
@@ -3625,14 +3699,14 @@ function pickInitialMapPinCard() {
   return pinCards[0];
 }
 
-function openInitialMapPinPreview() {
+function openInitialMapPinPreview({ pan = true } = {}) {
   const card = pickInitialMapPinCard();
   if (!card) return;
   const entry = findMarkerEntry(card);
   if (!entry) return;
   setFocusedCard(card);
   setActiveMapPin(entry.marker);
-  scheduleCenterMapOnCard(card, { animate: false, waitForSheet: false });
+  if (pan) scheduleCenterMapOnCard(card, { animate: false, waitForSheet: false });
 }
 
 function panToFocusedCard() {
@@ -3678,15 +3752,15 @@ async function openPhoneDetailSheet(card, { mode = 'expanded', pan = false, mark
   if (marker) setActiveMapPin(marker);
   else if (mode === 'expanded' && mapView.classList.contains('is-hidden')) clearMapPinActive();
 
-  await ensurePhenomenonDetail(card.dataset.id);
+  const detailItem = (await ensurePhenomenonDetail(card.dataset.id)) ?? getItemForCard(card);
 
   const expanded = mode !== 'peek';
   mapSheet.classList.toggle('is-expanded', expanded);
   mapSheet.classList.add('is-open');
   mapSheetHandle?.setAttribute('aria-label', t(expanded ? 'home.close' : 'home.expandPanel'));
 
-  if (expanded) mountMapSheetDetail(card);
-  else mountMapSheetPeek(card);
+  if (expanded) mountMapSheetDetail(card, detailItem);
+  else mountMapSheetPeek(card, { item: detailItem });
 
   updateMapSheetPeekNav();
 
@@ -3901,7 +3975,8 @@ function enterMapView() {
   scrollToSiteheadMenu({ instant: true });
   initMap();
   syncMapRail();
-  openInitialMapPinPreview();
+  fitMapToVisiblePins();
+  openInitialMapPinPreview({ pan: false });
   updateMapRailVisibility({ pan: false, animate: false });
 }
 
@@ -3968,8 +4043,8 @@ function openSplitDetail(card) {
   updateMapRailVisibility();
   updateDetailRailBtn();
   void (async () => {
-    await ensurePhenomenonDetail(card.dataset.id);
-    mountSplitDetail(card);
+    const detailItem = (await ensurePhenomenonDetail(card.dataset.id)) ?? getItemForCard(card);
+    mountSplitDetail(card, detailItem);
     renderFeedDetailMenu();
     setFeedDetailMenuOpen(false);
     if (!mapView.classList.contains('is-hidden')) {
@@ -4198,6 +4273,9 @@ loadWeather();
   document.addEventListener('fn:user-updated', () => {
     remountOpenDetailForAuth();
   });
+  if (typeof refreshCurrentUser === 'function') {
+    await refreshCurrentUser().catch(() => {});
+  }
   await loadPhenomena();
   void syncTrackedFromServer();
   captureDeepLinkSpotId();
