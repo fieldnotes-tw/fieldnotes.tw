@@ -102,18 +102,24 @@ export async function createSessionToken(user: SessionUser) {
   );
 }
 
-export function setSessionCookie(c: Context, token: string) {
-  setCookie(c, SESSION_COOKIE, token, {
+function sessionCookieOptions() {
+  return {
     httpOnly: true,
-    sameSite: 'Lax',
+    sameSite: 'Lax' as const,
     path: '/',
     secure: process.env.COOKIE_SECURE === '1',
+  };
+}
+
+export function setSessionCookie(c: Context, token: string) {
+  setCookie(c, SESSION_COOKIE, token, {
+    ...sessionCookieOptions(),
     maxAge: 60 * 60 * 24 * 14,
   });
 }
 
 export function clearSessionCookie(c: Context) {
-  deleteCookie(c, SESSION_COOKIE, { path: '/' });
+  deleteCookie(c, SESSION_COOKIE, sessionCookieOptions());
 }
 
 export async function readSessionUser(c: Context): Promise<SessionUser | null> {

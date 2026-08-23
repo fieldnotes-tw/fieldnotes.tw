@@ -94,7 +94,7 @@ export function setLineOAuthCookies(
       maxAge: 60 * 10,
     });
   } else {
-    deleteCookie(c, LINE_OAUTH_NEXT_COOKIE, { path: '/' });
+    deleteCookie(c, LINE_OAUTH_NEXT_COOKIE, cookieOptions());
   }
   if (returnTo) {
     setCookie(c, LINE_OAUTH_RETURN_COOKIE, returnTo, {
@@ -102,7 +102,7 @@ export function setLineOAuthCookies(
       maxAge: 60 * 10,
     });
   } else {
-    deleteCookie(c, LINE_OAUTH_RETURN_COOKIE, { path: '/' });
+    deleteCookie(c, LINE_OAUTH_RETURN_COOKIE, cookieOptions());
   }
   if (callbackUrl) {
     setCookie(c, LINE_OAUTH_CALLBACK_COOKIE, callbackUrl, {
@@ -110,15 +110,16 @@ export function setLineOAuthCookies(
       maxAge: 60 * 10,
     });
   } else {
-    deleteCookie(c, LINE_OAUTH_CALLBACK_COOKIE, { path: '/' });
+    deleteCookie(c, LINE_OAUTH_CALLBACK_COOKIE, cookieOptions());
   }
 }
 
 export function clearLineOAuthCookies(c: Context) {
-  deleteCookie(c, LINE_OAUTH_STATE_COOKIE, { path: '/' });
-  deleteCookie(c, LINE_OAUTH_NEXT_COOKIE, { path: '/' });
-  deleteCookie(c, LINE_OAUTH_RETURN_COOKIE, { path: '/' });
-  deleteCookie(c, LINE_OAUTH_CALLBACK_COOKIE, { path: '/' });
+  const opts = cookieOptions();
+  deleteCookie(c, LINE_OAUTH_STATE_COOKIE, opts);
+  deleteCookie(c, LINE_OAUTH_NEXT_COOKIE, opts);
+  deleteCookie(c, LINE_OAUTH_RETURN_COOKIE, opts);
+  deleteCookie(c, LINE_OAUTH_CALLBACK_COOKIE, opts);
 }
 
 export function createLineOAuthState() {
