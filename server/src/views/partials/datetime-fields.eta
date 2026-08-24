@@ -1,10 +1,12 @@
 <div class="submit-form__datetime">
   <label class="submit-form__field submit-form__datetime-part">
-    <span class="submit-form__datetime-label"><%= it.t('form.datetime.date') %></span>
-    <input type="date" id="f_seenDate" required>
+    <span class="visually-hidden"><%= it.t('form.datetime.date') %></span>
+    <span class="submit-form__date-wrap">
+      <input type="date" id="f_seenDate" required>
+    </span>
   </label>
   <div class="submit-form__field submit-form__datetime-part">
-    <span class="submit-form__datetime-label" id="f_seenTimeLabel"><%= it.t('form.datetime.time') %></span>
+    <span class="visually-hidden" id="f_seenTimeLabel"><%= it.t('form.datetime.time') %></span>
     <div class="submit-form__time-row" role="group" aria-labelledby="f_seenTimeLabel">
       <label class="submit-form__time-select">
         <span class="visually-hidden"><%= it.t('form.datetime.hour') %></span>
