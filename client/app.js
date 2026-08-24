@@ -1953,7 +1953,7 @@ function getReportedSpots(item) {
 }
 
 function getSpotsWithCoords(item) {
-  return getReportedSpots(item).filter((spot) => {
+  return (item?.spots ?? []).filter((spot) => {
     const lat = Number(spot.lat);
     const lng = Number(spot.lng);
     return Number.isFinite(lat) && Number.isFinite(lng);
@@ -2199,7 +2199,7 @@ function applyDetailSpotSelection(root, item, spotId) {
 }
 
 function initDetailSpotSelection(root, item) {
-  const spots = getReportedSpots(item);
+  const spots = getSpotsWithCoords(item);
   if (!spots.length) return;
 
   let defaultId = getPreferredNavSpot(item)?.id || spots[0].id;
@@ -2823,7 +2823,7 @@ function detailActionIcon(type, { filled = false } = {}) {
 }
 
 function buildSpotsSection(item) {
-  const spotList = getReportedSpots(item);
+  const spotList = getSpotsWithCoords(item);
   if (spotList.length <= 1) return null;
 
   const section = document.createElement('section');

@@ -227,6 +227,7 @@
       <div>
         <p class="about__text"><strong><%= it.t('home.about.bodyTitle') %></strong><%= it.t('home.about.body') %></p>
         <p class="about__text"><%= it.t('home.about.body2') %></p>
+        <p class="about__text"><span class="about__mark"><%= it.t('home.about.welcome') %></span><%= it.t('home.about.body3') %></p>
         <div class="about__actions">
           <a href="/register" class="about__btn about__btn--primary"><%= it.t('nav.register') %></a>
         </div>
