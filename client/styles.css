@@ -1122,6 +1122,8 @@ html[lang="en"] .sitehead__menu-oval{
   .map-sheet.is-open:not(.is-expanded) .map-sheet__body .detail__row,
   .map-sheet.is-open:not(.is-expanded) .map-sheet__body .detail__cta,
   .map-sheet.is-open:not(.is-expanded) .map-sheet__body .detail__map-block,
+  .map-sheet.is-open:not(.is-expanded) .map-sheet__body .detail__map-actions-wrap,
+  .map-sheet.is-open:not(.is-expanded) .map-sheet__body .detail__map-actions,
   .map-sheet.is-open:not(.is-expanded) .map-sheet__body .detail__actions,
   .map-sheet.is-open:not(.is-expanded) .map-sheet__body .detail__edit-btn,
   .map-sheet.is-open:not(.is-expanded) .map-sheet__body .detail__sightings,
