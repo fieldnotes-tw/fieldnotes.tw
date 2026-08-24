@@ -1311,7 +1311,6 @@ html[lang="en"] .sitehead__menu-oval{
     position:sticky;
     top:var(--feed-sticky-top, 1rem);
     align-self:start;
-    max-height:calc(100vh - var(--feed-sticky-top, 1rem) - 1rem);
     overflow:visible;
     background:var(--ground); border-radius:8px;
     box-shadow:4px 0 16px rgba(20,20,20,0.06);
@@ -1341,10 +1340,8 @@ html[lang="en"] .sitehead__menu-oval{
     display:none !important;
   }
   .feed-stage.is-detail-open .feed-detail__body{
-    overflow-y:auto;
-    overscroll-behavior:contain;
-    flex:1 1 auto;
-    min-height:0;
+    overflow:visible;
+    flex:none;
   }
   .feed-stage.is-detail-open .card.is-selected{
     box-shadow:none;
