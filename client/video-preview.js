@@ -1,6 +1,12 @@
+const resolvedPosterCache = new Map();
+
 export function videoPosterUrl(videoUrl) {
   if (!/\.(mp4|webm|mov)(\?|#|$)/i.test(String(videoUrl || ''))) return '';
   return String(videoUrl).replace(/\.(mp4|webm|mov)(?=($|[?#]))/i, '-poster.jpg');
+}
+
+export function seedPosterCache(videoUrl, src) {
+  if (videoUrl && src) resolvedPosterCache.set(videoUrl, src);
 }
 
 /** Prefer transcoded .mp4 when the stored path is still .mov. */
@@ -95,10 +101,17 @@ function applyPosterToImage(img, src) {
 }
 
 function setPosterImage(img, posterUrl, videoUrl) {
+  const cached = resolvedPosterCache.get(videoUrl);
+  if (cached) {
+    applyPosterToImage(img, cached);
+    return;
+  }
+
   let done = false;
   const finish = (src) => {
     if (done || !src) return;
     done = true;
+    resolvedPosterCache.set(videoUrl, src);
     applyPosterToImage(img, src);
   };
 

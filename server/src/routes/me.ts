@@ -7,7 +7,7 @@ import {
   sightings,
   users,
 } from '../db/schema.js';
-import { toPublicUser } from '../lib/auth.js';
+import { clearSessionCookie, toPublicUser } from '../lib/auth.js';
 import { listPhenomenaWithStats } from '../lib/phenomena-query.js';
 import { localeOf, t } from '../lib/i18n.js';
 import { profileUpdateSchema, uuidSchema } from '../lib/validators.js';
@@ -58,6 +58,25 @@ meRoutes.patch('/', validated('json', profileUpdateSchema), async (c) => {
     });
 
   return c.json({ data: toPublicUser(row) });
+});
+
+meRoutes.delete('/', async (c) => {
+  const locale = localeOf(c);
+  const user = c.get('user');
+
+  if (user.role === 'admin') {
+    const admins = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.role, 'admin'));
+    if (admins.length <= 1) {
+      return c.json({ error: t(locale, 'errors.cannotDeleteLastAdmin') }, 400);
+    }
+  }
+
+  await db.delete(users).where(eq(users.id, user.id));
+  clearSessionCookie(c);
+  return c.body(null, 204);
 });
 
 meRoutes.get('/phenomena', async (c) => {

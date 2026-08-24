@@ -19,20 +19,16 @@ import {
 import { localeOf, t } from '../lib/i18n.js';
 import {
   clearLineOAuthCookies,
-  createLineOAuthState,
+  createSignedLineOAuthState,
   exchangeLineCode,
   fetchLineProfile,
   getLineOAuthConfig,
   lineAuthorizeUrl,
-  readLineOAuthCallback,
-  readLineOAuthNext,
-  readLineOAuthReturn,
+  parseSignedLineOAuthState,
   readSafeNextPath,
   readSafeReturnPath,
   resolveLineCallbackUrl,
-  setLineOAuthCookies,
   upsertLineUser,
-  verifyLineOAuthState,
 } from '../lib/line.js';
 import { sendConfirmEmail, sendResetPasswordEmail } from '../lib/mail.js';
 import { validated } from '../lib/validate.js';
@@ -300,16 +296,21 @@ authRoutes.get('/line/start', async (c) => {
     return c.redirect(`${returnTo}?line=unavailable`);
   }
 
-  const state = createLineOAuthState();
   const next = readSafeNextPath(c.req.query('next'));
-  setLineOAuthCookies(c, state, next === '/' ? undefined : next, returnTo, callbackUrl);
+  const state = await createSignedLineOAuthState({
+    next: next === '/' ? undefined : next,
+    returnTo,
+    callbackUrl: config.callbackUrl,
+  });
+  clearLineOAuthCookies(c);
   return c.redirect(lineAuthorizeUrl(state, config));
 });
 
 authRoutes.get('/line/callback', async (c) => {
   const locale = localeOf(c);
-  const returnTo = readLineOAuthReturn(c);
-  const callbackUrl = readLineOAuthCallback(c) || resolveLineCallbackUrl(c);
+  const parsed = await parseSignedLineOAuthState(c.req.query('state'));
+  const returnTo = parsed?.returnTo ?? readSafeReturnPath(null);
+  const callbackUrl = parsed?.callbackUrl || resolveLineCallbackUrl(c);
   const config = getLineOAuthConfig(c, callbackUrl);
   const fail = (code: string) => {
     clearLineOAuthCookies(c);
@@ -326,13 +327,12 @@ authRoutes.get('/line/callback', async (c) => {
     return fail('denied');
   }
 
-  const state = c.req.query('state')?.trim();
   const code = c.req.query('code')?.trim();
-  if (!verifyLineOAuthState(c, state) || !code) {
+  if (!parsed || !code) {
     return fail('invalid');
   }
 
-  const next = readLineOAuthNext(c);
+  const next = parsed.next;
   clearLineOAuthCookies(c);
 
   try {

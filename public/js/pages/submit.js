@@ -229,7 +229,7 @@ function initSearch() {
 }
 
 function defaultSeenDate(force = false) {
-  setDefaultSeenDateTime($('f_seenDate'), $('f_seenTime'), { force });
+  setDefaultSeenDateTime($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'), { force });
 }
 
 function hasPinPosition() {
@@ -263,7 +263,222 @@ function initCurrentLocation() {
   );
 }
 
+let editId = '';
+let submitBaseline = '';
+let submitLeaveGuard = null;
+
+function submitDraftStorageKey() {
+  const user = getCurrentUser();
+  if (!user) return '';
+  const key = user.id || user.email;
+  return key ? `fieldnotes.submitDraft.${key}` : '';
+}
+
+function submitDraftDismissedKey() {
+  return `${submitDraftStorageKey()}.dismissed`;
+}
+
+function isSubmitDraftDismissed() {
+  return sessionStorage.getItem(submitDraftDismissedKey()) === '1';
+}
+
+function markSubmitDraftDismissed() {
+  sessionStorage.setItem(submitDraftDismissedKey(), '1');
+}
+
+function clearSubmitDraftDismissed() {
+  sessionStorage.removeItem(submitDraftDismissedKey());
+}
+
+function hasUserEnteredSubmitContent(state) {
+  if (!state) return false;
+  if (state.title || state.description || state.extra || state.findingHint || state.location) return true;
+  if (Array.isArray(state.photos) && state.photos.length) return true;
+  return false;
+}
+
+function formIsEmptyForDraft() {
+  return !hasUserEnteredSubmitContent(JSON.parse(serializeSubmitState()));
+}
+
+function shouldGuardSubmitLeave() {
+  const form = $('submitForm');
+  if (!form || form.hidden) return false;
+  if (editId) return isSubmitDirty();
+  return hasUserEnteredSubmitContent(JSON.parse(serializeSubmitState()));
+}
+
+function serializeSubmitState() {
+  return JSON.stringify({
+    title: $('f_title').value.trim(),
+    description: $('f_description').value.trim(),
+    categories: getSelectedCategories().slice().sort(),
+    extra: $('f_extra').value.trim(),
+    findingHint: $('f_finding').value.trim(),
+    location: $('f_location').value.trim(),
+    lat: $('f_lat').value,
+    lng: $('f_lng').value,
+    seenDate: $('f_seenDate')?.value || '',
+    seenHour: $('f_seenHour')?.value || '',
+    seenMinute: $('f_seenMinute')?.value || '',
+    extraOpen: !$('extraPanel')?.hidden,
+    photos: photos
+      .filter((photo) => photo.url && !photo.uploading)
+      .map((photo) => ({
+        url: photo.url,
+        caption: photo.caption || '',
+        isVideo: photo.isVideo || isVideoMediaUrl(photo.url),
+        posterUrl: photo.posterUrl || '',
+      })),
+  });
+}
+
+function captureSubmitBaseline() {
+  submitBaseline = serializeSubmitState();
+}
+
+function isSubmitDirty() {
+  return serializeSubmitState() !== submitBaseline;
+}
+
+function hasSubmitDraftContent(state) {
+  if (!state) return false;
+  if (state.title || state.description || state.extra || state.findingHint || state.location) return true;
+  if (state.lat && state.lng) return true;
+  if (Array.isArray(state.photos) && state.photos.length) return true;
+  return false;
+}
+
+function buildSubmitDraftPayload() {
+  const parsed = JSON.parse(serializeSubmitState());
+  return {
+    ...parsed,
+    placedLabel,
+  };
+}
+
+function saveSubmitDraft({ silent = false } = {}) {
+  if (editId) return false;
+  if (photos.some((photo) => photo.uploading)) {
+    if (!silent) setError(t('submit.error.uploadInProgress'));
+    return false;
+  }
+
+  const draft = buildSubmitDraftPayload();
+  if (!hasSubmitDraftContent(draft)) {
+    return false;
+  }
+
+  writeStoredDraft(submitDraftStorageKey(), draft);
+  clearSubmitDraftDismissed();
+  return true;
+}
+
+function clearSubmitDraft() {
+  clearStoredDraft(submitDraftStorageKey());
+}
+
+function dismissSubmitDraft() {
+  clearSubmitDraft();
+  markSubmitDraftDismissed();
+  hideSubmitDraftBanner();
+  captureSubmitBaseline();
+}
+
+function hideSubmitDraftBanner() {
+  const banner = $('submitDraftBanner');
+  if (banner) banner.hidden = true;
+}
+
+function showSubmitDraftBanner(draft) {
+  const banner = $('submitDraftBanner');
+  const text = $('submitDraftBannerText');
+  if (!banner || !text) return;
+
+  const title = draft.title?.trim() || t('submit.draft.unnamed');
+  text.textContent = t('submit.draft.restorePrompt', { title });
+  banner.hidden = false;
+}
+
+async function applySubmitDraft(draft) {
+  $('f_title').value = draft.title || '';
+  $('f_description').value = draft.description || '';
+  $('f_extra').value = draft.extra || '';
+  $('f_finding').value = draft.findingHint || '';
+  setSelectedCategories(draft.categories?.length ? draft.categories : ['plant']);
+  setExtraPanelOpen(Boolean(draft.extraOpen || draft.extra?.trim()));
+
+  $('f_location').value = draft.location || '';
+  placedLabel = draft.placedLabel || draft.location || '';
+  if (draft.lat && draft.lng) {
+    setPin(Number(draft.lat), Number(draft.lng), draft.location || '');
+  } else {
+    clearPinPosition();
+  }
+
+  if (!applySeenTimeDraft($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'), draft)) {
+    defaultSeenDate(true);
+  }
+
+  clearPhotos();
+  for (const item of draft.photos || []) {
+    photos.push({
+      id: randomId(),
+      url: item.url,
+      caption: item.caption || '',
+      localUrl: '',
+      posterUrl: item.posterUrl || '',
+      uploading: false,
+      isVideo: item.isVideo || isVideoMediaUrl(item.url),
+    });
+  }
+  renderPhotoList();
+  $('f_description').dispatchEvent(new Event('input'));
+}
+
+function initSubmitDraftRestore() {
+  if (editId || isSubmitDraftDismissed()) return;
+
+  const draft = readStoredDraft(submitDraftStorageKey());
+  if (!hasSubmitDraftContent(draft)) {
+    if (draft) clearSubmitDraft();
+    return;
+  }
+  if (!formIsEmptyForDraft()) return;
+
+  showSubmitDraftBanner(draft);
+
+  $('submitDraftRestoreBtn')?.addEventListener('click', async () => {
+    await applySubmitDraft(draft);
+    clearSubmitDraft();
+    clearSubmitDraftDismissed();
+    hideSubmitDraftBanner();
+    captureSubmitBaseline();
+  }, { once: true });
+
+  $('submitDraftDiscardBtn')?.addEventListener('click', () => {
+    dismissSubmitDraft();
+  }, { once: true });
+}
+
+function initSubmitLeaveGuard() {
+  if (submitLeaveGuard) return;
+  submitLeaveGuard = initFormLeaveGuard({
+    isDirty: () => shouldGuardSubmitLeave(),
+    confirmLeave: () => {
+      if (editId) {
+        return confirm(t('submit.leave.editConfirm')) ? 'leave' : 'stay';
+      }
+      return confirm(t('submit.leave.saveDraftConfirm')) ? 'save' : 'leave';
+    },
+    onSaveDraft: () => saveSubmitDraft({ silent: true }),
+  });
+}
+
 function showSuccess(phenomenonId) {
+  clearSubmitDraft();
+  clearSubmitDraftDismissed();
+  submitLeaveGuard?.allowLeaveWithoutPrompt();
   $('submitForm').hidden = true;
   $('submitSuccess').hidden = false;
   const viewLink = $('submitSuccessView');
@@ -275,17 +490,6 @@ function showSuccess(phenomenonId) {
       viewLink.hidden = true;
     }
   }
-}
-
-function setImageStatus(msg) {
-  const el = $('imageStatus');
-  if (!msg) {
-    el.hidden = true;
-    el.textContent = '';
-    return;
-  }
-  el.hidden = false;
-  el.textContent = msg;
 }
 
 function photoSrc(photo) {
@@ -304,7 +508,6 @@ function clearPhotos() {
   photos = [];
   renderPhotoList();
   $('f_image').value = '';
-  setImageStatus('');
 }
 
 function movePhoto(id, delta) {
@@ -380,13 +583,6 @@ function renderPhotoList() {
 
     appendPhotoCaptionField(body, photo);
 
-    if (photo.uploading) {
-      const loading = document.createElement('span');
-      loading.className = 'submit-form__photo-loading';
-      loading.textContent = t('submit.photo.uploading');
-      body.appendChild(loading);
-    }
-
     const actions = document.createElement('div');
     actions.className = 'submit-form__photo-actions';
 
@@ -456,7 +652,7 @@ function renderPhotoList() {
 
   list.hidden = photos.length === 0;
   $('photoDragHint').hidden = photos.length < 2;
-  syncPhotoUploadLabel(photos.length);
+  syncPhotoUploadLabel(photos.length, photos);
   syncSubmitState();
 }
 
@@ -497,14 +693,11 @@ async function handleImagePick(fileList) {
   const files = Array.from(fileList || []).filter(isUploadMediaFile);
   if (!files.length) return;
 
-  setImageStatus(t('submit.photo.uploading'));
   try {
     for (const file of files) {
       await addPhotoFile(file);
     }
-    setImageStatus('');
   } catch (err) {
-    setImageStatus('');
     setError(err.message || t('submit.error.uploadFailed'));
   } finally {
     $('f_image').value = '';
@@ -596,6 +789,8 @@ function resetForm() {
   map?.setView(ZUOYING_CENTER, 14);
   syncMapPinState();
   initCurrentLocation();
+  hideSubmitDraftBanner();
+  captureSubmitBaseline();
 }
 
 function initDescriptionCounter() {
@@ -618,7 +813,11 @@ function validateForm() {
   if (!$('f_description').value.trim()) {
     return t('submit.error.noDescription');
   }
-  if (!combineSeenDateTime($('f_seenDate').value, $('f_seenTime').value)) {
+  if (!combineSeenDateTime(
+    $('f_seenDate').value,
+    $('f_seenHour').value,
+    $('f_seenMinute').value,
+  )) {
     return t('submit.error.noSeenDate');
   }
   if (!getSelectedCategories().length) {
@@ -650,6 +849,7 @@ async function handleDelete() {
 
   try {
     await api(`/api/submissions/phenomena/${editId}`, { method: 'DELETE' });
+    submitLeaveGuard?.allowLeaveWithoutPrompt();
     location.href = '/';
   } catch (err) {
     setError(err.message || t('submit.error.deleteFailed'));
@@ -679,7 +879,7 @@ async function handleSubmit(e) {
     location: $('f_location').value.trim(),
     lat: Number($('f_lat').value),
     lng: Number($('f_lng').value),
-    seenAt: seenDateTimeIso($('f_seenDate'), $('f_seenTime')),
+    seenAt: seenDateTimeIso($('f_seenDate'), $('f_seenHour'), $('f_seenMinute')),
     images: formImagesPayload(photos),
   };
 
@@ -719,8 +919,6 @@ async function handleSubmit(e) {
   }
 }
 
-let editId = '';
-
 async function loadEditPhenomenon(id) {
   const { data } = await api(`/api/submissions/phenomena/${id}`);
   editId = id;
@@ -733,7 +931,7 @@ async function loadEditPhenomenon(id) {
   $('f_location').value = data.location || '';
   if (data.lat != null && data.lng != null) setPin(data.lat, data.lng);
   if (data.lastNoticedAt) {
-    setSeenDateTimeInputs($('f_seenDate'), $('f_seenTime'), data.lastNoticedAt);
+    setSeenDateTimeInputs($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'), data.lastNoticedAt);
   }
   clearPhotos();
   for (const item of normalizeLoadedFormImages(data)) {
@@ -750,6 +948,8 @@ async function loadEditPhenomenon(id) {
   setSubmitFormTitle('submit.editTitle');
   setSubmitPrimaryLabel('submit.save');
   setSubmitDeleteVisible(true);
+  hideSubmitDraftBanner();
+  captureSubmitBaseline();
 }
 
 async function boot() {
@@ -767,6 +967,8 @@ async function boot() {
     return;
   }
 
+  initSubmitLeaveGuard();
+
   if (typeof L === 'undefined') {
     setError(t('submit.error.mapLoad'));
   } else {
@@ -775,14 +977,15 @@ async function boot() {
   initSearch();
   initPhotoUpload();
   defaultSeenDate();
-  initDescriptionCounter();
-  initExtraToggle();
 
   const params = new URLSearchParams(location.search);
   const editParam = params.get('edit');
   if (!editParam) {
-    initCurrentLocation();
+    captureSubmitBaseline();
   }
+
+  initDescriptionCounter();
+  initExtraToggle();
 
   $('submitForm').addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' || e.target.tagName === 'TEXTAREA') return;
@@ -804,6 +1007,9 @@ async function boot() {
       }
       setError(err.message || t('submit.error.failed'));
     }
+  } else {
+    initSubmitDraftRestore();
+    initCurrentLocation();
   }
 }
 

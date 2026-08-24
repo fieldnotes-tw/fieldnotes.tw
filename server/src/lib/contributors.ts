@@ -1,4 +1,4 @@
-import { asc, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, exists, or, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { phenomena, sightings, users } from '../db/schema.js';
 import type { PHENOMENON_CATEGORIES } from '../db/schema.js';
@@ -24,29 +24,6 @@ function featuredContributorEmails(): string[] {
 }
 
 export async function loadFeaturedContributors(): Promise<ContributorProfile[]> {
-  const contributorIds = await db
-    .selectDistinct({ id: users.id })
-    .from(users)
-    .leftJoin(phenomena, sql`${phenomena.userId} = ${users.id}`)
-    .leftJoin(sightings, sql`${sightings.userId} = ${users.id}`)
-    .where(
-      sql`trim(coalesce(${users.displayName}, '')) <> '' AND (${phenomena.id} IS NOT NULL OR ${sightings.id} IS NOT NULL)`,
-    );
-
-  const featuredEmails = featuredContributorEmails();
-  const featuredRows = featuredEmails.length
-    ? await db
-      .select({ id: users.id })
-      .from(users)
-      .where(inArray(users.email, featuredEmails))
-    : [];
-
-  const idSet = new Set<string>();
-  for (const row of featuredRows) idSet.add(row.id);
-  for (const row of contributorIds) idSet.add(row.id);
-
-  if (!idSet.size) return [];
-
   const rows = await db
     .select({
       id: users.id,
@@ -56,13 +33,32 @@ export async function loadFeaturedContributors(): Promise<ContributorProfile[]> 
       email: users.email,
     })
     .from(users)
-    .where(inArray(users.id, [...idSet]))
+    .where(
+      and(
+        sql`trim(coalesce(${users.displayName}, '')) <> ''`,
+        or(
+          exists(
+            db.select({ one: sql`1` }).from(phenomena).where(eq(phenomena.userId, users.id)),
+          ),
+          exists(
+            db.select({ one: sql`1` }).from(sightings).where(eq(sightings.userId, users.id)),
+          ),
+        ),
+      ),
+    )
     .orderBy(asc(users.displayName));
 
+  if (!rows.length) return [];
+
+  const featuredEmails = featuredContributorEmails();
   const featuredOrder = new Map(featuredEmails.map((email, index) => [email, index]));
   rows.sort((a, b) => {
-    const aFeatured = featuredOrder.has(a.email.toLowerCase()) ? featuredOrder.get(a.email.toLowerCase())! : 99;
-    const bFeatured = featuredOrder.has(b.email.toLowerCase()) ? featuredOrder.get(b.email.toLowerCase())! : 99;
+    const aFeatured = featuredOrder.has(a.email.toLowerCase())
+      ? featuredOrder.get(a.email.toLowerCase())!
+      : 99;
+    const bFeatured = featuredOrder.has(b.email.toLowerCase())
+      ? featuredOrder.get(b.email.toLowerCase())!
+      : 99;
     if (aFeatured !== bFeatured) return aFeatured - bFeatured;
     return (a.displayName ?? '').localeCompare(b.displayName ?? '', 'zh-Hant');
   });

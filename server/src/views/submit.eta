@@ -12,6 +12,14 @@
       </div>
     </header>
 
+    <div class="submit-form__draft-banner" id="submitDraftBanner" hidden>
+      <p class="submit-form__draft-banner-text" id="submitDraftBannerText"></p>
+      <div class="submit-form__draft-banner-actions">
+        <button type="button" class="submit-form__draft-restore" id="submitDraftRestoreBtn"><%= it.t('submit.draft.restore') %></button>
+        <button type="button" class="submit-form__draft-discard" id="submitDraftDiscardBtn"><%= it.t('submit.draft.discard') %></button>
+      </div>
+    </div>
+
     <section class="submit-form__section" aria-labelledby="submitWhat">
       <h2 class="submit-form__section-title" id="submitWhat"><%= it.t('submit.what.label') %></h2>
       <label class="submit-form__field">
@@ -65,6 +73,15 @@
         <textarea id="f_description" rows="3" maxlength="120" required aria-describedby="submitDescHint descriptionCounter"></textarea>
         <p class="submit-form__counter" id="descriptionCounter" aria-live="polite">0 / 120</p>
       </label>
+      <button type="button" class="submit-form__extra-toggle" id="extraToggle" aria-expanded="false" aria-controls="extraPanel">
+        <%= it.t('submit.extra.toggle') %>
+      </button>
+      <div class="submit-form__extra-panel" id="extraPanel" hidden>
+        <label class="submit-form__field">
+          <span class="visually-hidden"><%= it.t('submit.extra.label') %></span>
+          <textarea id="f_extra" rows="6"></textarea>
+        </label>
+      </div>
     </section>
 
     <section class="submit-form__section" aria-labelledby="submitWhenWhere">
@@ -101,20 +118,10 @@
       </div>
     </section>
 
-    <section class="submit-form__section submit-form__section--extra">
-      <button type="button" class="submit-form__extra-toggle" id="extraToggle" aria-expanded="false" aria-controls="extraPanel">
-        <%= it.t('submit.extra.toggle') %>
-      </button>
-      <div class="submit-form__extra-panel" id="extraPanel" hidden>
-        <label class="submit-form__field">
-          <span class="visually-hidden"><%= it.t('submit.extra.label') %></span>
-          <textarea id="f_extra" rows="6"></textarea>
-        </label>
-      </div>
-    </section>
-
     <p class="submit-form__error" id="submitError" hidden></p>
-    <button type="submit" class="submit-form__submit" id="submitBtn"><%= it.t('submit.send') %></button>
+    <div class="submit-form__primary-actions">
+      <button type="submit" class="submit-form__submit" id="submitBtn"><%= it.t('submit.send') %></button>
+    </div>
   </form>
 
   <div class="submit-form__success" id="submitSuccess" hidden>

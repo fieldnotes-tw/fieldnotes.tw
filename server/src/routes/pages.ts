@@ -71,7 +71,7 @@ pageRoutes.get('/submit', (c) =>
   renderPage(c, 'submit', {
     titleKey: 'submit.pageTitle',
     leaflet: true,
-    scripts: ['/js/datetime-local.js', '/js/media.js', '/js/pages/submit.js'],
+    scripts: ['/js/datetime-local.js', '/js/media.js', '/js/form-guard.js', '/js/pages/submit.js'],
   }),
 );
 
@@ -79,7 +79,7 @@ pageRoutes.get('/sighting', (c) =>
   renderPage(c, 'sighting', {
     titleKey: 'sighting.form.pageTitle',
     leaflet: true,
-    scripts: ['/js/datetime-local.js', '/js/media.js', '/js/submit-map.js', '/js/pages/sighting.js'],
+    scripts: ['/js/datetime-local.js', '/js/media.js', '/js/submit-map.js', '/js/form-guard.js', '/js/pages/sighting.js'],
   }),
 );
 

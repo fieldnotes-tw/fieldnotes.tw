@@ -8,6 +8,7 @@ import {
   users,
 } from '../db/schema.js';
 import { localeOf, t } from '../lib/i18n.js';
+import { cleanupOrphanSpotAfterSightingDelete } from '../lib/spots.js';
 import { updateSightingSchema, normalizeFormImages, uuidSchema } from '../lib/validators.js';
 import { validated } from '../lib/validate.js';
 import { requireAuth, type AuthEnv } from '../middleware/auth.js';
@@ -98,14 +99,21 @@ sightingRoutes.delete('/:id', requireAuth, async (c) => {
     return c.json({ error: t(locale, 'errors.forbidden') }, 403);
   }
 
-  const [row] = await db
-    .delete(sightings)
+  const [target] = await db
+    .select({
+      spotId: sightings.spotId,
+      phenomenonId: sightings.phenomenonId,
+    })
+    .from(sightings)
     .where(eq(sightings.id, id.data))
-    .returning({ id: sightings.id });
+    .limit(1);
 
-  if (!row) {
+  if (!target) {
     return c.json({ error: t(locale, 'errors.notFound') }, 404);
   }
+
+  await db.delete(sightings).where(eq(sightings.id, id.data));
+  await cleanupOrphanSpotAfterSightingDelete(target.spotId, target.phenomenonId);
 
   return c.json({ ok: true });
 });

@@ -1,9 +1,37 @@
+function showRegisterLoggedIn() {
+  const signupEl = document.getElementById('registerSignup');
+  const oauthEl = document.getElementById('registerOauth');
+  const loggedInEl = document.getElementById('registerLoggedIn');
+  const switchEl = document.querySelector('.auth-form__switch');
+  const titleEl = document.getElementById('registerTitle');
+
+  signupEl.hidden = true;
+  oauthEl.hidden = true;
+  if (switchEl) switchEl.hidden = true;
+  loggedInEl.hidden = false;
+  if (titleEl) titleEl.textContent = t('auth.register.alreadyLoggedInTitle');
+}
+
+function showRegisterSignup() {
+  const signupEl = document.getElementById('registerSignup');
+  const oauthEl = document.getElementById('registerOauth');
+  const loggedInEl = document.getElementById('registerLoggedIn');
+  const switchEl = document.querySelector('.auth-form__switch');
+  const titleEl = document.getElementById('registerTitle');
+
+  signupEl.hidden = false;
+  oauthEl.hidden = false;
+  if (switchEl) switchEl.hidden = false;
+  loggedInEl.hidden = true;
+  if (titleEl) titleEl.textContent = t('auth.register.title');
+}
+
 i18nReady.then(() => {
   const errorEl = document.getElementById('registerError');
   showLineAuthError(errorEl);
 
   refreshCurrentUser().then((user) => {
-    if (user) location.href = '/';
+    if (user) showRegisterLoggedIn();
   }).catch(() => {});
 
   const form = document.getElementById('registerForm');
@@ -13,6 +41,12 @@ i18nReady.then(() => {
   const oauthEl = document.getElementById('registerOauth');
   const titleEl = document.getElementById('registerTitle');
   let pendingEmail = '';
+
+  document.getElementById('registerLogoutBtn')?.addEventListener('click', async () => {
+    await logout();
+    showRegisterSignup();
+    document.querySelectorAll('[data-auth-nav]').forEach(renderAuthNav);
+  });
 
   function showRegisterPending(email) {
     pendingEmail = email;

@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
-import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
+import { deleteCookie } from 'hono/cookie';
+import { sign, verify } from 'hono/jwt';
 import { db } from '../db/index.js';
 import { userIdentities, users } from '../db/schema.js';
 import { toPublicUser, type SessionUser } from './auth.js';
@@ -11,6 +12,30 @@ export const LINE_OAUTH_STATE_COOKIE = 'fn_line_oauth_state';
 export const LINE_OAUTH_NEXT_COOKIE = 'fn_line_oauth_next';
 export const LINE_OAUTH_RETURN_COOKIE = 'fn_line_oauth_return';
 export const LINE_OAUTH_CALLBACK_COOKIE = 'fn_line_oauth_callback';
+
+const LINE_OAUTH_STATE_TTL_SEC = 60 * 10;
+
+type LineOAuthStatePayload = {
+  next: string;
+  returnTo: string;
+  callbackUrl: string;
+  nonce: string;
+  exp: number;
+};
+
+export type ParsedLineOAuthState = {
+  next: string;
+  returnTo: string;
+  callbackUrl: string;
+};
+
+function jwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET is required');
+  }
+  return secret;
+}
 
 export type LineOAuthConfig = {
   channelId: string;
@@ -77,52 +102,49 @@ function cookieOptions() {
   };
 }
 
-export function setLineOAuthCookies(
-  c: Context,
-  state: string,
-  next?: string,
-  returnTo?: string,
-  callbackUrl?: string,
-) {
-  setCookie(c, LINE_OAUTH_STATE_COOKIE, state, {
-    ...cookieOptions(),
-    maxAge: 60 * 10,
-  });
-  if (next) {
-    setCookie(c, LINE_OAUTH_NEXT_COOKIE, next, {
-      ...cookieOptions(),
-      maxAge: 60 * 10,
-    });
-  } else {
-    deleteCookie(c, LINE_OAUTH_NEXT_COOKIE, { path: '/' });
-  }
-  if (returnTo) {
-    setCookie(c, LINE_OAUTH_RETURN_COOKIE, returnTo, {
-      ...cookieOptions(),
-      maxAge: 60 * 10,
-    });
-  } else {
-    deleteCookie(c, LINE_OAUTH_RETURN_COOKIE, { path: '/' });
-  }
-  if (callbackUrl) {
-    setCookie(c, LINE_OAUTH_CALLBACK_COOKIE, callbackUrl, {
-      ...cookieOptions(),
-      maxAge: 60 * 10,
-    });
-  } else {
-    deleteCookie(c, LINE_OAUTH_CALLBACK_COOKIE, { path: '/' });
-  }
-}
-
 export function clearLineOAuthCookies(c: Context) {
-  deleteCookie(c, LINE_OAUTH_STATE_COOKIE, { path: '/' });
-  deleteCookie(c, LINE_OAUTH_NEXT_COOKIE, { path: '/' });
-  deleteCookie(c, LINE_OAUTH_RETURN_COOKIE, { path: '/' });
-  deleteCookie(c, LINE_OAUTH_CALLBACK_COOKIE, { path: '/' });
+  const opts = cookieOptions();
+  deleteCookie(c, LINE_OAUTH_STATE_COOKIE, opts);
+  deleteCookie(c, LINE_OAUTH_NEXT_COOKIE, opts);
+  deleteCookie(c, LINE_OAUTH_RETURN_COOKIE, opts);
+  deleteCookie(c, LINE_OAUTH_CALLBACK_COOKIE, opts);
 }
 
-export function createLineOAuthState() {
-  return randomBytes(32).toString('base64url');
+export async function createSignedLineOAuthState(opts: {
+  next?: string;
+  returnTo?: string;
+  callbackUrl: string;
+}) {
+  const now = Math.floor(Date.now() / 1000);
+  return sign(
+    {
+      next: readSafeNextPath(opts.next),
+      returnTo: readSafeReturnPath(opts.returnTo),
+      callbackUrl: opts.callbackUrl.trim(),
+      nonce: randomBytes(16).toString('base64url'),
+      exp: now + LINE_OAUTH_STATE_TTL_SEC,
+    } satisfies LineOAuthStatePayload,
+    jwtSecret(),
+    'HS256',
+  );
+}
+
+export async function parseSignedLineOAuthState(
+  state: string | undefined | null,
+): Promise<ParsedLineOAuthState | null> {
+  if (!state?.trim()) return null;
+
+  try {
+    const payload = await verify(state.trim(), jwtSecret(), 'HS256') as LineOAuthStatePayload;
+    if (!payload.callbackUrl?.trim() || !payload.returnTo) return null;
+    return {
+      next: readSafeNextPath(payload.next),
+      returnTo: readSafeReturnPath(payload.returnTo),
+      callbackUrl: payload.callbackUrl.trim(),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function readSafeNextPath(next: string | undefined | null) {
@@ -317,21 +339,4 @@ export async function upsertLineUser(profile: LineProfile): Promise<SessionUser>
   });
 
   return toPublicUser(created);
-}
-
-export function verifyLineOAuthState(c: Context, state: string | undefined) {
-  const expected = getCookie(c, LINE_OAUTH_STATE_COOKIE);
-  return Boolean(expected && state && expected === state);
-}
-
-export function readLineOAuthNext(c: Context) {
-  return readSafeNextPath(getCookie(c, LINE_OAUTH_NEXT_COOKIE));
-}
-
-export function readLineOAuthReturn(c: Context) {
-  return readSafeReturnPath(getCookie(c, LINE_OAUTH_RETURN_COOKIE));
-}
-
-export function readLineOAuthCallback(c: Context) {
-  return getCookie(c, LINE_OAUTH_CALLBACK_COOKIE)?.trim() || '';
 }
