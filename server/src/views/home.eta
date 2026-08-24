@@ -5,6 +5,20 @@
   </filter>
 </svg>
 
+<script>
+(function () {
+  var lang = document.documentElement.lang || 'zh-Hant';
+  window.__phenomenaPrefetch = fetch('/api/phenomena', {
+    headers: { 'Accept-Language': lang },
+    credentials: 'same-origin',
+    priority: 'high',
+  }).then(function (res) {
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  });
+})();
+</script>
+
 <div class="floatingbar" id="floatingbar">
   <div class="floatingbar__row">
     <a href="#top" class="brand-mark" aria-label="<%= it.t('brand.name') %>"><span>最</span><span>近</span><span>高</span><span>雄</span></a>
@@ -135,7 +149,12 @@
         <div class="feed-layout-host" id="feedLayoutHost">
           <div class="feed-layout" id="feedLayout">
             <div class="feed-layout__list">
-              <div class="grid-feed" id="gridFeed" aria-live="polite"></div>
+              <div class="grid-feed grid-feed--loading" id="gridFeed" aria-live="polite" aria-busy="true">
+                <article class="card card--skeleton" aria-hidden="true"><div class="card__photo"></div><div class="card__body"><span></span><span></span></div></article>
+                <article class="card card--skeleton" aria-hidden="true"><div class="card__photo"></div><div class="card__body"><span></span><span></span></div></article>
+                <article class="card card--skeleton" aria-hidden="true"><div class="card__photo"></div><div class="card__body"><span></span><span></span></div></article>
+                <article class="card card--skeleton" aria-hidden="true"><div class="card__photo"></div><div class="card__body"><span></span><span></span></div></article>
+              </div>
             </div>
           </div>
         </div>

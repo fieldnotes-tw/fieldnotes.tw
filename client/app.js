@@ -29,13 +29,21 @@ function bootstrapFeedLocale() {
   return 'zh-Hant';
 }
 
-const phenomenaFetchPromise = fetch('/api/phenomena', {
-  headers: { 'Accept-Language': bootstrapFeedLocale() },
-  priority: 'high',
-}).then(async (res) => {
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-});
+const phenomenaFetchPromise = (() => {
+  const existing = window.__phenomenaPrefetch;
+  if (existing) {
+    delete window.__phenomenaPrefetch;
+    return existing;
+  }
+  return fetch('/api/phenomena', {
+    headers: { 'Accept-Language': bootstrapFeedLocale() },
+    credentials: 'same-origin',
+    priority: 'high',
+  }).then(async (res) => {
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  });
+})();
 const feedDetailPane = document.getElementById('feedDetailPane');
 const feedDetailBody = document.getElementById('feedDetailBody');
 const feedDetailHeader = document.getElementById('feedDetailHeader');
@@ -268,6 +276,17 @@ function updateFeedStickyTop() {
     stickyTop = Math.max(stickyTop, floatingbar.getBoundingClientRect().bottom + 8);
   }
   document.documentElement.style.setProperty('--feed-sticky-top', `${stickyTop}px`);
+}
+
+function syncMobileMapViewLayout() {
+  const inMobileMap = isPhoneLayout() && feedStage.classList.contains('is-map-view');
+  document.body.classList.toggle('is-mobile-map-view', inMobileMap);
+  if (!inMobileMap) {
+    document.documentElement.style.removeProperty('--map-controls-top');
+    return;
+  }
+  const controlsTop = sitehead ? sitehead.getBoundingClientRect().bottom : 0;
+  document.documentElement.style.setProperty('--map-controls-top', `${Math.max(0, controlsTop)}px`);
 }
 function isFeedToolbarPanelOpen() {
   return Boolean(
@@ -3821,6 +3840,12 @@ function getMapPinScreenBand() {
   const mapRect = leafletMap.getContainer().getBoundingClientRect();
   if (!mapRect.height) return null;
   let visibleTop = mapRect.top;
+  if (document.body.classList.contains('is-mobile-map-view')) {
+    if (sitehead) visibleTop = Math.max(visibleTop, sitehead.getBoundingClientRect().bottom);
+    if (feedControls && !feedControls.classList.contains('is-floating-nav')) {
+      visibleTop = Math.max(visibleTop, feedControls.getBoundingClientRect().bottom);
+    }
+  }
   const bar = document.getElementById('floatingbar');
   if (bar?.classList.contains('is-visible')) {
     visibleTop = Math.max(visibleTop, bar.getBoundingClientRect().bottom);
@@ -3949,11 +3974,6 @@ function expandMapSheet() {
     if (!item || !focusedCard || !mapSheet.classList.contains('is-expanded')) return;
     mountMapSheetDetail(focusedCard, item);
   });
-}
-
-function collapseMapSheet() {
-  if (!mapSheet.classList.contains('is-expanded')) return;
-  closeMapSheet();
 }
 
 function pickInitialMapPinCard() {
@@ -4150,8 +4170,12 @@ function onMapSheetSwipeEnd(startX, startY, e) {
     }
   }
 
+  if (expanded) {
+    mapSheetTouchAxis = '';
+    return;
+  }
+
   if (dy < -52 && peek && mapSheetTouchAxis !== 'x') expandMapSheet();
-  else if (dy > 52 && expanded && mapSheetBody.scrollTop <= 4) collapseMapSheet();
   else if (dy > 72 && peek && mapSheetTouchAxis !== 'x') closeMapSheet();
   mapSheetTouchAxis = '';
 }
@@ -4248,11 +4272,13 @@ function enterMapView() {
   hideSplitDetail();
   hideMapSheet();
   scrollToSiteheadMenu({ instant: true });
+  syncMobileMapViewLayout();
   initMap();
   syncMapRail();
   fitMapToVisiblePins();
   openInitialMapPinPreview({ pan: false });
   updateMapRailVisibility({ pan: false, animate: false });
+  settleMapLayout({ pan: false, animate: false });
 }
 
 const viewToggleBtns = document.querySelectorAll('.view-toggle__btn');
@@ -4269,6 +4295,7 @@ viewToggleBtns.forEach((btn) => btn.addEventListener('click', () => {
     closeMapSheet();
     enterMapView();
   } else {
+    syncMobileMapViewLayout();
     hideMapSheet();
     clearMapPinActive();
     updateMapRailVisibility();
@@ -4477,16 +4504,19 @@ const onScroll = () => {
     window.closeAllLangPanels?.();
   }
   updateFeedStickyTop();
+  syncMobileMapViewLayout();
 };
 onScroll();
 window.addEventListener('scroll', onScroll, { passive: true });
 window.addEventListener('resize', () => {
   if (detailScrollRoot) detailLoopHeight = measureDetailLoopHeight();
+  syncMobileMapViewLayout();
   syncMapLayoutOnly();
   syncMapSheetPeekLayout();
 }, { passive: true });
 window.visualViewport?.addEventListener('resize', () => {
   if (shouldDeferMapLayoutSync()) return;
+  syncMobileMapViewLayout();
   syncMapLayoutOnly();
 }, { passive: true });
 
@@ -4500,6 +4530,8 @@ document.querySelector('.sitehead .brand-mark')?.addEventListener('click', reset
 
 function showFeedMessage(message) {
   closeSplitDetail();
+  gridFeed.classList.remove('grid-feed--loading');
+  gridFeed.removeAttribute('aria-busy');
   const p = document.createElement('p');
   p.className = 'grid-feed__message';
   p.textContent = message;
@@ -4508,13 +4540,47 @@ function showFeedMessage(message) {
   clearMapMarkers();
 }
 
+function bindFeedCards(nodes) {
+  nodes.forEach((card) => card.addEventListener('click', () => openCardDetail(card)));
+}
+
+function mountFeedCards(items) {
+  gridFeed.classList.remove('grid-feed--loading');
+  gridFeed.removeAttribute('aria-busy');
+  const nodes = items.map((item, index) => renderCard(item, { eagerImage: index < 8 }));
+  const firstBatch = Math.min(8, nodes.length);
+  gridFeed.replaceChildren(...nodes.slice(0, firstBatch));
+  bindFeedCards(nodes.slice(0, firstBatch));
+  cards = nodes.slice(0, firstBatch);
+
+  const finishFeedMount = () => {
+    if (nodes.length > firstBatch) {
+      gridFeed.append(...nodes.slice(firstBatch));
+      bindFeedCards(nodes.slice(firstBatch));
+    }
+    cards = nodes;
+    if (leafletMap) addMapMarkers();
+    applyFilters();
+  };
+
+  if (nodes.length > firstBatch) {
+    requestAnimationFrame(finishFeedMount);
+  } else {
+    finishFeedMount();
+  }
+}
+
 async function loadPhenomena() {
   try {
-    await i18nReady;
-    let payload = await phenomenaFetchPromise.catch(() => null);
+    const [, payloadOrNull] = await Promise.all([
+      i18nReady,
+      phenomenaFetchPromise.catch(() => null),
+    ]);
+    let payload = payloadOrNull;
     if (!payload || bootstrapFeedLocale() !== getLocale()) {
       const res = await fetch('/api/phenomena', {
         headers: { 'Accept-Language': getLocale() },
+        credentials: 'same-origin',
         priority: 'high',
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -4526,7 +4592,6 @@ async function loadPhenomena() {
       return;
     }
     cachePhenomena(items);
-    checkTrackedUpdates(items);
     items.sort((a, b) => {
       const aRecent = new Date(a.lastSeenAt || a.lastNoticedAt || 0).getTime();
       const bRecent = new Date(b.lastSeenAt || b.lastNoticedAt || 0).getTime();
@@ -4535,12 +4600,8 @@ async function loadPhenomena() {
       const bCreated = new Date(b.createdAt || 0).getTime();
       return bCreated - aCreated;
     });
-    const nodes = items.map((item, index) => renderCard(item, { eagerImage: index < 8 }));
-    gridFeed.replaceChildren(...nodes);
-    cards = nodes;
-    cards.forEach((card) => card.addEventListener('click', () => openCardDetail(card)));
-    if (leafletMap) addMapMarkers();
-    applyFilters();
+    mountFeedCards(items);
+    requestAnimationFrame(() => checkTrackedUpdates(items));
   } catch (err) {
     console.error(err);
     showFeedMessage(t('home.feed.error'));

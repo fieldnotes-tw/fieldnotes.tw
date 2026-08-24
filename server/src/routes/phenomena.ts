@@ -48,8 +48,15 @@ phenomenaRoutes.get('/', async (c) => {
   }
 
   const rows = await listPhenomenaWithStats(filters);
-  const withSummaries = await attachLocationSummaries(rows);
-  const data = await attachImageUrls(withSummaries);
+  const [withSummaries, withImages] = await Promise.all([
+    attachLocationSummaries(rows),
+    attachImageUrls(rows),
+  ]);
+  const data = withSummaries.map((item, index) => ({
+    ...item,
+    imageUrls: withImages[index]?.imageUrls ?? [],
+  }));
+  c.header('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
   return c.json({ data });
 });
 

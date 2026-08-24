@@ -465,7 +465,7 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
     ...base,
     locationSummary,
     spotCount: reportedSpots.length,
-    spots: reportedSpots,
+    spots: spotList,
     imageUrls,
     images,
     recentSightings,
