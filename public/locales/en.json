@@ -94,7 +94,7 @@
   "home.detail.iAlsoWent": "I saw it too",
   "home.detail.reportElsewhereHint": "You can report from somewhere else too.",
   "home.detail.startedByPrefix": "Found by ",
-  "home.detail.startedBySuffix": " discovered",
+  "home.detail.startedBySuffix": "",
   "home.detail.recentSightings": "Recent reports",
   "home.detail.spotsHeading": "Where to look recently",
   "home.detail.overlayNoReport": "No report notes for this spot yet",

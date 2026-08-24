@@ -3820,6 +3820,12 @@ footer .credit{ font-size:var(--type-meta); color:var(--ink-faint); }
 .submit-form__datetime--combo input[type="time"]:focus-visible{
   outline:2px solid var(--ink); outline-offset:-2px;
 }
+.submit-form__section--desc .submit-form__extra-toggle{
+  margin-top:0.15rem;
+}
+.submit-form__section--desc .submit-form__extra-panel{
+  margin-top:0.15rem;
+}
 .submit-form__extra-toggle{
   display:flex; align-items:center; justify-content:center;
   width:100%; margin:0; padding:0.6rem 0.85rem;
@@ -3846,7 +3852,7 @@ footer .credit{ font-size:var(--type-meta); color:var(--ink-faint); }
   display:flex; flex-direction:column; gap:0.55rem; min-width:0;
 }
 .submit-form__whenwhere .submit-form__datetime{
-  gap:0;
+  gap:0.55rem;
 }
 .submit-form__whenwhere .submit-form__map{ height:180px; }
 .submit-form__whenwhere-note textarea{
@@ -3860,6 +3866,10 @@ footer .credit{ font-size:var(--type-meta); color:var(--ink-faint); }
   min-width:0;
   max-width:100%;
   width:100%;
+  overflow:hidden;
+}
+.submit-form__datetime-part:has(> input[type="date"]){
+  position:relative;
 }
 .submit-form__datetime-label{
   font-size:0.82rem;
@@ -3874,6 +3884,24 @@ footer .credit{ font-size:var(--type-meta); color:var(--ink-faint); }
   box-sizing:border-box;
   font-size:max(1rem, 16px);
   -webkit-min-logical-width:0;
+  padding-right:2.25rem;
+}
+.submit-form__datetime input[type="date"]::-webkit-datetime-edit,
+.submit-form__datetime input[type="date"]::-webkit-datetime-edit-fields-wrapper{
+  min-width:0;
+}
+.submit-form__datetime input[type="date"]::-webkit-date-and-time-value{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.submit-form__datetime input[type="date"]::-webkit-calendar-picker-indicator{
+  width:1.25rem;
+  height:1.25rem;
+  margin:0;
+  padding:0;
+  cursor:pointer;
 }
 .submit-form__time-row{
   display:flex;
@@ -4371,6 +4399,13 @@ footer .credit{ font-size:var(--type-meta); color:var(--ink-faint); }
     padding:1.5rem 1.25rem;
     border-radius:16px;
     overflow-x:clip;
+  }
+  .submit-form__whenwhere{
+    padding:0.75rem;
+  }
+  .submit-form__datetime input[type="date"]{
+    padding-left:0.55rem;
+    padding-right:2rem;
   }
   .submit-form__map{ height:200px; }
   .submit-form__datetime--combo input[type="time"]{

@@ -10,6 +10,32 @@ const feedLayoutHost = document.getElementById('feedLayoutHost');
 const mapRail = document.getElementById('mapRail');
 const mapRailList = document.getElementById('mapRailList');
 const gridFeed = document.getElementById('gridFeed');
+
+function bootstrapFeedLocale() {
+  const match = document.cookie.match(/(?:^|; )fn_locale=([^;]*)/);
+  if (match) {
+    const value = decodeURIComponent(match[1]).trim().toLowerCase().replace(/_/g, '-');
+    if (value === 'en' || value.startsWith('en-')) return 'en';
+    if (value === 'zh-hant' || value === 'zh-tw' || value === 'zh-hk' || value === 'zh') return 'zh-Hant';
+  }
+  const lang = (document.documentElement.lang || '').trim().toLowerCase().replace(/_/g, '-');
+  if (lang.startsWith('en')) return 'en';
+  if (lang === 'zh-hant' || lang === 'zh-tw' || lang === 'zh-hk' || lang === 'zh') return 'zh-Hant';
+  for (const tag of (navigator.languages || [navigator.language]).filter(Boolean)) {
+    const value = String(tag).trim().toLowerCase().replace(/_/g, '-');
+    if (value === 'en' || value.startsWith('en-')) return 'en';
+    if (value === 'zh-hant' || value === 'zh-tw' || value === 'zh-hk' || value === 'zh') return 'zh-Hant';
+  }
+  return 'zh-Hant';
+}
+
+const phenomenaFetchPromise = fetch('/api/phenomena', {
+  headers: { 'Accept-Language': bootstrapFeedLocale() },
+  priority: 'high',
+}).then(async (res) => {
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+});
 const feedDetailPane = document.getElementById('feedDetailPane');
 const feedDetailBody = document.getElementById('feedDetailBody');
 const feedDetailHeader = document.getElementById('feedDetailHeader');
@@ -1743,7 +1769,7 @@ function appendCardLocation(parent, locationText) {
   parent.appendChild(location);
 }
 
-function renderCard(item) {
+function renderCard(item, { eagerImage = false } = {}) {
   const card = document.createElement('article');
   card.className = 'card';
   card.dataset.id = item.id;
@@ -1785,8 +1811,9 @@ function renderCard(item) {
       const img = document.createElement('img');
       img.src = first;
       img.alt = item.imageAlt || '';
-      img.loading = 'lazy';
-      img.decoding = 'async';
+      img.loading = eagerImage ? 'eager' : 'lazy';
+      img.decoding = eagerImage ? 'sync' : 'async';
+      img.fetchPriority = eagerImage ? 'high' : 'auto';
       photo.appendChild(img);
       tuneCardPhoto(img);
     }
@@ -4482,14 +4509,17 @@ function showFeedMessage(message) {
 }
 
 async function loadPhenomena() {
-  gridFeed.replaceChildren();
   try {
-    const res = await fetch('/api/phenomena', {
-      headers: { 'Accept-Language': getLocale() },
-      priority: 'high',
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const payload = await res.json();
+    await i18nReady;
+    let payload = await phenomenaFetchPromise.catch(() => null);
+    if (!payload || bootstrapFeedLocale() !== getLocale()) {
+      const res = await fetch('/api/phenomena', {
+        headers: { 'Accept-Language': getLocale() },
+        priority: 'high',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      payload = await res.json();
+    }
     const items = payload.data ?? [];
     if (!items.length) {
       showFeedMessage(t('home.feed.empty'));
@@ -4505,7 +4535,7 @@ async function loadPhenomena() {
       const bCreated = new Date(b.createdAt || 0).getTime();
       return bCreated - aCreated;
     });
-    const nodes = items.map(renderCard);
+    const nodes = items.map((item, index) => renderCard(item, { eagerImage: index < 8 }));
     gridFeed.replaceChildren(...nodes);
     cards = nodes;
     cards.forEach((card) => card.addEventListener('click', () => openCardDetail(card)));
@@ -4517,8 +4547,9 @@ async function loadPhenomena() {
   }
 }
 
-// Start weather immediately (do not await) so it never gates the feed.
+// Start weather and feed fetch immediately so they never gate first paint.
 loadWeather();
+const phenomenaBootPromise = loadPhenomena();
 
 (async () => {
   await i18nReady;
@@ -4528,10 +4559,10 @@ loadWeather();
   document.addEventListener('fn:user-updated', () => {
     remountOpenDetailForAuth();
   });
-  if (typeof refreshCurrentUser === 'function') {
-    await refreshCurrentUser().catch(() => {});
-  }
-  await loadPhenomena();
+  const userPromise = typeof refreshCurrentUser === 'function'
+    ? refreshCurrentUser().catch(() => {})
+    : Promise.resolve();
+  await Promise.all([phenomenaBootPromise, userPromise]);
   void syncTrackedFromServer();
   captureDeepLinkSpotId();
   const deepLinkId = new URLSearchParams(location.search).get('phenomenon');

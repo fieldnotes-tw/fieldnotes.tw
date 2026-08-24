@@ -73,6 +73,15 @@
         <textarea id="f_description" rows="3" maxlength="120" required aria-describedby="submitDescHint descriptionCounter"></textarea>
         <p class="submit-form__counter" id="descriptionCounter" aria-live="polite">0 / 120</p>
       </label>
+      <button type="button" class="submit-form__extra-toggle" id="extraToggle" aria-expanded="false" aria-controls="extraPanel">
+        <%= it.t('submit.extra.toggle') %>
+      </button>
+      <div class="submit-form__extra-panel" id="extraPanel" hidden>
+        <label class="submit-form__field">
+          <span class="visually-hidden"><%= it.t('submit.extra.label') %></span>
+          <textarea id="f_extra" rows="6"></textarea>
+        </label>
+      </div>
     </section>
 
     <section class="submit-form__section" aria-labelledby="submitWhenWhere">
@@ -106,18 +115,6 @@
             <textarea id="f_finding" rows="2" maxlength="500" placeholder="<%= it.t('submit.whenWhere.notePlaceholder') %>"></textarea>
           </label>
         </div>
-      </div>
-    </section>
-
-    <section class="submit-form__section submit-form__section--extra">
-      <button type="button" class="submit-form__extra-toggle" id="extraToggle" aria-expanded="false" aria-controls="extraPanel">
-        <%= it.t('submit.extra.toggle') %>
-      </button>
-      <div class="submit-form__extra-panel" id="extraPanel" hidden>
-        <label class="submit-form__field">
-          <span class="visually-hidden"><%= it.t('submit.extra.label') %></span>
-          <textarea id="f_extra" rows="6"></textarea>
-        </label>
       </div>
     </section>
 
