@@ -263,7 +263,198 @@ function initCurrentLocation() {
   );
 }
 
+let editId = '';
+let submitBaseline = '';
+let submitLeaveGuard = null;
+
+function submitDraftStorageKey() {
+  const userId = getCurrentUser()?.id;
+  return userId ? `fieldnotes.submitDraft.${userId}` : '';
+}
+
+function serializeSubmitState() {
+  return JSON.stringify({
+    title: $('f_title').value.trim(),
+    description: $('f_description').value.trim(),
+    categories: getSelectedCategories().slice().sort(),
+    extra: $('f_extra').value.trim(),
+    findingHint: $('f_finding').value.trim(),
+    location: $('f_location').value.trim(),
+    lat: $('f_lat').value,
+    lng: $('f_lng').value,
+    seenDate: $('f_seenDate').value,
+    seenTime: $('f_seenTime').value,
+    extraOpen: !$('extraPanel')?.hidden,
+    photos: photos
+      .filter((photo) => photo.url && !photo.uploading)
+      .map((photo) => ({
+        url: photo.url,
+        caption: photo.caption || '',
+        isVideo: photo.isVideo || isVideoMediaUrl(photo.url),
+        posterUrl: photo.posterUrl || '',
+      })),
+  });
+}
+
+function captureSubmitBaseline() {
+  submitBaseline = serializeSubmitState();
+}
+
+function isSubmitDirty() {
+  return serializeSubmitState() !== submitBaseline;
+}
+
+function hasSubmitDraftContent(state) {
+  if (!state) return false;
+  if (state.title || state.description || state.extra || state.findingHint || state.location) return true;
+  if (state.lat && state.lng) return true;
+  if (Array.isArray(state.photos) && state.photos.length) return true;
+  return false;
+}
+
+function buildSubmitDraftPayload() {
+  const parsed = JSON.parse(serializeSubmitState());
+  return {
+    ...parsed,
+    placedLabel,
+  };
+}
+
+function saveSubmitDraft({ silent = false } = {}) {
+  if (editId) return false;
+  if (photos.some((photo) => photo.uploading)) {
+    if (!silent) setError(t('submit.error.uploadInProgress'));
+    return false;
+  }
+
+  const draft = buildSubmitDraftPayload();
+  if (!hasSubmitDraftContent(draft)) {
+    if (!silent) setDraftFeedback(t('submit.draft.empty'));
+    return false;
+  }
+
+  writeStoredDraft(submitDraftStorageKey(), draft);
+  if (!silent) setDraftFeedback(t('submit.draft.saved'));
+  return true;
+}
+
+function clearSubmitDraft() {
+  clearStoredDraft(submitDraftStorageKey());
+}
+
+function setDraftFeedback(msg) {
+  const el = $('submitDraftFeedback');
+  if (!el) return;
+  if (!msg) {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  el.hidden = false;
+  el.textContent = msg;
+}
+
+function syncSubmitDraftUi() {
+  const draftBtn = $('submitDraftBtn');
+  if (draftBtn) draftBtn.hidden = Boolean(editId);
+}
+
+function hideSubmitDraftBanner() {
+  const banner = $('submitDraftBanner');
+  if (banner) banner.hidden = true;
+}
+
+function showSubmitDraftBanner(draft) {
+  const banner = $('submitDraftBanner');
+  const text = $('submitDraftBannerText');
+  if (!banner || !text) return;
+
+  const title = draft.title?.trim() || t('submit.draft.unnamed');
+  text.textContent = t('submit.draft.restorePrompt', { title });
+  banner.hidden = false;
+}
+
+async function applySubmitDraft(draft) {
+  $('f_title').value = draft.title || '';
+  $('f_description').value = draft.description || '';
+  $('f_extra').value = draft.extra || '';
+  $('f_finding').value = draft.findingHint || '';
+  setSelectedCategories(draft.categories?.length ? draft.categories : ['plant']);
+  setExtraPanelOpen(Boolean(draft.extraOpen || draft.extra?.trim()));
+
+  $('f_location').value = draft.location || '';
+  placedLabel = draft.placedLabel || draft.location || '';
+  if (draft.lat && draft.lng) {
+    setPin(Number(draft.lat), Number(draft.lng), draft.location || '');
+  } else {
+    clearPinPosition();
+  }
+
+  if (draft.seenDate) {
+    $('f_seenDate').value = draft.seenDate;
+    $('f_seenTime').value = draft.seenTime || '';
+  } else {
+    defaultSeenDate(true);
+  }
+
+  clearPhotos();
+  for (const item of draft.photos || []) {
+    photos.push({
+      id: randomId(),
+      url: item.url,
+      caption: item.caption || '',
+      localUrl: '',
+      posterUrl: item.posterUrl || '',
+      uploading: false,
+      isVideo: item.isVideo || isVideoMediaUrl(item.url),
+    });
+  }
+  renderPhotoList();
+  $('f_description').dispatchEvent(new Event('input'));
+}
+
+function initSubmitDraftRestore() {
+  if (editId) return;
+
+  const draft = readStoredDraft(submitDraftStorageKey());
+  if (!hasSubmitDraftContent(draft)) return;
+
+  showSubmitDraftBanner(draft);
+
+  $('submitDraftRestoreBtn')?.addEventListener('click', async () => {
+    await applySubmitDraft(draft);
+    hideSubmitDraftBanner();
+    captureSubmitBaseline();
+    setDraftFeedback('');
+  }, { once: true });
+
+  $('submitDraftDiscardBtn')?.addEventListener('click', () => {
+    clearSubmitDraft();
+    hideSubmitDraftBanner();
+    setDraftFeedback(t('submit.draft.discarded'));
+  }, { once: true });
+}
+
+function initSubmitLeaveGuard() {
+  submitLeaveGuard = initFormLeaveGuard({
+    isDirty: () => !$('submitForm').hidden && isSubmitDirty(),
+    getMessage: () => t(editId ? 'submit.leave.editConfirm' : 'submit.leave.unsavedConfirm'),
+    onConfirmLeave: () => {
+      if (!editId) saveSubmitDraft({ silent: true });
+    },
+  });
+}
+
+async function handleSaveDraftClick() {
+  setError('');
+  if (saveSubmitDraft()) {
+    captureSubmitBaseline();
+  }
+}
+
 function showSuccess(phenomenonId) {
+  clearSubmitDraft();
+  submitLeaveGuard?.allowLeaveWithoutPrompt();
   $('submitForm').hidden = true;
   $('submitSuccess').hidden = false;
   const viewLink = $('submitSuccessView');
@@ -275,17 +466,6 @@ function showSuccess(phenomenonId) {
       viewLink.hidden = true;
     }
   }
-}
-
-function setImageStatus(msg) {
-  const el = $('imageStatus');
-  if (!msg) {
-    el.hidden = true;
-    el.textContent = '';
-    return;
-  }
-  el.hidden = false;
-  el.textContent = msg;
 }
 
 function photoSrc(photo) {
@@ -304,7 +484,6 @@ function clearPhotos() {
   photos = [];
   renderPhotoList();
   $('f_image').value = '';
-  setImageStatus('');
 }
 
 function movePhoto(id, delta) {
@@ -380,13 +559,6 @@ function renderPhotoList() {
 
     appendPhotoCaptionField(body, photo);
 
-    if (photo.uploading) {
-      const loading = document.createElement('span');
-      loading.className = 'submit-form__photo-loading';
-      loading.textContent = t('submit.photo.uploading');
-      body.appendChild(loading);
-    }
-
     const actions = document.createElement('div');
     actions.className = 'submit-form__photo-actions';
 
@@ -456,7 +628,7 @@ function renderPhotoList() {
 
   list.hidden = photos.length === 0;
   $('photoDragHint').hidden = photos.length < 2;
-  syncPhotoUploadLabel(photos.length);
+  syncPhotoUploadLabel(photos.length, photos);
   syncSubmitState();
 }
 
@@ -497,14 +669,11 @@ async function handleImagePick(fileList) {
   const files = Array.from(fileList || []).filter(isUploadMediaFile);
   if (!files.length) return;
 
-  setImageStatus(t('submit.photo.uploading'));
   try {
     for (const file of files) {
       await addPhotoFile(file);
     }
-    setImageStatus('');
   } catch (err) {
-    setImageStatus('');
     setError(err.message || t('submit.error.uploadFailed'));
   } finally {
     $('f_image').value = '';
@@ -596,6 +765,9 @@ function resetForm() {
   map?.setView(ZUOYING_CENTER, 14);
   syncMapPinState();
   initCurrentLocation();
+  syncSubmitDraftUi();
+  hideSubmitDraftBanner();
+  captureSubmitBaseline();
 }
 
 function initDescriptionCounter() {
@@ -650,6 +822,7 @@ async function handleDelete() {
 
   try {
     await api(`/api/submissions/phenomena/${editId}`, { method: 'DELETE' });
+    submitLeaveGuard?.allowLeaveWithoutPrompt();
     location.href = '/';
   } catch (err) {
     setError(err.message || t('submit.error.deleteFailed'));
@@ -719,8 +892,6 @@ async function handleSubmit(e) {
   }
 }
 
-let editId = '';
-
 async function loadEditPhenomenon(id) {
   const { data } = await api(`/api/submissions/phenomena/${id}`);
   editId = id;
@@ -750,6 +921,9 @@ async function loadEditPhenomenon(id) {
   setSubmitFormTitle('submit.editTitle');
   setSubmitPrimaryLabel('submit.save');
   setSubmitDeleteVisible(true);
+  syncSubmitDraftUi();
+  hideSubmitDraftBanner();
+  captureSubmitBaseline();
 }
 
 async function boot() {
@@ -792,6 +966,11 @@ async function boot() {
   $('submitForm').addEventListener('submit', handleSubmit);
   $('submitDeleteBtn')?.addEventListener('click', handleDelete);
   $('submitAgain').addEventListener('click', resetForm);
+  $('submitDraftBtn')?.addEventListener('click', () => {
+    void handleSaveDraftClick();
+  });
+
+  syncSubmitDraftUi();
 
   if (editParam) {
     try {
@@ -804,7 +983,12 @@ async function boot() {
       }
       setError(err.message || t('submit.error.failed'));
     }
+  } else {
+    initSubmitDraftRestore();
   }
+
+  captureSubmitBaseline();
+  initSubmitLeaveGuard();
 }
 
 boot();

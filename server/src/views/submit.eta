@@ -12,6 +12,14 @@
       </div>
     </header>
 
+    <div class="submit-form__draft-banner" id="submitDraftBanner" hidden>
+      <p class="submit-form__draft-banner-text" id="submitDraftBannerText"></p>
+      <div class="submit-form__draft-banner-actions">
+        <button type="button" class="submit-form__draft-restore" id="submitDraftRestoreBtn"><%= it.t('submit.draft.restore') %></button>
+        <button type="button" class="submit-form__draft-discard" id="submitDraftDiscardBtn"><%= it.t('submit.draft.discard') %></button>
+      </div>
+    </div>
+
     <section class="submit-form__section" aria-labelledby="submitWhat">
       <h2 class="submit-form__section-title" id="submitWhat"><%= it.t('submit.what.label') %></h2>
       <label class="submit-form__field">
@@ -114,7 +122,11 @@
     </section>
 
     <p class="submit-form__error" id="submitError" hidden></p>
-    <button type="submit" class="submit-form__submit" id="submitBtn"><%= it.t('submit.send') %></button>
+    <p class="submit-form__draft-feedback" id="submitDraftFeedback" hidden></p>
+    <div class="submit-form__primary-actions">
+      <button type="button" class="submit-form__secondary" id="submitDraftBtn" hidden><%= it.t('submit.draft.save') %></button>
+      <button type="submit" class="submit-form__submit" id="submitBtn"><%= it.t('submit.send') %></button>
+    </div>
   </form>
 
   <div class="submit-form__success" id="submitSuccess" hidden>

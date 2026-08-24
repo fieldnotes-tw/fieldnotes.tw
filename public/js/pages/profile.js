@@ -254,6 +254,20 @@ async function boot() {
     await logout();
     location.href = '/';
   });
+  $('profileDeleteAccountBtn').addEventListener('click', async () => {
+    if (!confirm(t('profile.confirmDeleteAccount'))) return;
+    setError('');
+    setSuccess('');
+    const btn = $('profileDeleteAccountBtn');
+    btn.disabled = true;
+    try {
+      await deleteAccount();
+      location.href = '/';
+    } catch (err) {
+      setError(err.message || t('profile.deleteAccountFailed'));
+      btn.disabled = false;
+    }
+  });
   $('f_avatar').addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;

@@ -105,6 +105,18 @@ export function formatSpotLabel(spot: {
   return name;
 }
 
+export function filterSpotsForLocationSummary<
+  T extends { id: string; sightingCount?: number },
+>(spotList: T[], statsBySpot?: Map<string, { sightingCount: number }>): T[] {
+  if (!spotList.length) return [];
+
+  return spotList.filter((spot, index) => {
+    if (index === 0) return true;
+    const count = spot.sightingCount ?? statsBySpot?.get(spot.id)?.sightingCount ?? 0;
+    return count > 0;
+  });
+}
+
 export function buildLocationSummary(
   spotList: Array<{ name: string; locationDetail?: string | null; kind?: SpotKind }>,
 ): string {
@@ -166,14 +178,17 @@ export async function attachLocationSummaries<
 
   try {
     const grouped = await listSpotsGroupedByPhenomenon(items.map((item) => item.id));
+    const allSpotIds = [...grouped.values()].flat().map((spot) => spot.id);
+    const { statsBySpot } = await loadSpotStats(allSpotIds);
 
     return items.map((item) => {
       const spotList = grouped.get(item.id) ?? [];
-      const locationSummary = buildLocationSummary(spotList) || item.location || '';
+      const summarySpots = filterSpotsForLocationSummary(spotList, statsBySpot);
+      const locationSummary = buildLocationSummary(summarySpots) || item.location || '';
       return {
         ...item,
         locationSummary,
-        spotCount: spotList.length,
+        spotCount: summarySpots.length,
       };
     });
   } catch (err) {
@@ -250,6 +265,36 @@ async function loadSpotsWithStats(phenomenonId: string): Promise<SpotWithStats[]
       latestCondition: conditionBySpot.get(spot.id) ?? null,
     };
   });
+}
+
+export async function cleanupOrphanSpotAfterSightingDelete(
+  spotId: string | null | undefined,
+  phenomenonId: string,
+) {
+  if (!spotId) return;
+
+  const [spot] = await db
+    .select({ id: spots.id })
+    .from(spots)
+    .where(and(eq(spots.id, spotId), eq(spots.phenomenonId, phenomenonId)))
+    .limit(1);
+  if (!spot) return;
+
+  const [primary] = await db
+    .select({ id: spots.id })
+    .from(spots)
+    .where(eq(spots.phenomenonId, phenomenonId))
+    .orderBy(asc(spots.sortOrder))
+    .limit(1);
+  if (primary?.id === spotId) return;
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(sightings)
+    .where(eq(sightings.spotId, spotId));
+  if ((countRow?.count ?? 0) > 0) return;
+
+  await db.delete(spots).where(eq(spots.id, spotId));
 }
 
 export async function createPrimarySpotForPhenomenon(

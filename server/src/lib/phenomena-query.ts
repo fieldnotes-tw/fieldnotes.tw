@@ -4,6 +4,7 @@ import { db } from '../db/index.js';
 import {
   attachLocationSummaries,
   buildLocationSummary,
+  filterSpotsForLocationSummary,
   formatSpotLabel,
   listSpotsWithStats,
   type SpotWithStats,
@@ -11,6 +12,7 @@ import {
 import {
   phenomena,
   phenomenonImages,
+  phenomenonTracks,
   sightingImages,
   sightings,
   spots,
@@ -25,6 +27,7 @@ export type { SpotWithStats };
 export type PhenomenonListItem = Phenomenon & {
   sightingCount: number;
   observerCount: number;
+  trackCount: number;
   lastSeenAt: Date | null;
   creatorName: string | null;
   creatorAvatarUrl: string | null;
@@ -48,6 +51,13 @@ export type SightingWithImages = {
   images: { imageUrl: string; imageAlt: string | null }[];
 };
 
+export type CommunityMember = {
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
+  bio: string | null;
+};
+
 export type PhenomenonDetail = PhenomenonListItem & {
   imageUrls: string[];
   images: { url: string; caption: string | null }[];
@@ -56,6 +66,7 @@ export type PhenomenonDetail = PhenomenonListItem & {
   spots: SpotWithStats[];
   recentSightings: SightingWithImages[];
   observers: { userId: string | null; name: string; avatarUrl: string | null; bio: string | null }[];
+  trackers: CommunityMember[];
 };
 
 function mapListRow(row: {
@@ -80,6 +91,7 @@ function mapListRow(row: {
   updatedAt: Date;
   sightingCount: number;
   observerCount: number;
+  trackCount: number;
   lastSeenAt: Date | null;
   creatorName: string | null;
   creatorAvatarUrl: string | null;
@@ -107,6 +119,7 @@ function mapListRow(row: {
     updatedAt: row.updatedAt,
     sightingCount: row.sightingCount,
     observerCount,
+    trackCount: row.trackCount,
     lastSeenAt: row.lastSeenAt ?? row.lastNoticedAt,
     creatorName: row.creatorName,
     creatorAvatarUrl: row.creatorAvatarUrl,
@@ -139,6 +152,11 @@ export async function listPhenomenaWithStats(filters: SQL[] = []) {
       creatorAvatarUrl: sql<string | null>`max(${creator.avatarUrl})`,
       sightingCount: sql<number>`coalesce(count(distinct ${sightings.id}), 0)::int`,
       observerCount: sql<number>`coalesce(count(distinct coalesce(${sightings.userId}::text, ${sightings.observerName})), 0)::int`,
+      trackCount: sql<number>`coalesce((
+        select count(*)::int
+        from ${phenomenonTracks} pt
+        where pt.phenomenon_id = ${phenomena.id}
+      ), 0)`,
       lastSeenAt: sql<Date | null>`max(${sightings.seenAt})`,
     })
     .from(phenomena)
@@ -147,8 +165,8 @@ export async function listPhenomenaWithStats(filters: SQL[] = []) {
     .where(filters.length ? and(...filters) : undefined)
     .groupBy(phenomena.id)
     .orderBy(
-      desc(phenomena.createdAt),
       desc(sql`coalesce(max(${sightings.seenAt}), ${phenomena.lastNoticedAt})`),
+      desc(phenomena.createdAt),
       asc(phenomena.title),
     );
 
@@ -352,7 +370,7 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
     if (observers.length >= 8) break;
   }
 
-  if (base.userId) {
+  if (base.userId && sightingRows.length > 0) {
     const [creatorUser] = await db
       .select({
         displayName: users.displayName,
@@ -385,15 +403,6 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
     }
   }
 
-  if (!observers.length && base.observerName?.trim()) {
-    addObserver({
-      userId: base.userId,
-      name: base.creatorName ?? base.observerName,
-      avatarUrl: base.creatorAvatarUrl,
-      bio: null,
-    });
-  }
-
   const phenomenonImageRows = await db
     .select({
       imageUrl: phenomenonImages.imageUrl,
@@ -423,16 +432,44 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
   const images = mergeUniqueImages(phenomenonImageList, sightingImageList);
   const imageUrls = images.map((image) => image.url);
   const spotList = await listSpotsWithStats(id);
-  const locationSummary = buildLocationSummary(spotList) || base.location || '';
+  const summarySpots = filterSpotsForLocationSummary(spotList);
+  const locationSummary = buildLocationSummary(summarySpots) || base.location || '';
+
+  const trackerRows = await db
+    .select({
+      userId: users.id,
+      name: users.displayName,
+      avatarUrl: users.avatarUrl,
+      bio: users.bio,
+    })
+    .from(phenomenonTracks)
+    .innerJoin(users, eq(users.id, phenomenonTracks.userId))
+    .where(eq(phenomenonTracks.phenomenonId, id))
+    .orderBy(desc(phenomenonTracks.createdAt))
+    .limit(8);
+
+  const trackers: CommunityMember[] = trackerRows
+    .map((row) => {
+      const name = row.name?.trim();
+      if (!name) return null;
+      return {
+        userId: row.userId,
+        name,
+        avatarUrl: row.avatarUrl ?? null,
+        bio: row.bio?.trim() || null,
+      };
+    })
+    .filter((row): row is CommunityMember => row !== null);
 
   return {
     ...base,
     locationSummary,
-    spotCount: spotList.length,
+    spotCount: summarySpots.length,
     spots: spotList,
     imageUrls,
     images,
     recentSightings,
     observers,
+    trackers,
   };
 }

@@ -188,6 +188,11 @@ async function logout() {
   }
 }
 
+async function deleteAccount() {
+  await api('/api/me', { method: 'DELETE' });
+  logoutCurrentUser();
+}
+
 function renderAuthNav(container) {
   const user = getCurrentUser();
   container.replaceChildren();

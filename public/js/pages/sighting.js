@@ -8,6 +8,46 @@ let selectedSpotId = '';
 let spotChoiceMode = 'existing';
 let otherSpotMap = null;
 
+let otherSpotMap = null;
+let sightingBaseline = '';
+let sightingLeaveGuard = null;
+
+function serializeSightingState() {
+  const state = {
+    note: $('f_note').value.trim(),
+    photos: formImagesPayload(photos),
+    seenDate: $('f_seenDate').value,
+    seenTime: $('f_seenTime').value,
+    commentOnly: isCommentOnly(),
+    spotChoiceMode,
+    selectedSpotId,
+  };
+
+  if (spotChoiceMode === 'other') {
+    state.otherSpotLocation = $('f_otherSpotLocation')?.value.trim() || '';
+    state.otherSpotLat = $('f_otherSpotLat')?.value || '';
+    state.otherSpotLng = $('f_otherSpotLng')?.value || '';
+  }
+
+  return JSON.stringify(state);
+}
+
+function captureSightingBaseline() {
+  sightingBaseline = serializeSightingState();
+}
+
+function isSightingDirty() {
+  return serializeSightingState() !== sightingBaseline;
+}
+
+function initSightingLeaveGuard() {
+  if (!editSightingId) return;
+  sightingLeaveGuard = initFormLeaveGuard({
+    isDirty: () => !$('sightingForm').hidden && isSightingDirty(),
+    getMessage: () => t('sighting.leave.editConfirm'),
+  });
+}
+
 function $(id) {
   return document.getElementById(id);
 }
@@ -101,17 +141,6 @@ function resolveSeenAtIso() {
     || new Date().toISOString();
 }
 
-function setImageStatus(msg) {
-  const el = $('imageStatus');
-  if (!msg) {
-    el.hidden = true;
-    el.textContent = '';
-    return;
-  }
-  el.hidden = false;
-  el.textContent = msg;
-}
-
 function revokePhotoPreview(photo) {
   if (photo.localUrl) {
     URL.revokeObjectURL(photo.localUrl);
@@ -124,7 +153,6 @@ function clearPhotos() {
   photos = [];
   renderPhotoList();
   $('f_image').value = '';
-  setImageStatus('');
 }
 
 function removePhoto(id) {
@@ -168,18 +196,11 @@ function renderPhotoList() {
     body.appendChild(frame);
     appendPhotoCaptionField(body, photo);
 
-    if (photo.uploading) {
-      const loading = document.createElement('span');
-      loading.className = 'submit-form__photo-loading';
-      loading.textContent = t('submit.photo.uploading');
-      body.appendChild(loading);
-    }
-
     li.appendChild(body);
     list.appendChild(li);
   });
   list.hidden = photos.length === 0;
-  syncPhotoUploadLabel(photos.length);
+  syncPhotoUploadLabel(photos.length, photos);
   syncSubmitState();
 }
 
@@ -218,12 +239,9 @@ async function addPhotoFile(file) {
 async function handleImagePick(fileList) {
   const files = Array.from(fileList || []).filter(isUploadMediaFile);
   if (!files.length) return;
-  setImageStatus(t('submit.photo.uploading'));
   try {
     for (const file of files) await addPhotoFile(file);
-    setImageStatus('');
   } catch (err) {
-    setImageStatus('');
     setError(err.message || t('submit.error.uploadFailed'));
   } finally {
     $('f_image').value = '';
@@ -410,6 +428,7 @@ async function handleDelete() {
   btn.disabled = true;
   try {
     await api(`/api/sightings/${editSightingId}`, { method: 'DELETE' });
+    sightingLeaveGuard?.allowLeaveWithoutPrompt();
     redirectToPhenomenonDetail(phenomenonId, editSpotId);
   } catch (err) {
     setError(err.message || t('submit.error.failed'));
@@ -455,6 +474,7 @@ async function handleSubmit(e) {
       });
       spotId = resolveSubmittedSpotId(payload, result);
     }
+    sightingLeaveGuard?.allowLeaveWithoutPrompt();
     redirectToPhenomenonDetail(phenomenonId, spotId);
   } catch (err) {
     setError(err.message || t('submit.error.failed'));
@@ -504,6 +524,11 @@ async function boot() {
   });
   $('sightingForm').addEventListener('submit', handleSubmit);
   $('sightingDeleteBtn')?.addEventListener('click', handleDelete);
+
+  if (editSightingId) {
+    captureSightingBaseline();
+    initSightingLeaveGuard();
+  }
 }
 
 boot();

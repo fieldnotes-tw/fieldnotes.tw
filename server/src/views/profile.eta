@@ -55,5 +55,11 @@
       <div class="profile-panel" id="profilePanelSightings" role="tabpanel" hidden></div>
     </section>
 
+    <section class="submit-form__section profile-account" aria-labelledby="profileAccount">
+      <h2 class="submit-form__section-title" id="profileAccount"><%= it.t('profile.account') %></h2>
+      <p class="submit-form__hint profile-account__hint"><%= it.t('profile.deleteAccountHint') %></p>
+      <button type="button" class="profile-delete-account" id="profileDeleteAccountBtn"><%= it.t('profile.deleteAccount') %></button>
+    </section>
+
   </div>
 </main>

@@ -188,6 +188,25 @@ async function primeVideoPoster(photo) {
   return photo.posterUrl;
 }
 
+function appendUploadOverlay(frame, photo) {
+  frame.querySelector('.submit-form__photo-upload-overlay')?.remove();
+  if (!photo.uploading) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'submit-form__photo-upload-overlay';
+  overlay.setAttribute('aria-hidden', 'true');
+
+  const spinner = document.createElement('span');
+  spinner.className = 'submit-form__photo-spinner';
+
+  const label = document.createElement('span');
+  label.className = 'submit-form__photo-upload-label';
+  label.textContent = t('submit.photo.uploading');
+
+  overlay.append(spinner, label);
+  frame.appendChild(overlay);
+}
+
 function appendUploadPreview(frame, photo) {
   const serverSrc = photo.url || '';
   const localSrc = photo.localUrl || '';
@@ -206,6 +225,7 @@ function appendUploadPreview(frame, photo) {
       setPosterImage(img, posterUrl, fallbackVideoUrl);
     }
     frame.appendChild(img);
+    appendUploadOverlay(frame, photo);
     return img;
   }
   const img = document.createElement('img');
@@ -214,6 +234,7 @@ function appendUploadPreview(frame, photo) {
   img.alt = '';
   img.draggable = false;
   frame.appendChild(img);
+  appendUploadOverlay(frame, photo);
   return img;
 }
 
@@ -469,10 +490,26 @@ function appendPhotoCaptionField(body, photo) {
   return input;
 }
 
-function syncPhotoUploadLabel(count) {
-  const label = document.querySelector('.submit-form__photo-upload .submit-form__photo-btn');
-  if (!label) return;
-  label.textContent = t(count > 0 ? 'submit.photo.uploadMore' : 'submit.photo.upload');
+function syncPhotoUploadLabel(count, photos = []) {
+  const uploading = photos.some((photo) => photo.uploading);
+  const wrap = document.querySelector('.submit-form__photo-upload');
+  const label = wrap?.querySelector('.submit-form__photo-btn');
+  const input = wrap?.querySelector('input[type="file"]');
+
+  if (label) {
+    label.textContent = uploading
+      ? t('submit.photo.uploading')
+      : t(count > 0 ? 'submit.photo.uploadMore' : 'submit.photo.upload');
+  }
+  if (wrap) wrap.classList.toggle('is-busy', uploading);
+  if (input) input.disabled = uploading;
+
+  const status = document.getElementById('imageStatus');
+  if (status) {
+    status.hidden = !uploading;
+    status.classList.toggle('is-active', uploading);
+    status.textContent = uploading ? t('submit.photo.uploading') : '';
+  }
 }
 
 function formImagesPayload(photos) {

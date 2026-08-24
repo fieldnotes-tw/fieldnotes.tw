@@ -1,4 +1,9 @@
-import { appendVideoThumbnail, resolvePlayableMediaUrl, videoPosterUrl } from './video-preview.js';
+import {
+  appendVideoThumbnail,
+  resolvePlayableMediaUrl,
+  seedPosterCache,
+  videoPosterUrl,
+} from './video-preview.js';
 
 const feedStage = document.getElementById('feedStage');
 const feedLayoutHost = document.getElementById('feedLayoutHost');
@@ -591,6 +596,16 @@ function getItemForCard(card) {
   return phenomenonCache.get(card.dataset.id) ?? cardToFallbackItem(card);
 }
 
+function seedVideoPosterCacheFromCard(card) {
+  if (!card) return;
+  card.querySelectorAll('.card__photo img[data-video-url]').forEach((img) => {
+    const videoUrl = img.dataset.videoUrl;
+    if (videoUrl && img.src && !img.hidden && img.complete && img.naturalWidth > 0) {
+      seedPosterCache(videoUrl, img.src);
+    }
+  });
+}
+
 function cardToFallbackItem(card) {
   return {
     id: card.dataset.id,
@@ -746,10 +761,13 @@ async function ensurePhenomenonDetail(id, { force = false } = {}) {
   }
   const cached = phenomenonCache.get(id);
   const cacheHasObservers = Array.isArray(cached?.observers) && cached.observers.length > 0;
+  const cacheHasCommunityDetail = cacheHasObservers || Array.isArray(cached?.trackers);
   const cacheMissingCreator = Boolean(
     cached?.userId && cached?.creatorName && !cacheHasObservers,
   );
-  if (!force && cached?.recentSightings && cacheHasObservers && !cacheMissingCreator) {
+  const cacheMissingTrackers = Number(cached?.trackCount ?? 0) > 0
+    && !Array.isArray(cached?.trackers);
+  if (!force && cached?.recentSightings && cacheHasCommunityDetail && !cacheMissingCreator && !cacheMissingTrackers) {
     return cached;
   }
   try {
@@ -1618,21 +1636,27 @@ function formatDetailLocationLabel(location) {
   return `📍 ${trimmed}`;
 }
 
-function buildStarterRow(item) {
+function appendStarterDiscoveryLine(line, item) {
   const name = item.creatorName || item.observerName;
-  if (!name) return null;
+  if (!name) return false;
 
-  const row = document.createElement('p');
-  row.className = 'detail__starter';
-  row.append(document.createTextNode(t('home.detail.startedByPrefix')));
-  row.appendChild(buildMemberAvatar({
+  const prefix = t('home.detail.startedByPrefix');
+  if (prefix) {
+    const prefixEl = document.createElement('span');
+    prefixEl.className = 'detail__starter-text';
+    prefixEl.textContent = prefix;
+    line.appendChild(prefixEl);
+  }
+
+  line.appendChild(buildMemberAvatar({
     userId: item.userId,
     name,
     avatarUrl: item.creatorAvatarUrl,
     category: item.category,
   }, { className: 'detail__member-avatar detail__member-avatar--sm' }));
+
   if (item.userId) {
-    row.appendChild(buildMemberName({
+    line.appendChild(buildMemberName({
       userId: item.userId,
       name,
       className: 'detail__starter-name detail__member-link',
@@ -1641,15 +1665,44 @@ function buildStarterRow(item) {
     const plain = document.createElement('strong');
     plain.className = 'detail__starter-name';
     plain.textContent = name;
-    row.appendChild(plain);
+    line.appendChild(plain);
   }
-  row.append(document.createTextNode(t('home.detail.startedBySuffix')));
-  return row;
+
+  const suffix = t('home.detail.startedBySuffix');
+  if (suffix) {
+    const suffixEl = document.createElement('span');
+    suffixEl.className = 'detail__starter-text';
+    suffixEl.textContent = suffix;
+    line.appendChild(suffixEl);
+  }
+
+  return true;
 }
 
 function appendDetailMeta(head, item) {
-  const starter = buildStarterRow(item);
-  if (starter) head.appendChild(starter);
+  const community = buildObserversSection(item, { placement: 'inline', excludeUserId: item.userId || null });
+  const hasDiscovery = Boolean(item.creatorName || item.observerName);
+
+  if (hasDiscovery || community) {
+    const group = document.createElement('div');
+    group.className = 'detail__starter-group';
+
+    if (hasDiscovery) {
+      const line = document.createElement('p');
+      line.className = 'detail__starter-line detail__starter-line--discovery';
+      appendStarterDiscoveryLine(line, item);
+      group.appendChild(line);
+    }
+
+    if (community) {
+      const line = document.createElement('p');
+      line.className = 'detail__starter-line detail__starter-line--community';
+      line.appendChild(community);
+      group.appendChild(line);
+    }
+
+    head.appendChild(group);
+  }
 
   if (resolveLocationText(item)) {
     const location = document.createElement('p');
@@ -1724,7 +1777,9 @@ function renderCard(item) {
         posterUrl: videoPosterUrl(first),
         className: 'card__photo-video',
       });
-      photo.appendChild(img);
+      img.addEventListener('load', () => {
+        if (img.src && img.naturalWidth > 0) seedPosterCache(first, img.src);
+      }, { once: true });
       tuneCardPhoto(img);
     } else {
       const img = document.createElement('img');
@@ -1888,8 +1943,6 @@ function resolveDetailMapPoints(item) {
     };
   });
   if (spotPoints.length) return spotPoints;
-
-  if ((item?.spots ?? []).length > 0) return [];
 
   const lat = Number(item?.lat);
   const lng = Number(item?.lng);
@@ -2882,16 +2935,7 @@ function bindObserverItemToggles(root = document) {
 }
 
 function resolveObserverProfiles(item) {
-  const apiObservers = item?.observers?.length
-    ? item.observers
-    : (item?.userId && item?.creatorName
-      ? [{
-        userId: item.userId,
-        name: item.creatorName,
-        avatarUrl: item.creatorAvatarUrl ?? null,
-        bio: null,
-      }]
-      : []);
+  const apiObservers = item?.observers?.length ? item.observers : [];
   if (!apiObservers.length) return [];
 
   return apiObservers.map((observer) => {
@@ -2998,30 +3042,221 @@ function buildObserverListItem(profile) {
   return li;
 }
 
-function buildObserversSection(item) {
-  const profiles = resolveObserverProfiles(item);
+function buildCommunityChevron() {
+  const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  chevron.setAttribute('class', 'detail__community-chevron');
+  chevron.setAttribute('viewBox', '0 0 24 24');
+  chevron.setAttribute('width', '14');
+  chevron.setAttribute('height', '14');
+  chevron.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M6 9 L12 15 L18 9');
+  path.setAttribute('stroke', 'currentColor');
+  path.setAttribute('stroke-width', '2.4');
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('stroke-linejoin', 'round');
+  path.setAttribute('fill', 'none');
+  chevron.appendChild(path);
+  return chevron;
+}
+
+function resolveTrackerProfiles(item) {
+  const apiTrackers = item?.trackers?.length ? item.trackers : [];
+  return apiTrackers.map((tracker) => ({
+    userId: tracker.userId,
+    name: tracker.name,
+    avatarUrl: tracker.avatarUrl,
+    category: item.category || 'plant',
+    bioParagraphs: tracker.bio?.trim() ? [tracker.bio.trim()] : [],
+  }));
+}
+
+function buildCommunityAvatarStack(profiles, { max = 5, category = 'plant' } = {}) {
+  const wrap = document.createElement('div');
+  wrap.className = 'detail__observer-avatars';
+  profiles.slice(0, max).forEach((profile) => {
+    const avatarShell = buildObserverAvatarShell({
+      name: profile.name,
+      avatarUrl: profile.avatarUrl,
+      category: profile.category || category,
+    });
+    const profileUrl = profile.userId ? memberProfileUrl(profile.userId) : '';
+    if (profileUrl) {
+      const link = document.createElement('a');
+      link.className = 'detail__member-avatar-link';
+      link.href = profileUrl;
+      link.appendChild(avatarShell);
+      wrap.appendChild(link);
+    } else {
+      wrap.appendChild(avatarShell);
+    }
+  });
+  if (profiles.length > max) {
+    const more = document.createElement('span');
+    more.className = 'detail__observer-more';
+    more.textContent = '+';
+    more.setAttribute('aria-hidden', 'true');
+    wrap.appendChild(more);
+  }
+  return wrap;
+}
+
+function buildCommunityPreviewRow(profiles, labelKey, category) {
   if (!profiles.length) return null;
+  const row = document.createElement('div');
+  row.className = 'detail__community-row';
+  const label = document.createElement('span');
+  label.className = 'detail__community-label';
+  label.textContent = t(labelKey);
+  row.append(label, buildCommunityAvatarStack(profiles, { category }));
+  return row;
+}
+
+function buildTrackerListItem(profile) {
+  const li = document.createElement('li');
+  li.className = 'observer-item';
+  const row = document.createElement('div');
+  row.className = 'observer-item__row';
+  const profileUrl = memberProfileUrl(profile.userId);
+  if (profileUrl) {
+    const link = document.createElement('a');
+    link.className = 'detail__member-avatar-link';
+    link.href = profileUrl;
+    link.appendChild(buildObserverAvatarShell({
+      name: profile.name,
+      avatarUrl: profile.avatarUrl,
+      category: profile.category,
+    }));
+    row.appendChild(link);
+  } else {
+    row.appendChild(buildObserverAvatarShell({
+      name: profile.name,
+      avatarUrl: profile.avatarUrl,
+      category: profile.category,
+    }));
+  }
+  const name = document.createElement('span');
+  name.className = 'observer-item__name';
+  if (profileUrl) {
+    const nameLink = document.createElement('a');
+    nameLink.href = profileUrl;
+    nameLink.textContent = profile.name;
+    name.appendChild(nameLink);
+  } else {
+    name.textContent = profile.name;
+  }
+  row.appendChild(name);
+  li.appendChild(row);
+  return li;
+}
+
+function mergeCommunityProfiles(reporters, trackers, { excludeUserId = null } = {}) {
+  const seen = new Set();
+  const merged = [];
+  [...reporters, ...trackers].forEach((profile) => {
+    if (excludeUserId && profile.userId === excludeUserId) return;
+    const key = profile.userId || profile.name;
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(profile);
+  });
+  return merged;
+}
+
+function buildObserversSection(item, { placement = 'inline', excludeUserId = null } = {}) {
+  const sightingCount = Number(item.sightingCount ?? 0);
+  const hasSightings = (item.recentSightings ?? []).length > 0;
+  const reporterProfiles = (sightingCount > 0 || hasSightings) ? resolveObserverProfiles(item) : [];
+  const trackerProfiles = resolveTrackerProfiles(item);
+  const isInline = placement === 'inline';
+  const otherProfiles = isInline
+    ? mergeCommunityProfiles(reporterProfiles, trackerProfiles, { excludeUserId })
+    : [];
+
+  if (isInline && !otherProfiles.length) return null;
+  if (!isInline && !reporterProfiles.length && !trackerProfiles.length) return null;
+
+  const category = item.category || 'plant';
+
+  if (isInline) {
+    const row = document.createElement('span');
+    row.className = 'detail__community-static';
+    const label = document.createElement('span');
+    label.className = 'detail__community-label';
+    label.textContent = t('home.detail.communityCompact');
+    row.append(
+      buildCommunityAvatarStack(otherProfiles, { max: 5, category }),
+      label,
+    );
+    return row;
+  }
 
   const section = document.createElement('section');
-  section.className = 'detail__observers-section';
+  section.className = 'detail__observers-section detail__community';
+
+  const preview = document.createElement('div');
+  preview.className = 'detail__community-preview';
+  const reportingRow = buildCommunityPreviewRow(reporterProfiles, 'home.detail.communityReporting', category);
+  const trackingRow = buildCommunityPreviewRow(trackerProfiles, 'home.detail.communityTracking', category);
+  if (reportingRow) preview.appendChild(reportingRow);
+  if (trackingRow) preview.appendChild(trackingRow);
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'detail__community-summary';
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('aria-label', t('home.detail.communityExpand'));
+  toggle.append(preview, buildCommunityChevron());
+
+  const panel = document.createElement('div');
+  panel.className = 'detail__community-panel';
+  panel.hidden = true;
 
   const heading = document.createElement('h4');
   heading.className = 'detail__section-title detail__section-title--observers';
   heading.textContent = t('home.detail.observersTitle');
-  section.appendChild(heading);
-
   const intro = document.createElement('p');
   intro.className = 'detail__observers-intro';
   intro.textContent = t('home.detail.observersIntro');
-  section.appendChild(intro);
+  section.append(heading, intro);
 
-  const list = document.createElement('ul');
-  list.className = 'observer-list detail__observer-list';
-  profiles.forEach((profile) => {
-    list.appendChild(buildObserverListItem(profile));
+  if (reporterProfiles.length) {
+    const groupLabel = document.createElement('p');
+    groupLabel.className = 'detail__community-group-label';
+    groupLabel.textContent = t('home.detail.communityReporting');
+    panel.appendChild(groupLabel);
+
+    const list = document.createElement('ul');
+    list.className = 'observer-list detail__observer-list';
+    reporterProfiles.forEach((profile) => {
+      list.appendChild(buildObserverListItem(profile));
+    });
+    panel.appendChild(list);
+  }
+
+  if (trackerProfiles.length) {
+    const groupLabel = document.createElement('p');
+    groupLabel.className = 'detail__community-group-label';
+    groupLabel.textContent = t('home.detail.communityTracking');
+    panel.appendChild(groupLabel);
+
+    const list = document.createElement('ul');
+    list.className = 'observer-list detail__observer-list detail__tracker-list';
+    trackerProfiles.forEach((profile) => {
+      list.appendChild(buildTrackerListItem(profile));
+    });
+    panel.appendChild(list);
+  }
+
+  toggle.addEventListener('click', () => {
+    const open = panel.hidden;
+    panel.hidden = !open;
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    section.classList.toggle('is-open', open);
+    if (open) bindObserverItemToggles(panel);
   });
-  section.appendChild(list);
-  bindObserverItemToggles(section);
+
+  section.append(toggle, panel);
   return section;
 }
 
@@ -3290,10 +3525,8 @@ function buildDetailNodes(item) {
   if (extras.childElementCount) body.appendChild(extras);
 
   const nodes = [photoWrap, body];
-  const observersSection = buildObserversSection(item);
   const about = buildAboutSection(item);
   const timeline = buildSightingsTimeline(item);
-  if (observersSection) nodes.push(observersSection);
   if (about) nodes.push(about);
   if (timeline) nodes.push(timeline);
 
@@ -3677,16 +3910,18 @@ function expandMapSheet() {
   if (!mapSheet.classList.contains('is-open') || mapSheet.classList.contains('is-expanded')) return;
   mapSheet.classList.add('is-expanded');
   mapSheetHandle?.setAttribute('aria-label', t('home.close'));
-  void (async () => {
-    if (focusedCard) {
-      const item = (await ensurePhenomenonDetail(focusedCard.dataset.id)) ?? getItemForCard(focusedCard);
-      mountMapSheetDetail(focusedCard, item);
-    }
-    updateMapSheetPeekNav();
-    settleMapLayout({ pan: Boolean(focusedCard), animate: false });
-    syncPhoneSheetBodyLock();
-    syncMapSheetChrome();
-  })();
+  if (focusedCard) {
+    seedVideoPosterCacheFromCard(focusedCard);
+    mountMapSheetDetail(focusedCard, getItemForCard(focusedCard));
+  }
+  updateMapSheetPeekNav();
+  settleMapLayout({ pan: Boolean(focusedCard), animate: false });
+  syncPhoneSheetBodyLock();
+  syncMapSheetChrome();
+  void ensurePhenomenonDetail(focusedCard?.dataset.id).then((item) => {
+    if (!item || !focusedCard || !mapSheet.classList.contains('is-expanded')) return;
+    mountMapSheetDetail(focusedCard, item);
+  });
 }
 
 function collapseMapSheet() {
@@ -3747,22 +3982,23 @@ function syncMapSheetChrome() {
   }
 }
 
-async function openPhoneDetailSheet(card, { mode = 'expanded', pan = false, marker = null } = {}) {
+function openPhoneDetailSheet(card, { mode = 'expanded', pan = false, marker = null } = {}) {
   hideCardModal();
   hideSplitDetail();
   setFocusedCard(card);
   if (marker) setActiveMapPin(marker);
   else if (mode === 'expanded' && mapView.classList.contains('is-hidden')) clearMapPinActive();
 
-  const detailItem = (await ensurePhenomenonDetail(card.dataset.id)) ?? getItemForCard(card);
+  const cachedItem = getItemForCard(card);
+  seedVideoPosterCacheFromCard(card);
 
   const expanded = mode !== 'peek';
   mapSheet.classList.toggle('is-expanded', expanded);
   mapSheet.classList.add('is-open');
   mapSheetHandle?.setAttribute('aria-label', t(expanded ? 'home.close' : 'home.expandPanel'));
 
-  if (expanded) mountMapSheetDetail(card, detailItem);
-  else mountMapSheetPeek(card, { item: detailItem });
+  if (expanded) mountMapSheetDetail(card, cachedItem);
+  else mountMapSheetPeek(card, { item: cachedItem });
 
   updateMapSheetPeekNav();
 
@@ -3773,6 +4009,16 @@ async function openPhoneDetailSheet(card, { mode = 'expanded', pan = false, mark
   }
   syncPhoneSheetBodyLock();
   syncMapSheetChrome();
+
+  void ensurePhenomenonDetail(card.dataset.id).then((detailItem) => {
+    if (!detailItem || focusedCard !== card || !mapSheet.classList.contains('is-open')) return;
+    if (mapSheet.classList.contains('is-expanded')) {
+      mountMapSheetDetail(card, detailItem);
+    } else {
+      mountMapSheetPeek(card, { item: detailItem });
+    }
+    updateMapSheetPeekNav();
+  });
 }
 
 function openMapSheet(card, marker, { pan = true } = {}) {
@@ -4044,16 +4290,23 @@ function openSplitDetail(card) {
   if (!usesSheetDetail()) document.body.classList.remove('is-detail-open');
   updateMapRailVisibility();
   updateDetailRailBtn();
-  void (async () => {
-    const detailItem = (await ensurePhenomenonDetail(card.dataset.id)) ?? getItemForCard(card);
+  const cachedItem = getItemForCard(card);
+  seedVideoPosterCacheFromCard(card);
+  mountSplitDetail(card, cachedItem);
+  renderFeedDetailMenu();
+  setFeedDetailMenuOpen(false);
+  if (!mapView.classList.contains('is-hidden')) {
+    panToFocusedCard();
+    requestAnimationFrame(() => scrollRailToFocusedCard());
+  }
+  void ensurePhenomenonDetail(card.dataset.id).then((detailItem) => {
+    if (!detailItem || focusedCard !== card || !feedStage.classList.contains('is-detail-open')) return;
     mountSplitDetail(card, detailItem);
     renderFeedDetailMenu();
-    setFeedDetailMenuOpen(false);
     if (!mapView.classList.contains('is-hidden')) {
-      panToFocusedCard();
       requestAnimationFrame(() => scrollRailToFocusedCard());
     }
-  })();
+  });
 }
 
 function closeSplitDetail() {
@@ -4245,12 +4498,12 @@ async function loadPhenomena() {
     cachePhenomena(items);
     checkTrackedUpdates(items);
     items.sort((a, b) => {
+      const aRecent = new Date(a.lastSeenAt || a.lastNoticedAt || 0).getTime();
+      const bRecent = new Date(b.lastSeenAt || b.lastNoticedAt || 0).getTime();
+      if (bRecent !== aRecent) return bRecent - aRecent;
       const aCreated = new Date(a.createdAt || 0).getTime();
       const bCreated = new Date(b.createdAt || 0).getTime();
-      if (bCreated !== aCreated) return bCreated - aCreated;
-      const aActive = new Date(a.lastSeenAt || a.lastNoticedAt || 0).getTime();
-      const bActive = new Date(b.lastSeenAt || b.lastNoticedAt || 0).getTime();
-      return bActive - aActive;
+      return bCreated - aCreated;
     });
     const nodes = items.map(renderCard);
     gridFeed.replaceChildren(...nodes);

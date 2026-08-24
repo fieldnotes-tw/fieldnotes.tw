@@ -6,6 +6,13 @@
 <main class="auth-main">
   <form class="auth-form" id="registerForm" novalidate>
     <h1 class="auth-form__title" id="registerTitle"><%= it.t('auth.register.title') %></h1>
+    <div id="registerLoggedIn" hidden>
+      <p class="auth-form__hint" id="registerLoggedInHint"><%= it.t('auth.register.alreadyLoggedInHint') %></p>
+      <div class="auth-form__actions">
+        <button type="button" class="auth-form__submit" id="registerLogoutBtn"><%= it.t('nav.logout') %></button>
+        <a href="/" class="auth-form__secondary auth-form__action-link"><%= it.t('auth.register.backHome') %></a>
+      </div>
+    </div>
     <div id="registerSignup">
       <label class="auth-form__field">
         <span><%= it.t('auth.field.email') %></span>
