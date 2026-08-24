@@ -229,7 +229,7 @@ function initSearch() {
 }
 
 function defaultSeenDate(force = false) {
-  setDefaultSeenDateTime($('f_seenDate'), $('f_seenTime'), { force });
+  setDefaultSeenDateTime($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'), { force });
 }
 
 function hasPinPosition() {
@@ -268,8 +268,20 @@ let submitBaseline = '';
 let submitLeaveGuard = null;
 
 function submitDraftStorageKey() {
-  const userId = getCurrentUser()?.id;
-  return userId ? `fieldnotes.submitDraft.${userId}` : '';
+  const user = getCurrentUser();
+  if (!user) return '';
+  const key = user.id || user.email;
+  return key ? `fieldnotes.submitDraft.${key}` : '';
+}
+
+function formIsEmptyForDraft() {
+  return !hasSubmitDraftContent(JSON.parse(serializeSubmitState()));
+}
+
+function shouldGuardSubmitLeave() {
+  if ($('submitForm').hidden) return false;
+  if (editId) return isSubmitDirty();
+  return hasSubmitDraftContent(JSON.parse(serializeSubmitState()));
 }
 
 function serializeSubmitState() {
@@ -282,8 +294,9 @@ function serializeSubmitState() {
     location: $('f_location').value.trim(),
     lat: $('f_lat').value,
     lng: $('f_lng').value,
-    seenDate: $('f_seenDate').value,
-    seenTime: $('f_seenTime').value,
+    seenDate: $('f_seenDate')?.value || '',
+    seenHour: $('f_seenHour')?.value || '',
+    seenMinute: $('f_seenMinute')?.value || '',
     extraOpen: !$('extraPanel')?.hidden,
     photos: photos
       .filter((photo) => photo.url && !photo.uploading)
@@ -329,34 +342,15 @@ function saveSubmitDraft({ silent = false } = {}) {
 
   const draft = buildSubmitDraftPayload();
   if (!hasSubmitDraftContent(draft)) {
-    if (!silent) setDraftFeedback(t('submit.draft.empty'));
     return false;
   }
 
   writeStoredDraft(submitDraftStorageKey(), draft);
-  if (!silent) setDraftFeedback(t('submit.draft.saved'));
   return true;
 }
 
 function clearSubmitDraft() {
   clearStoredDraft(submitDraftStorageKey());
-}
-
-function setDraftFeedback(msg) {
-  const el = $('submitDraftFeedback');
-  if (!el) return;
-  if (!msg) {
-    el.hidden = true;
-    el.textContent = '';
-    return;
-  }
-  el.hidden = false;
-  el.textContent = msg;
-}
-
-function syncSubmitDraftUi() {
-  const draftBtn = $('submitDraftBtn');
-  if (draftBtn) draftBtn.hidden = Boolean(editId);
 }
 
 function hideSubmitDraftBanner() {
@@ -390,10 +384,7 @@ async function applySubmitDraft(draft) {
     clearPinPosition();
   }
 
-  if (draft.seenDate) {
-    $('f_seenDate').value = draft.seenDate;
-    $('f_seenTime').value = draft.seenTime || '';
-  } else {
+  if (!applySeenTimeDraft($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'), draft)) {
     defaultSeenDate(true);
   }
 
@@ -417,7 +408,11 @@ function initSubmitDraftRestore() {
   if (editId) return;
 
   const draft = readStoredDraft(submitDraftStorageKey());
-  if (!hasSubmitDraftContent(draft)) return;
+  if (!hasSubmitDraftContent(draft)) {
+    if (draft) clearSubmitDraft();
+    return;
+  }
+  if (!formIsEmptyForDraft()) return;
 
   showSubmitDraftBanner(draft);
 
@@ -425,31 +420,27 @@ function initSubmitDraftRestore() {
     await applySubmitDraft(draft);
     hideSubmitDraftBanner();
     captureSubmitBaseline();
-    setDraftFeedback('');
   }, { once: true });
 
   $('submitDraftDiscardBtn')?.addEventListener('click', () => {
     clearSubmitDraft();
     hideSubmitDraftBanner();
-    setDraftFeedback(t('submit.draft.discarded'));
+    captureSubmitBaseline();
   }, { once: true });
 }
 
 function initSubmitLeaveGuard() {
   submitLeaveGuard = initFormLeaveGuard({
-    isDirty: () => !$('submitForm').hidden && isSubmitDirty(),
-    getMessage: () => t(editId ? 'submit.leave.editConfirm' : 'submit.leave.unsavedConfirm'),
-    onConfirmLeave: () => {
-      if (!editId) saveSubmitDraft({ silent: true });
+    isDirty: () => shouldGuardSubmitLeave(),
+    confirmLeave: () => {
+      if (editId) {
+        return confirm(t('submit.leave.editConfirm')) ? 'leave' : 'stay';
+      }
+      if (!confirm(t('submit.leave.confirmLeave'))) return 'stay';
+      return confirm(t('submit.leave.saveDraftConfirm')) ? 'save' : 'leave';
     },
+    onSaveDraft: () => saveSubmitDraft({ silent: true }),
   });
-}
-
-async function handleSaveDraftClick() {
-  setError('');
-  if (saveSubmitDraft()) {
-    captureSubmitBaseline();
-  }
 }
 
 function showSuccess(phenomenonId) {
@@ -765,7 +756,6 @@ function resetForm() {
   map?.setView(ZUOYING_CENTER, 14);
   syncMapPinState();
   initCurrentLocation();
-  syncSubmitDraftUi();
   hideSubmitDraftBanner();
   captureSubmitBaseline();
 }
@@ -790,7 +780,11 @@ function validateForm() {
   if (!$('f_description').value.trim()) {
     return t('submit.error.noDescription');
   }
-  if (!combineSeenDateTime($('f_seenDate').value, $('f_seenTime').value)) {
+  if (!combineSeenDateTime(
+    $('f_seenDate').value,
+    $('f_seenHour').value,
+    $('f_seenMinute').value,
+  )) {
     return t('submit.error.noSeenDate');
   }
   if (!getSelectedCategories().length) {
@@ -852,7 +846,7 @@ async function handleSubmit(e) {
     location: $('f_location').value.trim(),
     lat: Number($('f_lat').value),
     lng: Number($('f_lng').value),
-    seenAt: seenDateTimeIso($('f_seenDate'), $('f_seenTime')),
+    seenAt: seenDateTimeIso($('f_seenDate'), $('f_seenHour'), $('f_seenMinute')),
     images: formImagesPayload(photos),
   };
 
@@ -904,7 +898,7 @@ async function loadEditPhenomenon(id) {
   $('f_location').value = data.location || '';
   if (data.lat != null && data.lng != null) setPin(data.lat, data.lng);
   if (data.lastNoticedAt) {
-    setSeenDateTimeInputs($('f_seenDate'), $('f_seenTime'), data.lastNoticedAt);
+    setSeenDateTimeInputs($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'), data.lastNoticedAt);
   }
   clearPhotos();
   for (const item of normalizeLoadedFormImages(data)) {
@@ -921,7 +915,6 @@ async function loadEditPhenomenon(id) {
   setSubmitFormTitle('submit.editTitle');
   setSubmitPrimaryLabel('submit.save');
   setSubmitDeleteVisible(true);
-  syncSubmitDraftUi();
   hideSubmitDraftBanner();
   captureSubmitBaseline();
 }
@@ -949,14 +942,15 @@ async function boot() {
   initSearch();
   initPhotoUpload();
   defaultSeenDate();
-  initDescriptionCounter();
-  initExtraToggle();
 
   const params = new URLSearchParams(location.search);
   const editParam = params.get('edit');
   if (!editParam) {
-    initCurrentLocation();
+    captureSubmitBaseline();
   }
+
+  initDescriptionCounter();
+  initExtraToggle();
 
   $('submitForm').addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' || e.target.tagName === 'TEXTAREA') return;
@@ -966,11 +960,6 @@ async function boot() {
   $('submitForm').addEventListener('submit', handleSubmit);
   $('submitDeleteBtn')?.addEventListener('click', handleDelete);
   $('submitAgain').addEventListener('click', resetForm);
-  $('submitDraftBtn')?.addEventListener('click', () => {
-    void handleSaveDraftClick();
-  });
-
-  syncSubmitDraftUi();
 
   if (editParam) {
     try {
@@ -985,9 +974,9 @@ async function boot() {
     }
   } else {
     initSubmitDraftRestore();
+    initCurrentLocation();
   }
 
-  captureSubmitBaseline();
   initSubmitLeaveGuard();
 }
 

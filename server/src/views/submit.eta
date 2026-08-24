@@ -122,9 +122,7 @@
     </section>
 
     <p class="submit-form__error" id="submitError" hidden></p>
-    <p class="submit-form__draft-feedback" id="submitDraftFeedback" hidden></p>
     <div class="submit-form__primary-actions">
-      <button type="button" class="submit-form__secondary" id="submitDraftBtn" hidden><%= it.t('submit.draft.save') %></button>
       <button type="submit" class="submit-form__submit" id="submitBtn"><%= it.t('submit.send') %></button>
     </div>
   </form>

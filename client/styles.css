@@ -4172,6 +4172,9 @@ footer .credit{ font-size:var(--type-meta); color:var(--ink-faint); }
   border-radius:12px;
   background:color-mix(in srgb, var(--map-ground) 70%, var(--ground));
 }
+.submit-form__draft-banner[hidden]{
+  display:none !important;
+}
 .submit-form__draft-banner-text{
   margin:0;
   font-size:0.85rem;

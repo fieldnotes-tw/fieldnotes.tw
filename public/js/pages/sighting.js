@@ -7,8 +7,6 @@ let phenomenonCategory = 'plant';
 let selectedSpotId = '';
 let spotChoiceMode = 'existing';
 let otherSpotMap = null;
-
-let otherSpotMap = null;
 let sightingBaseline = '';
 let sightingLeaveGuard = null;
 
@@ -17,7 +15,8 @@ function serializeSightingState() {
     note: $('f_note').value.trim(),
     photos: formImagesPayload(photos),
     seenDate: $('f_seenDate').value,
-    seenTime: $('f_seenTime').value,
+    seenHour: $('f_seenHour').value,
+    seenMinute: $('f_seenMinute').value,
     commentOnly: isCommentOnly(),
     spotChoiceMode,
     selectedSpotId,
@@ -69,7 +68,7 @@ function setError(msg) {
 
 function defaultSeenAt() {
   if ($('f_commentOnly')?.checked) return;
-  setDefaultSeenDateTime($('f_seenDate'), $('f_seenTime'));
+  setDefaultSeenDateTime($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'));
 }
 
 function isCommentOnly() {
@@ -112,7 +111,7 @@ function syncCommentOnlyMode() {
     whenSection.hidden = on;
     whenSection.classList.toggle('is-collapsed', on);
   }
-  ['f_seenDate', 'f_seenTime'].forEach((id) => {
+  ['f_seenDate', 'f_seenHour', 'f_seenMinute'].forEach((id) => {
     const el = $(id);
     if (el) el.required = !on;
   });
@@ -137,7 +136,7 @@ function resolveSeenAtIso() {
   if (isCommentOnly() || !$('f_seenDate').value) {
     return new Date().toISOString();
   }
-  return seenDateTimeIso($('f_seenDate'), $('f_seenTime'))
+  return seenDateTimeIso($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'))
     || new Date().toISOString();
 }
 
@@ -275,7 +274,7 @@ async function loadEditSighting(id) {
   $('sightingContext').textContent = data.phenomenonTitle;
   $('sightingCommentOnlySection').hidden = true;
   $('f_note').value = data.note || '';
-  setSeenDateTimeInputs($('f_seenDate'), $('f_seenTime'), data.seenAt);
+  setSeenDateTimeInputs($('f_seenDate'), $('f_seenHour'), $('f_seenMinute'), data.seenAt);
   clearPhotos();
   for (const item of normalizeLoadedFormImages(data)) {
     photos.push({
@@ -384,7 +383,8 @@ function validateSightingForm() {
     if ($('f_seenDate').value) {
       const parsed = combineSeenDateTime(
         $('f_seenDate').value,
-        $('f_seenTime').value,
+        $('f_seenHour').value,
+        $('f_seenMinute').value,
       );
       if (!parsed) return t('sighting.error.noSeenAt');
     }

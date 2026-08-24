@@ -1,4 +1,4 @@
-function initFormLeaveGuard({ isDirty, getMessage, onConfirmLeave } = {}) {
+function initFormLeaveGuard({ isDirty, getMessage, onSaveDraft, confirmLeave } = {}) {
   let bypassLeaveGuard = false;
 
   function allowLeaveWithoutPrompt() {
@@ -16,11 +16,13 @@ function initFormLeaveGuard({ isDirty, getMessage, onConfirmLeave } = {}) {
   });
 
   document.addEventListener('click', (event) => {
+    if (event.defaultPrevented) return;
     if (!shouldBlock()) return;
 
     const link = event.target.closest('a[href]');
     if (!link) return;
     if (link.target && link.target !== '_self') return;
+    if (link.hasAttribute('download')) return;
 
     const rawHref = link.getAttribute('href');
     if (!rawHref || rawHref.startsWith('#') || rawHref.startsWith('mailto:') || rawHref.startsWith('tel:')) {
@@ -38,14 +40,27 @@ function initFormLeaveGuard({ isDirty, getMessage, onConfirmLeave } = {}) {
     if (url.pathname === location.pathname && url.search === location.search) return;
 
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
+
+    const navigateAway = () => {
+      allowLeaveWithoutPrompt();
+      location.assign(url.href);
+    };
+
+    if (typeof confirmLeave === 'function') {
+      const action = confirmLeave();
+      if (action === 'stay') return;
+      if (action === 'save' && typeof onSaveDraft === 'function') {
+        if (onSaveDraft() === false) return;
+      }
+      navigateAway();
+      return;
+    }
 
     const message = typeof getMessage === 'function' ? getMessage() : String(getMessage || '');
     if (message && !confirm(message)) return;
 
-    if (typeof onConfirmLeave === 'function') onConfirmLeave();
-    allowLeaveWithoutPrompt();
-    location.href = url.href;
+    navigateAway();
   }, true);
 
   return { allowLeaveWithoutPrompt };
