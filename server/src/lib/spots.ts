@@ -110,8 +110,7 @@ export function filterSpotsForLocationSummary<
 >(spotList: T[], statsBySpot?: Map<string, { sightingCount: number }>): T[] {
   if (!spotList.length) return [];
 
-  return spotList.filter((spot, index) => {
-    if (index === 0) return true;
+  return spotList.filter((spot) => {
     const count = spot.sightingCount ?? statsBySpot?.get(spot.id)?.sightingCount ?? 0;
     return count > 0;
   });
@@ -279,14 +278,6 @@ export async function cleanupOrphanSpotAfterSightingDelete(
     .where(and(eq(spots.id, spotId), eq(spots.phenomenonId, phenomenonId)))
     .limit(1);
   if (!spot) return;
-
-  const [primary] = await db
-    .select({ id: spots.id })
-    .from(spots)
-    .where(eq(spots.phenomenonId, phenomenonId))
-    .orderBy(asc(spots.sortOrder))
-    .limit(1);
-  if (primary?.id === spotId) return;
 
   const [countRow] = await db
     .select({ count: sql<number>`count(*)::int` })

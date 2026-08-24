@@ -432,8 +432,8 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
   const images = mergeUniqueImages(phenomenonImageList, sightingImageList);
   const imageUrls = images.map((image) => image.url);
   const spotList = await listSpotsWithStats(id);
-  const summarySpots = filterSpotsForLocationSummary(spotList);
-  const locationSummary = buildLocationSummary(summarySpots) || base.location || '';
+  const reportedSpots = filterSpotsForLocationSummary(spotList);
+  const locationSummary = buildLocationSummary(reportedSpots) || base.location || '';
 
   const trackerRows = await db
     .select({
@@ -464,8 +464,8 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
   return {
     ...base,
     locationSummary,
-    spotCount: summarySpots.length,
-    spots: spotList,
+    spotCount: reportedSpots.length,
+    spots: reportedSpots,
     imageUrls,
     images,
     recentSightings,

@@ -1944,6 +1944,10 @@ function resolveDetailMapPoints(item) {
   });
   if (spotPoints.length) return spotPoints;
 
+  const hasSightings = Number(item?.sightingCount ?? 0) > 0
+    || (item?.recentSightings?.length ?? 0) > 0;
+  if (!hasSightings) return [];
+
   const lat = Number(item?.lat);
   const lng = Number(item?.lng);
   if (Number.isFinite(lat) && Number.isFinite(lng)) {
@@ -2213,7 +2217,7 @@ function initDetailMiniMap(canvas) {
 
   const map = L.map(canvas, {
     zoomControl: false,
-    dragging: true,
+    dragging: !isPhoneLayout(),
     scrollWheelZoom: false,
     touchZoom: false,
     doubleClickZoom: false,

@@ -1182,7 +1182,34 @@ html[lang="en"] .sitehead__menu-oval{
 }
 
 @media (max-width:759px){
-  :root{ --map-peek-photo-height:11rem; }
+  :root{
+    --map-peek-height:9.4rem;
+    --map-peek-photo-height:8.8rem;
+  }
+  .map-sheet.is-open:not(.is-expanded) .map-sheet__peek-row .photo-mosaic,
+  .map-sheet.is-open:not(.is-expanded) .map-sheet__body .photo-mosaic{
+    aspect-ratio:16 / 9;
+    max-height:min(26vh, 10.5rem);
+    min-height:6.5rem;
+  }
+  .map-sheet.is-open:not(.is-expanded) .map-sheet__peek-row--split .photo-mosaic{
+    min-height:6rem;
+    max-width:9rem;
+  }
+  .map-sheet.is-open:not(.is-expanded) .map-sheet__peek-row--split .photo-mosaic__cell--main{
+    min-height:6rem;
+  }
+  .map-sheet.is-open:not(.is-expanded) .map-sheet__peek-row .card__body,
+  .map-sheet.is-open:not(.is-expanded) .map-sheet__body .card__body{
+    padding:0 0.9rem 0.65rem;
+    gap:0.15rem;
+  }
+  .detail__map-preview,
+  .detail__map-canvas,
+  .detail__map-canvas .leaflet-container{
+    touch-action:pan-y;
+    cursor:default;
+  }
   .feed-shell{ padding-bottom:0; }
   .feed-layout__list{ background:var(--grid-feed-seam); }
   .feed-stage:not(.is-map-view) .feed-controls{
