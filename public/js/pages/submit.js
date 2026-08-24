@@ -274,14 +274,38 @@ function submitDraftStorageKey() {
   return key ? `fieldnotes.submitDraft.${key}` : '';
 }
 
+function submitDraftDismissedKey() {
+  return `${submitDraftStorageKey()}.dismissed`;
+}
+
+function isSubmitDraftDismissed() {
+  return sessionStorage.getItem(submitDraftDismissedKey()) === '1';
+}
+
+function markSubmitDraftDismissed() {
+  sessionStorage.setItem(submitDraftDismissedKey(), '1');
+}
+
+function clearSubmitDraftDismissed() {
+  sessionStorage.removeItem(submitDraftDismissedKey());
+}
+
+function hasUserEnteredSubmitContent(state) {
+  if (!state) return false;
+  if (state.title || state.description || state.extra || state.findingHint || state.location) return true;
+  if (Array.isArray(state.photos) && state.photos.length) return true;
+  return false;
+}
+
 function formIsEmptyForDraft() {
-  return !hasSubmitDraftContent(JSON.parse(serializeSubmitState()));
+  return !hasUserEnteredSubmitContent(JSON.parse(serializeSubmitState()));
 }
 
 function shouldGuardSubmitLeave() {
-  if ($('submitForm').hidden) return false;
+  const form = $('submitForm');
+  if (!form || form.hidden) return false;
   if (editId) return isSubmitDirty();
-  return hasSubmitDraftContent(JSON.parse(serializeSubmitState()));
+  return hasUserEnteredSubmitContent(JSON.parse(serializeSubmitState()));
 }
 
 function serializeSubmitState() {
@@ -346,11 +370,19 @@ function saveSubmitDraft({ silent = false } = {}) {
   }
 
   writeStoredDraft(submitDraftStorageKey(), draft);
+  clearSubmitDraftDismissed();
   return true;
 }
 
 function clearSubmitDraft() {
   clearStoredDraft(submitDraftStorageKey());
+}
+
+function dismissSubmitDraft() {
+  clearSubmitDraft();
+  markSubmitDraftDismissed();
+  hideSubmitDraftBanner();
+  captureSubmitBaseline();
 }
 
 function hideSubmitDraftBanner() {
@@ -405,7 +437,7 @@ async function applySubmitDraft(draft) {
 }
 
 function initSubmitDraftRestore() {
-  if (editId) return;
+  if (editId || isSubmitDraftDismissed()) return;
 
   const draft = readStoredDraft(submitDraftStorageKey());
   if (!hasSubmitDraftContent(draft)) {
@@ -418,25 +450,25 @@ function initSubmitDraftRestore() {
 
   $('submitDraftRestoreBtn')?.addEventListener('click', async () => {
     await applySubmitDraft(draft);
+    clearSubmitDraft();
+    clearSubmitDraftDismissed();
     hideSubmitDraftBanner();
     captureSubmitBaseline();
   }, { once: true });
 
   $('submitDraftDiscardBtn')?.addEventListener('click', () => {
-    clearSubmitDraft();
-    hideSubmitDraftBanner();
-    captureSubmitBaseline();
+    dismissSubmitDraft();
   }, { once: true });
 }
 
 function initSubmitLeaveGuard() {
+  if (submitLeaveGuard) return;
   submitLeaveGuard = initFormLeaveGuard({
     isDirty: () => shouldGuardSubmitLeave(),
     confirmLeave: () => {
       if (editId) {
         return confirm(t('submit.leave.editConfirm')) ? 'leave' : 'stay';
       }
-      if (!confirm(t('submit.leave.confirmLeave'))) return 'stay';
       return confirm(t('submit.leave.saveDraftConfirm')) ? 'save' : 'leave';
     },
     onSaveDraft: () => saveSubmitDraft({ silent: true }),
@@ -445,6 +477,7 @@ function initSubmitLeaveGuard() {
 
 function showSuccess(phenomenonId) {
   clearSubmitDraft();
+  clearSubmitDraftDismissed();
   submitLeaveGuard?.allowLeaveWithoutPrompt();
   $('submitForm').hidden = true;
   $('submitSuccess').hidden = false;
@@ -934,6 +967,8 @@ async function boot() {
     return;
   }
 
+  initSubmitLeaveGuard();
+
   if (typeof L === 'undefined') {
     setError(t('submit.error.mapLoad'));
   } else {
@@ -976,8 +1011,6 @@ async function boot() {
     initSubmitDraftRestore();
     initCurrentLocation();
   }
-
-  initSubmitLeaveGuard();
 }
 
 boot();

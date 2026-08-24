@@ -9,6 +9,23 @@ function initFormLeaveGuard({ isDirty, getMessage, onSaveDraft, confirmLeave } =
     return !bypassLeaveGuard && typeof isDirty === 'function' && isDirty();
   }
 
+  function handleLeaveAttempt(navigateAway) {
+    if (typeof confirmLeave === 'function') {
+      const action = confirmLeave();
+      if (action === 'stay') return;
+      if (action === 'save') {
+        if (typeof onSaveDraft === 'function' && onSaveDraft() === false) return;
+      }
+      navigateAway();
+      return;
+    }
+
+    const message = typeof getMessage === 'function' ? getMessage() : String(getMessage || '');
+    if (message && !confirm(message)) return;
+
+    navigateAway();
+  }
+
   window.addEventListener('beforeunload', (event) => {
     if (!shouldBlock()) return;
     event.preventDefault();
@@ -16,7 +33,6 @@ function initFormLeaveGuard({ isDirty, getMessage, onSaveDraft, confirmLeave } =
   });
 
   document.addEventListener('click', (event) => {
-    if (event.defaultPrevented) return;
     if (!shouldBlock()) return;
 
     const link = event.target.closest('a[href]');
@@ -42,25 +58,10 @@ function initFormLeaveGuard({ isDirty, getMessage, onSaveDraft, confirmLeave } =
     event.preventDefault();
     event.stopImmediatePropagation();
 
-    const navigateAway = () => {
+    handleLeaveAttempt(() => {
       allowLeaveWithoutPrompt();
       location.assign(url.href);
-    };
-
-    if (typeof confirmLeave === 'function') {
-      const action = confirmLeave();
-      if (action === 'stay') return;
-      if (action === 'save' && typeof onSaveDraft === 'function') {
-        if (onSaveDraft() === false) return;
-      }
-      navigateAway();
-      return;
-    }
-
-    const message = typeof getMessage === 'function' ? getMessage() : String(getMessage || '');
-    if (message && !confirm(message)) return;
-
-    navigateAway();
+    });
   }, true);
 
   return { allowLeaveWithoutPrompt };
