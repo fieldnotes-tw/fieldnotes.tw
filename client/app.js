@@ -244,18 +244,18 @@ function renderFeedDetailMenu() {
 const catToggles = document.querySelectorAll('.cat-toggle');
 function bindCatToggle(el) {
   el.addEventListener('click', (e) => {
-    e.preventDefault();
-    const cat = el.dataset.cat;
-    const nowSelected = !selectedCats.has(cat);
-    if (nowSelected) selectedCats.add(cat); else selectedCats.delete(cat);
-    document.querySelectorAll(`.cat-toggle[data-cat="${cat}"]`).forEach((match) => {
-      match.classList.toggle('is-selected', nowSelected);
-      if (match.hasAttribute('aria-pressed')) match.setAttribute('aria-pressed', nowSelected);
-    });
-    applyFilters();
+  e.preventDefault();
+  const cat = el.dataset.cat;
+  const nowSelected = !selectedCats.has(cat);
+  if (nowSelected) selectedCats.add(cat); else selectedCats.delete(cat);
+  document.querySelectorAll(`.cat-toggle[data-cat="${cat}"]`).forEach((match) => {
+    match.classList.toggle('is-selected', nowSelected);
+    if (match.hasAttribute('aria-pressed')) match.setAttribute('aria-pressed', nowSelected);
+  });
+  applyFilters();
   });
   el.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
   });
 }
 catToggles.forEach(bindCatToggle);
@@ -691,12 +691,26 @@ function patchCardPreview(card, item) {
 
   const body = card.querySelector('.card__body');
   if (body) {
+    const title = body.querySelector('.card__title');
+    const seenText = buildCardSeenText(item.lastSeenAt);
+    const footEl = body.querySelector('.card__foot');
+    if (seenText) {
+      if (footEl) footEl.textContent = seenText;
+      else {
+        const foot = document.createElement('p');
+        foot.className = 'card__foot';
+        foot.textContent = seenText;
+        title?.insertAdjacentElement('afterend', foot);
+      }
+    } else if (footEl) {
+      footEl.remove();
+    }
+
     const locWrap = body.querySelector('.card__location');
     if (locationText) {
       if (locWrap) {
         locWrap.querySelector('.card__location-text').textContent = locationText;
       } else {
-        const title = body.querySelector('.card__title');
         const loc = document.createElement('p');
         loc.className = 'card__location';
         const pin = document.createElement('span');
@@ -707,24 +721,12 @@ function patchCardPreview(card, item) {
         text.className = 'card__location-text';
         text.textContent = locationText;
         loc.append(pin, text);
-        title?.insertAdjacentElement('afterend', loc);
+        const foot = body.querySelector('.card__foot');
+        if (foot) foot.insertAdjacentElement('afterend', loc);
+        else title?.insertAdjacentElement('afterend', loc);
       }
     } else if (locWrap) {
       locWrap.remove();
-    }
-
-    const seenText = buildCardSeenText(item.lastSeenAt);
-    const footEl = body.querySelector('.card__foot');
-    if (seenText) {
-      if (footEl) footEl.textContent = seenText;
-      else {
-        const foot = document.createElement('p');
-        foot.className = 'card__foot';
-        foot.textContent = seenText;
-        body.appendChild(foot);
-      }
-    } else if (footEl) {
-      footEl.remove();
     }
   }
 
@@ -1681,6 +1683,34 @@ function formatDetailLocationLabel(location) {
   return `📍 ${trimmed}`;
 }
 
+function primaryLocationToken(text) {
+  return String(text ?? '')
+    .replace(/^📍\s*/u, '')
+    .trim()
+    .split(/[，,]/)[0]
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function isSameLocationAsPost(item, spotLabel) {
+  if (!spotLabel?.trim()) return true;
+
+  const spotToken = primaryLocationToken(spotLabel);
+  if (!spotToken) return true;
+
+  const candidates = [
+    resolveLocationText(item),
+    item.location,
+    ...(item.spots ?? []).flatMap((spot) => [spot.label, spot.name]),
+  ];
+
+  return candidates.some((candidate) => {
+    const token = primaryLocationToken(candidate);
+    return token && token === spotToken;
+  });
+}
+
 function appendStarterDiscoveryLine(line, item) {
   const name = item.creatorName || item.observerName;
   if (!name) return false;
@@ -1748,23 +1778,16 @@ function appendDetailMeta(head, item) {
 
     head.appendChild(group);
   }
+}
 
-  if (resolveLocationText(item)) {
-    const location = document.createElement('p');
-    location.className = 'detail__subtitle detail__subtitle--location';
-    location.textContent = formatDetailLocationLabel(resolveLocationText(item));
-    head.appendChild(location);
-  }
+function buildDetailMapLocation(item) {
+  const locationText = resolveLocationText(item);
+  if (!locationText) return null;
 
-  const latest = item.recentSightings?.[0];
-  const seenAt = latest?.seenAt || item.lastSeenAt;
-  if (seenAt) {
-    const when = formatRelativeTime(seenAt) || t('home.relative.justNow');
-    const report = document.createElement('p');
-    report.className = 'detail__last-report';
-    report.textContent = t('home.card.lastReport', { time: when });
-    head.appendChild(report);
-  }
+  const location = document.createElement('p');
+  location.className = 'detail__map-location detail__subtitle detail__subtitle--location';
+  location.textContent = formatDetailLocationLabel(locationText);
+  return location;
 }
 
 function buildCardSeenText(iso) {
@@ -1827,13 +1850,13 @@ function renderCard(item, { eagerImage = false } = {}) {
       }, { once: true });
       tuneCardPhoto(img);
     } else {
-      const img = document.createElement('img');
+    const img = document.createElement('img');
       img.src = first;
-      img.alt = item.imageAlt || '';
+    img.alt = item.imageAlt || '';
       img.loading = eagerImage ? 'eager' : 'lazy';
       img.decoding = eagerImage ? 'sync' : 'async';
       img.fetchPriority = eagerImage ? 'high' : 'auto';
-      photo.appendChild(img);
+    photo.appendChild(img);
       tuneCardPhoto(img);
     }
   }
@@ -1846,9 +1869,6 @@ function renderCard(item, { eagerImage = false } = {}) {
   title.textContent = item.title;
   body.appendChild(title);
 
-  const locationText = resolveLocationText(item);
-  if (locationText) appendCardLocation(body, locationText);
-
   const seenText = buildCardSeenText(item.lastSeenAt);
   if (seenText) {
     const foot = document.createElement('p');
@@ -1856,6 +1876,9 @@ function renderCard(item, { eagerImage = false } = {}) {
     foot.textContent = seenText;
     body.appendChild(foot);
   }
+
+  const locationText = resolveLocationText(item);
+  if (locationText) appendCardLocation(body, locationText);
 
   card.append(photo, body);
 
@@ -1973,7 +1996,8 @@ function getPreferredNavSpot(item) {
 
 function getLatestSightingForSpot(item, spotId) {
   if (!spotId) return null;
-  return (item.recentSightings ?? []).find((sighting) => sighting.spotId === spotId) ?? null;
+  const matches = (item.recentSightings ?? []).filter((sighting) => sighting.spotId === spotId);
+  return sortSightingsNewestFirst(matches)[0] ?? null;
 }
 
 function resolveDetailMapPoints(item) {
@@ -1993,7 +2017,7 @@ function resolveDetailMapPoints(item) {
   const lat = Number(item?.lat);
   const lng = Number(item?.lng);
   if (Number.isFinite(lat) && Number.isFinite(lng)) {
-    const latest = item.recentSightings?.[0] ?? null;
+    const latest = sortSightingsNewestFirst(item.recentSightings ?? [])[0] ?? null;
     return [{
       id: null,
       lat,
@@ -2181,7 +2205,7 @@ function applyDetailSpotSelection(root, item, spotId) {
   });
 
   const navBtn = root.querySelector('.detail__action--nav');
-  const reportBtn = root.querySelector('.detail__action--primary');
+  const reportBtn = root.querySelector('.detail__report-link');
   const mapsUrl = googleMapsDirectionsUrl(item, spot);
   if (navBtn) {
     if (mapsUrl) {
@@ -2193,6 +2217,12 @@ function applyDetailSpotSelection(root, item, spotId) {
   }
   if (reportBtn) {
     reportBtn.href = buildSightingUrl(item.id, spotId);
+  }
+
+  const mapLocation = root.querySelector('.detail__map-location');
+  if (mapLocation) {
+    const label = spot.label || spot.name || resolveLocationText(item);
+    mapLocation.textContent = formatDetailLocationLabel(label);
   }
 
   updateDetailMapSpotSelection(root, item, spotId);
@@ -2872,12 +2902,26 @@ function buildSpotsSection(item) {
 
 function buildSightingReportLink(item) {
   const reportLink = document.createElement('a');
-  reportLink.className = 'detail__action detail__action--primary';
+  reportLink.className = 'detail__action detail__action--primary detail__report-link';
   const preferred = getPreferredNavSpot(item) || getReportedSpots(item)[0];
   reportLink.href = buildSightingUrl(item.id, preferred?.id);
   reportLink.innerHTML = `${detailActionIcon('report')}<span>${t('home.detail.iAlsoWent')}</span>`;
   reportLink.addEventListener('click', (e) => e.stopPropagation());
   return reportLink;
+}
+
+function buildDetailReportCta(item) {
+  const wrap = document.createElement('div');
+  wrap.className = 'detail__report-cta';
+  wrap.append(buildSightingReportLink(item), buildDetailReportHint());
+  return wrap;
+}
+
+function buildDetailReportHint() {
+  const hint = document.createElement('p');
+  hint.className = 'detail__report-hint';
+  hint.textContent = t('home.detail.reportElsewhereHint');
+  return hint;
 }
 
 function buildDetailTrackButton(item) {
@@ -2893,16 +2937,9 @@ function buildDetailTrackButton(item) {
   return trackBtn;
 }
 
-function buildDetailReportHint() {
-  const hint = document.createElement('p');
-  hint.className = 'detail__report-hint';
-  hint.textContent = t('home.detail.reportElsewhereHint');
-  return hint;
-}
-
 function buildDetailMapActions(item) {
   const actions = document.createElement('div');
-  actions.className = 'detail__map-actions';
+  actions.className = 'detail__map-actions detail__map-actions--nav-only';
 
   const mapsUrl = googleMapsDirectionsUrl(item);
   if (mapsUrl) {
@@ -2914,30 +2951,27 @@ function buildDetailMapActions(item) {
     navBtn.innerHTML = `${detailActionIcon('navigate')}<span>${t('home.detail.navigateShort')}</span>`;
     navBtn.addEventListener('click', (e) => e.stopPropagation());
     actions.appendChild(navBtn);
-  } else {
-    actions.classList.add('detail__map-actions--solo');
   }
-
-  const reportCol = document.createElement('div');
-  reportCol.className = 'detail__map-report-col';
-  reportCol.append(buildSightingReportLink(item), buildDetailReportHint());
-  actions.appendChild(reportCol);
 
   return actions;
 }
 
 function buildDetailMapBlock(item) {
   const mapPoints = resolveDetailMapPoints(item);
+  const location = buildDetailMapLocation(item);
   if (!mapPoints.length) {
     const wrap = document.createElement('div');
     wrap.className = 'detail__map-actions-wrap';
-    wrap.append(buildDetailMapActions(item));
+    if (location) wrap.appendChild(location);
+    const actions = buildDetailMapActions(item);
+    if (actions.childElementCount) wrap.appendChild(actions);
     wrap.classList.add('detail__actions--no-map');
     return wrap;
   }
 
   const block = document.createElement('section');
   block.className = 'detail__map-block';
+  if (location) block.appendChild(location);
 
   const previewBtn = document.createElement('button');
   previewBtn.type = 'button';
@@ -3306,8 +3340,17 @@ function buildObserversSection(item, { placement = 'inline', excludeUserId = nul
   return section;
 }
 
+function sortSightingsNewestFirst(sightings) {
+  return [...sightings].sort((a, b) => {
+    const aTime = a?.seenAt ? new Date(a.seenAt).getTime() : 0;
+    const bTime = b?.seenAt ? new Date(b.seenAt).getTime() : 0;
+    if (bTime !== aTime) return bTime - aTime;
+    return String(b.id ?? '').localeCompare(String(a.id ?? ''));
+  });
+}
+
 function buildSightingsTimeline(item) {
-  const sightings = item.recentSightings ?? [];
+  const sightings = sortSightingsNewestFirst(item.recentSightings ?? []);
 
   const wrap = document.createElement('section');
   wrap.className = 'detail__sightings';
@@ -3355,7 +3398,7 @@ function buildSightingsTimeline(item) {
     head.append(author, date);
     entry.appendChild(head);
 
-    if (sighting.spotLabel) {
+    if (sighting.spotLabel && !isSameLocationAsPost(item, sighting.spotLabel)) {
       const spot = document.createElement('p');
       spot.className = 'detail__sighting-spot';
       spot.textContent = sighting.spotLabel;
@@ -3433,13 +3476,6 @@ function buildSightingsTimeline(item) {
       wrap.appendChild(rule);
     }
   });
-
-  const reportWrap = document.createElement('div');
-  reportWrap.className = 'detail__sightings-report-wrap';
-  const reportBtn = buildSightingReportLink(item);
-  reportBtn.classList.add('detail__sightings-report');
-  reportWrap.append(reportBtn, buildDetailReportHint());
-  wrap.appendChild(reportWrap);
 
   return wrap;
 }
@@ -3548,9 +3584,13 @@ function buildDetailNodes(item) {
 
   if (item.updatedAt) markTrackUpdateSeen(item.id, item.updatedAt);
 
+  body.appendChild(buildSightingsTimeline(item));
+
   const mapBlock = buildDetailMapBlock(item);
   mapBlock.classList.add('detail__block', 'detail__block--map');
   body.appendChild(mapBlock);
+
+  body.appendChild(buildDetailReportCta(item));
 
   const extras = document.createElement('div');
   extras.className = 'detail__extras';
@@ -3572,9 +3612,7 @@ function buildDetailNodes(item) {
 
   const nodes = [photoWrap, body];
   const about = buildAboutSection(item);
-  const timeline = buildSightingsTimeline(item);
   if (about) nodes.push(about);
-  if (timeline) nodes.push(timeline);
 
   return nodes;
 }
@@ -3753,6 +3791,14 @@ function renderMapRailItem(card) {
   title.textContent = item.title;
   body.appendChild(title);
 
+  const seenText = buildCardSeenText(item.lastSeenAt);
+  if (seenText) {
+    const recent = document.createElement('p');
+    recent.className = 'map-rail__activity-recent';
+    recent.textContent = seenText;
+    body.appendChild(recent);
+  }
+
   if (resolveLocationText(item)) {
     const location = document.createElement('p');
     location.className = 'map-rail__location';
@@ -3765,14 +3811,6 @@ function renderMapRailItem(card) {
     text.textContent = resolveLocationText(item);
     location.append(pin, text);
     body.appendChild(location);
-  }
-
-  const seenText = buildCardSeenText(item.lastSeenAt);
-  if (seenText) {
-    const recent = document.createElement('p');
-    recent.className = 'map-rail__activity-recent';
-    recent.textContent = seenText;
-    body.appendChild(recent);
   }
 
   itemEl.appendChild(body);
@@ -4473,9 +4511,9 @@ document.querySelectorAll('.observer-item__toggle').forEach((btn) => {
   if (btn.dataset.bound) return;
   btn.dataset.bound = '1';
   btn.addEventListener('click', () => {
-    const item = btn.closest('.observer-item');
+  const item = btn.closest('.observer-item');
     if (!item) return;
-    const isOpen = item.classList.toggle('is-open');
+  const isOpen = item.classList.toggle('is-open');
     btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
   });
 });
@@ -4578,12 +4616,12 @@ async function loadPhenomena() {
     ]);
     let payload = payloadOrNull;
     if (!payload || bootstrapFeedLocale() !== getLocale()) {
-      const res = await fetch('/api/phenomena', {
-        headers: { 'Accept-Language': getLocale() },
+    const res = await fetch('/api/phenomena', {
+      headers: { 'Accept-Language': getLocale() },
         credentials: 'same-origin',
-        priority: 'high',
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      priority: 'high',
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
       payload = await res.json();
     }
     const items = payload.data ?? [];
@@ -4613,8 +4651,8 @@ loadWeather();
 const phenomenaBootPromise = loadPhenomena();
 
 (async () => {
-  await i18nReady;
-  formatToday();
+await i18nReady;
+formatToday();
   syncFloatingLangOptions();
   initAboutBird();
   document.addEventListener('fn:user-updated', () => {

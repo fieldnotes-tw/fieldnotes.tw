@@ -285,7 +285,35 @@ export async function cleanupOrphanSpotAfterSightingDelete(
     .where(eq(sightings.spotId, spotId));
   if ((countRow?.count ?? 0) > 0) return;
 
+  const [phenomenonSpotCount] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(spots)
+    .where(eq(spots.phenomenonId, phenomenonId));
+  // Keep at least one spot so sighting reports can reuse the phenomenon location.
+  if ((phenomenonSpotCount?.count ?? 0) <= 1) return;
+
   await db.delete(spots).where(eq(spots.id, spotId));
+}
+
+export async function ensurePrimarySpotForPhenomenon(
+  phenomenonId: string,
+  opts: {
+    location?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+    findingHint?: string | null;
+    kind?: SpotKind;
+  },
+) {
+  const existing = await getPrimarySpotId(phenomenonId);
+  if (existing) return existing;
+
+  const hasLocation = Boolean(opts.location?.trim())
+    || (opts.lat != null && opts.lng != null);
+  if (!hasLocation) return null;
+
+  const spot = await createPrimarySpotForPhenomenon(phenomenonId, opts);
+  return spot.id;
 }
 
 export async function createPrimarySpotForPhenomenon(

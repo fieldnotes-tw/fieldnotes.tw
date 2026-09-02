@@ -57,6 +57,18 @@ meRoutes.patch('/', validated('json', profileUpdateSchema), async (c) => {
       bio: users.bio,
     });
 
+  if (body.displayName !== undefined) {
+    const displayName = body.displayName.trim();
+    await db
+      .update(phenomena)
+      .set({ observerName: displayName, updatedAt: now })
+      .where(eq(phenomena.userId, user.id));
+    await db
+      .update(sightings)
+      .set({ observerName: displayName })
+      .where(eq(sightings.userId, user.id));
+  }
+
   return c.json({ data: toPublicUser(row) });
 });
 

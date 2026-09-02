@@ -55,6 +55,8 @@ jobs:
           # Set after ACM is issued; also set CREATE_DNS_RECORDS=true after legacy_github_pages=false.
           TF_VAR_use_custom_domain: ${{ vars.USE_CUSTOM_DOMAIN || 'false' }}
           TF_VAR_create_dns_records: ${{ vars.CREATE_DNS_RECORDS || 'false' }}
+          TF_VAR_line_channel_id: ${{ vars.LINE_CHANNEL_ID || '' }}
+          TF_VAR_line_channel_secret: ${{ secrets.LINE_CHANNEL_SECRET || '' }}
         run: |
           cat > backend.hcl <<EOF
           bucket = "${TF_BACKEND_BUCKET}"
