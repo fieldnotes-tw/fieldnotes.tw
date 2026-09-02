@@ -4,6 +4,7 @@ import { db } from '../db/index.js';
 import {
   attachLocationSummaries,
   buildLocationSummary,
+  ensurePrimarySpotForPhenomenon,
   filterSpotsForLocationSummary,
   formatSpotLabel,
   listSpotsWithStats,
@@ -370,7 +371,7 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
     if (observers.length >= 8) break;
   }
 
-  if (base.userId && sightingRows.length > 0) {
+  if (base.userId) {
     const [creatorUser] = await db
       .select({
         displayName: users.displayName,
@@ -431,6 +432,12 @@ export async function getPhenomenonDetail(id: string): Promise<PhenomenonDetail 
 
   const images = mergeUniqueImages(phenomenonImageList, sightingImageList);
   const imageUrls = images.map((image) => image.url);
+  await ensurePrimarySpotForPhenomenon(id, {
+    location: base.location,
+    lat: base.lat,
+    lng: base.lng,
+    findingHint: base.findingHint,
+  });
   const spotList = await listSpotsWithStats(id);
   const reportedSpots = filterSpotsForLocationSummary(spotList);
   const locationSummary = buildLocationSummary(reportedSpots) || base.location || '';

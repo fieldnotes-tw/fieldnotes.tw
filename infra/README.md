@@ -18,6 +18,25 @@ aws secretsmanager get-secret-value --region ap-east-2 \
   --secret-id fieldnotes-staging/app --query SecretString --output text | jq -r '{admin_email,admin_password}'
 ```
 
+Production uses `fieldnotes-production/app` (same `admin_email` / `admin_password` keys).
+
+### LINE Login
+
+Create a LINE Login channel and register callback URLs for each environment you use:
+
+- `https://fieldnotes.tw/api/auth/line/callback` (production)
+- `https://staging.fieldnotes.tw/api/auth/line/callback` (staging)
+- `http://127.0.0.1:3001/api/auth/line/callback` (local)
+
+In each GitHub **Environment** (`staging`, `production`), set:
+
+| Name | Type | Maps to |
+|------|------|---------|
+| `LINE_CHANNEL_ID` | Variable | `TF_VAR_line_channel_id` |
+| `LINE_CHANNEL_SECRET` | Secret | `TF_VAR_line_channel_secret` |
+
+Deploy workflows pass these into Terraform so `fieldnotes-{environment}/app` keeps `line_channel_id` and `line_channel_secret` across applies. Leave empty to disable LINE login.
+
 ### SES email
 
 SES identities are created in `ap-northeast-1` (Tokyo). **Production** owns the domain identity (`manage_ses_identity = true`); staging only looks it up so it can be destroyed without breaking mail. DKIM CNAMEs are managed in `infra/dns` from `ses_dkim_tokens` (production output). Until the domain verifies (and while the account is in the SES sandbox), confirmation mail only delivers to SES-verified recipient addresses. Request production access when ready.

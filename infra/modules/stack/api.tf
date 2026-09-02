@@ -18,8 +18,9 @@ locals {
     #!/bin/bash
     set -euo pipefail
     dnf update -y
-    dnf install -y docker nginx jq awscli
+    dnf install -y docker nginx jq awscli amazon-ssm-agent
     systemctl enable --now docker
+    systemctl enable --now amazon-ssm-agent
     usermod -aG docker ec2-user
 
     cat >/etc/nginx/conf.d/api.conf <<'NGINX'

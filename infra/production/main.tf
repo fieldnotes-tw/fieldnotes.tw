@@ -16,6 +16,19 @@ variable "create_dns_records" {
   default     = false
 }
 
+variable "line_channel_id" {
+  type        = string
+  description = "LINE Login channel ID (empty disables LINE login)"
+  default     = ""
+}
+
+variable "line_channel_secret" {
+  type        = string
+  description = "LINE Login channel secret"
+  default     = ""
+  sensitive   = true
+}
+
 data "terraform_remote_state" "dns" {
   count = var.use_custom_domain ? 1 : 0
 
@@ -47,6 +60,8 @@ module "stack" {
   domain_names        = var.use_custom_domain ? ["fieldnotes.tw", "www.fieldnotes.tw"] : []
   primary_domain      = var.use_custom_domain ? "fieldnotes.tw" : null
   create_dns_records  = var.use_custom_domain && var.create_dns_records
+  line_channel_id     = var.line_channel_id
+  line_channel_secret = var.line_channel_secret
 }
 
 output "cloudfront_domain_name" {

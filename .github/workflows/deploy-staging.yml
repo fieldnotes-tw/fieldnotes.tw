@@ -82,6 +82,8 @@ jobs:
           TF_VAR_tf_state_bucket: ${{ vars.TF_STATE_BUCKET }}
           # Set GitHub Environment variable USE_CUSTOM_DOMAIN=true after ACM is issued.
           TF_VAR_use_custom_domain: ${{ vars.USE_CUSTOM_DOMAIN || 'false' }}
+          TF_VAR_line_channel_id: ${{ vars.LINE_CHANNEL_ID || '' }}
+          TF_VAR_line_channel_secret: ${{ secrets.LINE_CHANNEL_SECRET || '' }}
         run: |
           cat > backend.hcl <<EOF
           bucket = "${TF_BACKEND_BUCKET}"
