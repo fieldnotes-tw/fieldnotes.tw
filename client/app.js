@@ -781,22 +781,82 @@ function patchMapRailPreview(card, item) {
 }
 
 const REFRESH_PHENOMENON_KEY = 'fieldnotes.refreshPhenomenon';
-let pendingDeepLinkSpotId = null;
 
-function captureDeepLinkSpotId() {
-  const params = new URLSearchParams(location.search);
-  const spotId = params.get('spot');
-  if (!spotId) return;
-  pendingDeepLinkSpotId = spotId;
-  params.delete('spot');
-  const qs = params.toString();
-  history.replaceState(null, '', `${location.pathname}${qs ? `?${qs}` : ''}${location.hash}`);
+function buildPhenomenonShareUrl(phenomenonId, spotId) {
+  const params = new URLSearchParams({ phenomenon: phenomenonId });
+  if (spotId) params.set('spot', spotId);
+  return `${location.origin}${location.pathname}?${params.toString()}`;
 }
 
-function consumePendingDeepLinkSpotId() {
-  const spotId = pendingDeepLinkSpotId;
-  pendingDeepLinkSpotId = null;
-  return spotId;
+function syncDetailShareUrl(phenomenonId, spotId) {
+  if (!phenomenonId) return;
+  const params = new URLSearchParams({ phenomenon: phenomenonId });
+  if (spotId) params.set('spot', spotId);
+  const next = `${location.pathname}?${params.toString()}${location.hash}`;
+  const current = `${location.pathname}${location.search}${location.hash}`;
+  if (next === current) return;
+  history.replaceState({ phenomenonId, spotId: spotId || null }, '', next);
+}
+
+function clearDetailShareUrl() {
+  const bare = `${location.pathname}${location.hash}`;
+  const current = `${location.pathname}${location.search}${location.hash}`;
+  if (current === bare) return;
+  history.replaceState(null, '', bare);
+}
+
+function readDeepLinkSpotId() {
+  return new URLSearchParams(location.search).get('spot');
+}
+
+async function sharePhenomenonLink(phenomenonId, spotId, btn) {
+  const url = buildPhenomenonShareUrl(phenomenonId, spotId);
+  const item = phenomenonCache.get(phenomenonId);
+  const title = item?.title || document.title;
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, url });
+      return;
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    if (!btn) return;
+    btn.classList.add('is-copied');
+    btn.setAttribute('aria-label', t('home.detail.linkCopied'));
+    window.setTimeout(() => {
+      btn.classList.remove('is-copied');
+      btn.setAttribute('aria-label', t('home.detail.share'));
+    }, 2000);
+  } catch {
+    window.prompt(t('home.detail.sharePrompt'), url);
+  }
+}
+
+async function ensureCardForPhenomenon(id) {
+  let card = cards.find((entry) => entry.dataset.id === id);
+  if (card) return card;
+
+  const item = await ensurePhenomenonDetail(id);
+  if (!item) return null;
+
+  card = cards.find((entry) => entry.dataset.id === id);
+  if (card) return card;
+
+  card = renderCard(item);
+  card.classList.add('is-filtered-out');
+  card.dataset.deepLink = '1';
+  gridFeed.appendChild(card);
+  cards.push(card);
+  card.addEventListener('click', () => openCardDetail(card));
+  return card;
+}
+
+async function openPhenomenonById(id) {
+  const card = await ensureCardForPhenomenon(id);
+  if (card) openCardDetail(card);
 }
 
 async function ensurePhenomenonDetail(id, { force = false } = {}) {
@@ -1089,6 +1149,48 @@ function bindGalleryTrackDrag(track, cells, onCellTap) {
 
   track.addEventListener('pointerup', finishDrag);
   track.addEventListener('pointercancel', () => {
+    drag = null;
+  });
+}
+
+function bindHorizontalPhotoStrip(strip) {
+  if (!strip || strip.children.length <= 1) return;
+
+  let drag = null;
+
+  strip.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    drag = {
+      startX: e.clientX,
+      scrollLeft: strip.scrollLeft,
+      moved: false,
+      pointerId: e.pointerId,
+    };
+    strip.setPointerCapture(e.pointerId);
+  });
+
+  strip.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    const dx = e.clientX - drag.startX;
+    if (!drag.moved) {
+      if (Math.abs(dx) < GALLERY_TAP_MOVE_PX) return;
+      drag.moved = true;
+    }
+    strip.scrollLeft = drag.scrollLeft - dx;
+    e.preventDefault();
+  });
+
+  const finishDrag = (e) => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    if (strip.hasPointerCapture(e.pointerId)) {
+      strip.releasePointerCapture(e.pointerId);
+    }
+    if (drag.moved) mapSheetGestureMoved = true;
+    drag = null;
+  };
+
+  strip.addEventListener('pointerup', finishDrag);
+  strip.addEventListener('pointercancel', () => {
     drag = null;
   });
 }
@@ -1647,6 +1749,7 @@ function debouncedCenterMapOnCard(card) {
 
 function syncFocusedFromDetailScroll(card) {
   setFocusedCard(card);
+  syncDetailShareUrl(card.dataset.id, readDeepLinkSpotId());
   updateDetailHeaderTitle(card);
   if (!mapView.classList.contains('is-hidden')) {
     const entry = findMarkerEntry(card);
@@ -2226,6 +2329,8 @@ function applyDetailSpotSelection(root, item, spotId) {
   }
 
   updateDetailMapSpotSelection(root, item, spotId);
+  syncDetailShareUrl(item.id, spotId);
+  updateDetailReportFabSpot(spotId);
 }
 
 function initDetailSpotSelection(root, item) {
@@ -2233,7 +2338,7 @@ function initDetailSpotSelection(root, item) {
   if (!spots.length) return;
 
   let defaultId = getPreferredNavSpot(item)?.id || spots[0].id;
-  const preferredFromLink = consumePendingDeepLinkSpotId();
+  const preferredFromLink = readDeepLinkSpotId();
   if (preferredFromLink && spots.some((spot) => spot.id === preferredFromLink)) {
     defaultId = preferredFromLink;
   }
@@ -2262,6 +2367,7 @@ function finishDetailMount(root, item) {
   if (item && !canEditPhenomenon(item)) {
     root?.querySelectorAll('.detail__edit-btn').forEach((btn) => btn.remove());
   }
+  syncDetailReportFab(item);
 }
 
 function initDetailMiniMap(canvas) {
@@ -2361,6 +2467,7 @@ function closeDetailMapOverlay() {
   detailMapOverlayItem = null;
   detailMapOverlayPoints = [];
   detailMapOverlayEl.querySelector('.detail-map-overlay__canvas')?.replaceChildren();
+  syncDetailReportFab(detailReportFabItem);
 }
 
 function findDetailRootsForPhenomenon(phenomenonId) {
@@ -2552,7 +2659,7 @@ function ensureDetailMapOverlay() {
 
   const reportBtn = document.createElement('a');
   reportBtn.className = 'detail__action detail__action--primary detail-map-overlay__action--report';
-  reportBtn.innerHTML = `${detailActionIcon('report')}<span>${t('home.detail.iAlsoWent')}</span>`;
+  reportBtn.innerHTML = `${detailActionIcon('report')}<span>${t('home.detail.reportStatus')}</span>`;
 
   actions.append(navBtn, reportBtn);
   panel.append(list, info, actions);
@@ -2589,6 +2696,7 @@ async function openDetailMapOverlay(item, selectedSpotId) {
   overlay.hidden = false;
   detailMapOverlayScrollLock = document.body.style.overflow;
   document.body.style.overflow = 'hidden';
+  syncDetailReportFab(detailReportFabItem);
   overlay.querySelector('.detail-map-overlay__close')?.focus();
 
   if (detailMapOverlayMap) {
@@ -2849,7 +2957,27 @@ function detailActionIcon(type, { filled = false } = {}) {
   if (type === 'edit') {
     return '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 20 H14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" fill="none"/></svg>';
   }
+  if (type === 'share') {
+    return '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M12 16V4m0 0 4 4m-4-4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
+  }
   return '';
+}
+
+function buildDetailShareButton(item) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'detail__share-btn';
+  btn.setAttribute('aria-label', t('home.detail.share'));
+  btn.innerHTML = detailActionIcon('share');
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const root = btn.closest('.feed-detail__section')
+      || btn.closest('.map-sheet__body')
+      || btn.closest('.card-modal__body');
+    const spotId = root?.querySelector('.detail__hero')?.dataset.selectedSpotId || readDeepLinkSpotId();
+    void sharePhenomenonLink(item.id, spotId, btn);
+  });
+  return btn;
 }
 
 function buildSpotsSection(item) {
@@ -2905,7 +3033,7 @@ function buildSightingReportLink(item) {
   reportLink.className = 'detail__action detail__action--primary detail__report-link';
   const preferred = getPreferredNavSpot(item) || getReportedSpots(item)[0];
   reportLink.href = buildSightingUrl(item.id, preferred?.id);
-  reportLink.innerHTML = `${detailActionIcon('report')}<span>${t('home.detail.iAlsoWent')}</span>`;
+  reportLink.innerHTML = `${detailActionIcon('report')}<span>${t('home.detail.reportStatus')}</span>`;
   reportLink.addEventListener('click', (e) => e.stopPropagation());
   return reportLink;
 }
@@ -2915,6 +3043,43 @@ function buildDetailReportCta(item) {
   wrap.className = 'detail__report-cta';
   wrap.append(buildSightingReportLink(item), buildDetailReportHint());
   return wrap;
+}
+
+let detailReportFab = null;
+let detailReportFabItem = null;
+
+function ensureDetailReportFab() {
+  if (detailReportFab) return detailReportFab;
+  detailReportFab = document.createElement('a');
+  detailReportFab.className = 'detail-report-fab';
+  detailReportFab.hidden = true;
+  detailReportFab.addEventListener('click', (e) => e.stopPropagation());
+  document.body.appendChild(detailReportFab);
+  return detailReportFab;
+}
+
+function isDetailMapOverlayOpen() {
+  return Boolean(detailMapOverlayEl && !detailMapOverlayEl.hidden);
+}
+
+function syncDetailReportFab(item = null) {
+  detailReportFabItem = item;
+  const fab = ensureDetailReportFab();
+  const sheetDetailOpen = usesSheetDetail()
+    && mapSheet.classList.contains('is-open')
+    && mapSheet.classList.contains('is-expanded');
+  const show = Boolean(item && sheetDetailOpen && !isDetailMapOverlayOpen());
+  fab.hidden = !show;
+  document.body.classList.toggle('has-detail-report-fab', show);
+  if (!show) return;
+  const preferred = getPreferredNavSpot(item) || getReportedSpots(item)[0];
+  fab.href = buildSightingUrl(item.id, preferred?.id);
+  fab.textContent = t('home.detail.reportStatus');
+}
+
+function updateDetailReportFabSpot(spotId) {
+  if (!detailReportFab || detailReportFab.hidden || !detailReportFabItem) return;
+  detailReportFab.href = buildSightingUrl(detailReportFabItem.id, spotId);
 }
 
 function buildDetailReportHint() {
@@ -3351,6 +3516,7 @@ function sortSightingsNewestFirst(sightings) {
 
 function buildSightingsTimeline(item) {
   const sightings = sortSightingsNewestFirst(item.recentSightings ?? []);
+  if (!sightings.length) return null;
 
   const wrap = document.createElement('section');
   wrap.className = 'detail__sightings';
@@ -3359,13 +3525,6 @@ function buildSightingsTimeline(item) {
   heading.className = 'detail__section-title detail__section-title--sightings';
   heading.textContent = t('home.detail.recentSightings');
   wrap.appendChild(heading);
-
-  if (!sightings.length) {
-    const empty = document.createElement('p');
-    empty.className = 'detail__sightings-empty';
-    empty.textContent = t('home.detail.recentSightingsEmpty');
-    wrap.appendChild(empty);
-  }
 
   sightings.forEach((sighting, index) => {
     const entry = document.createElement('article');
@@ -3466,6 +3625,7 @@ function buildSightingsTimeline(item) {
         }
         photos.appendChild(item);
       });
+      if (urls.length > 1) bindHorizontalPhotoStrip(photos);
       entry.appendChild(photos);
     }
 
@@ -3558,6 +3718,7 @@ function buildDetailNodes(item) {
 
   const titleActions = document.createElement('div');
   titleActions.className = 'detail__title-actions';
+  titleActions.appendChild(buildDetailShareButton(item));
   titleActions.appendChild(buildDetailTrackButton(item));
   if (canEditPhenomenon(item)) {
     const editLink = document.createElement('a');
@@ -3584,7 +3745,8 @@ function buildDetailNodes(item) {
 
   if (item.updatedAt) markTrackUpdateSeen(item.id, item.updatedAt);
 
-  body.appendChild(buildSightingsTimeline(item));
+  const sightingsSection = buildSightingsTimeline(item);
+  if (sightingsSection) body.appendChild(sightingsSection);
 
   const mapBlock = buildDetailMapBlock(item);
   mapBlock.classList.add('detail__block', 'detail__block--map');
@@ -3662,6 +3824,7 @@ function navigateMapSheetPin(step) {
   if (!entry) return;
 
   setFocusedCard(nextCard);
+  syncDetailShareUrl(nextCard.dataset.id, readDeepLinkSpotId());
   setActiveMapPin(entry.marker);
   if (mapSheet.classList.contains('is-expanded')) {
     void ensurePhenomenonDetail(nextCard.dataset.id).then((item) => {
@@ -4071,6 +4234,7 @@ function openPhoneDetailSheet(card, { mode = 'expanded', pan = false, marker = n
   hideCardModal();
   hideSplitDetail();
   setFocusedCard(card);
+  syncDetailShareUrl(card.dataset.id, readDeepLinkSpotId());
   if (marker) setActiveMapPin(marker);
   else if (mode === 'expanded' && mapView.classList.contains('is-hidden')) clearMapPinActive();
 
@@ -4136,6 +4300,8 @@ function hideMapSheet() {
 }
 
 function closeMapSheet() {
+  clearDetailShareUrl();
+  syncDetailReportFab(null);
   hideMapSheet();
   if (!feedStage.classList.contains('is-detail-open')) setFocusedCard(null);
 }
@@ -4222,7 +4388,7 @@ function bindMapSheetSwipe(el, { trackAxis = false } = {}) {
     if (!usesSheetDetail() || !mapSheet.classList.contains('is-open')) return;
     mapSheetTouchStartX = e.touches[0].clientX;
     mapSheetTouchStartY = e.touches[0].clientY;
-    mapSheetTouchOnGallery = Boolean(e.target.closest('.photo-mosaic'));
+    mapSheetTouchOnGallery = Boolean(e.target.closest('.photo-mosaic, .detail__sighting-photos'));
     mapSheetTouchOnPeekNav = Boolean(e.target.closest('.map-sheet__peek-nav-btn'));
     mapSheetTouchAxis = '';
   }, { passive: true });
@@ -4249,7 +4415,7 @@ let mapSheetTapStartX = 0;
 let mapSheetTapStartY = 0;
 function tryExpandMapSheetFromTap(e) {
   if (!mapSheetPeekOpen()) return;
-  if (e.target.closest('a, button, .detail__map-preview, .detail__edit-btn, .detail__map-actions, .map-sheet__peek-nav-btn, .detail__action--track')) return;
+  if (e.target.closest('a, button, .detail__map-preview, .detail__edit-btn, .detail__share-btn, .detail__map-actions, .map-sheet__peek-nav-btn, .detail__action--track')) return;
   expandMapSheet();
 }
 mapSheetBody?.addEventListener('click', (e) => {
@@ -4376,6 +4542,7 @@ function openSplitDetail(card) {
   hideCardModal();
   hideMapSheet();
   setFocusedCard(card);
+  syncDetailShareUrl(card.dataset.id, readDeepLinkSpotId());
   updateDetailHeaderTitle(card);
   feedDetailPane.setAttribute('aria-hidden', 'false');
   feedStage.classList.add('is-detail-open');
@@ -4407,6 +4574,8 @@ function closeSplitDetail() {
     return;
   }
   if (!focusedCard && !feedStage.classList.contains('is-detail-open')) return;
+  clearDetailShareUrl();
+  syncDetailReportFab(null);
   const returnToMap = usesSheetDetail() && !mapView.classList.contains('is-hidden');
   hideSplitDetail();
   if (!returnToMap) clearMapPinActive();
@@ -4432,6 +4601,7 @@ function resetHomeView() {
 }
 
 function openCardDetail(card) {
+  syncDetailShareUrl(card.dataset.id, readDeepLinkSpotId());
   if (usesSheetDetail()) {
     const inMap = !mapView.classList.contains('is-hidden');
     const entry = inMap ? findMarkerEntry(card) : null;
@@ -4462,6 +4632,7 @@ function hideCardModal() {
   cardModal.classList.remove('is-open');
 }
 function closeCardModal() {
+  clearDetailShareUrl();
   hideCardModal();
   setFocusedCard(null);
 }
@@ -4663,14 +4834,12 @@ formatToday();
     : Promise.resolve();
   await Promise.all([phenomenaBootPromise, userPromise]);
   void syncTrackedFromServer();
-  captureDeepLinkSpotId();
   const deepLinkId = new URLSearchParams(location.search).get('phenomenon');
   if (deepLinkId && sessionStorage.getItem(REFRESH_PHENOMENON_KEY) === deepLinkId) {
     await ensurePhenomenonDetail(deepLinkId);
   }
   if (deepLinkId) {
-    const card = cards.find((c) => c.dataset.id === deepLinkId);
-    if (card) openCardDetail(card);
+    await openPhenomenonById(deepLinkId);
   }
   updateDetailRailBtn();
 })();

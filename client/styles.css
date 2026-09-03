@@ -1912,7 +1912,8 @@ html[lang="en"] .sitehead__menu-oval{
 .detail__actions--no-map{
   margin-top:0;
 }
-.detail__edit-btn{
+.detail__edit-btn,
+.detail__share-btn{
   flex:0 0 auto;
   display:inline-flex; align-items:center; justify-content:center;
   width:var(--btn-h-compact); height:var(--btn-h-compact);
@@ -1924,12 +1925,22 @@ html[lang="en"] .sitehead__menu-oval{
   color:var(--ink-soft);
   text-decoration:none;
 }
-.detail__edit-btn:hover{
+.detail__share-btn{
+  cursor:pointer;
+  font:inherit;
+}
+.detail__edit-btn:hover,
+.detail__share-btn:hover{
   color:var(--ink);
   border-color:color-mix(in srgb, var(--ink) 34%, transparent);
   background:var(--map-ground);
 }
-.detail__edit-btn svg{ display:block; }
+.detail__share-btn.is-copied{
+  color:var(--ink);
+  border-color:var(--ink);
+}
+.detail__edit-btn svg,
+.detail__share-btn svg{ display:block; }
 .detail__section-title--observers{
   margin:0 0 0.75rem;
 }
@@ -2453,6 +2464,55 @@ html[lang="en"] .sitehead__menu-oval{
   margin:0;
   text-align:center;
 }
+.detail-report-fab{
+  position:fixed;
+  left:50%;
+  bottom:calc(1rem + env(safe-area-inset-bottom, 0px));
+  transform:translateX(-50%);
+  z-index:1305;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:var(--btn-h-primary);
+  padding:0 var(--btn-px-primary);
+  border-radius:var(--btn-radius);
+  border:1.5px solid var(--ink);
+  background:var(--ink);
+  color:var(--ground);
+  font-size:var(--btn-fs-primary);
+  font-weight:var(--btn-primary-weight);
+  line-height:var(--btn-primary-lh);
+  text-decoration:none;
+  box-shadow:0 4px 18px rgba(0,0,0,0.18);
+  white-space:nowrap;
+}
+.detail-report-fab[hidden]{ display:none !important; }
+body.has-detail-report-fab .map-sheet.is-open.is-expanded .map-sheet__body{
+  padding-bottom:5.25rem;
+}
+@media (max-width:1199px){
+  .detail__report-cta{ display:none; }
+  body.has-detail-report-fab::before{
+    content:"";
+    position:fixed;
+    left:0;
+    right:0;
+    bottom:0;
+    z-index:1304;
+    height:calc(5.75rem + env(safe-area-inset-bottom, 0px));
+    pointer-events:none;
+    background:linear-gradient(to top, var(--ground) 45%, color-mix(in srgb, var(--ground) 72%, transparent) 72%, transparent);
+  }
+  .detail-report-fab{
+    min-height:3.5rem;
+    padding:0 1.75rem;
+    font-size:1rem;
+    font-weight:700;
+  }
+}
+@media (min-width:1200px){
+  .detail-report-fab{ display:none !important; }
+}
 .detail__sightings,
 .detail__about,
 .detail__observers-section{
@@ -2569,6 +2629,12 @@ html[lang="en"] .sitehead__menu-oval{
   display:flex; gap:0.4rem; overflow-x:auto; padding-bottom:0.05rem; margin-top:0.1rem;
   -webkit-overflow-scrolling:touch;
   overscroll-behavior-x:contain;
+  touch-action:pan-x;
+  scrollbar-width:none;
+}
+.detail__sighting-photos::-webkit-scrollbar{ display:none; }
+.map-sheet.is-open.is-expanded .map-sheet__body .detail__sighting-photos{
+  touch-action:pan-x;
 }
 .detail__sighting-photo-item{
   padding:0; border:none; background:none; cursor:pointer; flex:0 0 auto;
